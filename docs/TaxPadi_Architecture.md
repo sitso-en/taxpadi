@@ -62,7 +62,7 @@ Before any code is written every team member needs the same tools installed and 
 **Frontend team additionally needs:**
 - VS Code — better than IntelliJ for React Native work.
 - Expo Go app installed on a physical Android or iOS phone.
-- Run `npm install -g expo-cli` once after Node.js is installed.
+- Use `npx expo` for Expo commands instead of installing `expo-cli` globally.
 
 ---
 
