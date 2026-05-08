@@ -1,7 +1,5 @@
 # taxpadi
 
-# TaxPadi
-
 > **Because GRA doesn't forget.**
 
 TaxPadi is a mobile-first personal tax management platform built for Ghana's self-employed individuals, freelancers, traders, and small business owners. It gives users a complete system for tracking income and expenses, understanding their tax liability in real time, saving toward their tax bill, filing returns, and paying taxes, all from their phone.
