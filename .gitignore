@@ -41,6 +41,12 @@ mobile/*.mobileprovision
 *.env
 !.env.example
 
+# Application properties (contains secrets)
+backend/api/src/main/resources/application.properties
+
 # OS files
 .DS_Store
-Thumbs.db
+
+Thumbs.db.claude/
+CLAUDE.md
+.claude/
