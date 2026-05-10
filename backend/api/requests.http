@@ -1,0 +1,129 @@
+### TaxPadi API Requests
+### Base URL: http://localhost:8080
+
+@baseUrl = http://localhost:8080
+
+
+### ============================================================
+### GROUP 1 — AUTH
+### ============================================================
+
+
+### 1. Register
+POST {{baseUrl}}/api/v1/auth/register
+Content-Type: application/json
+
+{
+  "full_name": "Kwame Mensah",
+  "phone": "+233201234567",
+  "email": "kwame@example.com",
+  "password": "Secret123!",
+  "region": "Ashanti",
+  "taxpayer_category": "INDIVIDUAL"
+}
+
+
+### 2. Verify OTP
+POST {{baseUrl}}/api/v1/auth/verify-otp
+Content-Type: application/json
+
+{
+  "phone": "+233201234567",
+  "otp_code": "123456",
+  "purpose": "REGISTER"
+}
+
+
+### 3. Resend OTP
+POST {{baseUrl}}/api/v1/auth/resend-otp
+Content-Type: application/json
+
+{
+  "phone": "+233201234567",
+  "purpose": "REGISTER"
+}
+
+
+### 4. Login
+POST {{baseUrl}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "phone": "+233201234567",
+  "password": "Secret123!",
+  "device_info": "Bruno Test Client"
+}
+
+
+### 5. Refresh Token
+POST {{baseUrl}}/api/v1/auth/refresh
+Content-Type: application/json
+
+{
+  "refresh_token": "paste-refresh-token-from-login-response-here"
+}
+
+
+### 6. Logout
+POST {{baseUrl}}/api/v1/auth/logout
+Content-Type: application/json
+
+{
+  "refresh_token": "paste-refresh-token-from-login-response-here"
+}
+
+
+### 7. Register Biometric (requires Bearer token)
+POST {{baseUrl}}/api/v1/auth/biometric/register
+Content-Type: application/json
+Authorization: Bearer paste-access-token-from-login-response-here
+
+{
+  "biometric_token": "test-biometric-token-abc123",
+  "device_info": "Bruno Test Client"
+}
+
+
+### 8. Biometric Login
+POST {{baseUrl}}/api/v1/auth/biometric/login
+Content-Type: application/json
+
+{
+  "biometric_token": "test-biometric-token-abc123",
+  "device_info": "Bruno Test Client"
+}
+
+
+### ============================================================
+### GROUP 2 — PASSWORD
+### ============================================================
+
+
+### 1. Forgot Password
+POST {{baseUrl}}/api/v1/auth/forgot-password
+Content-Type: application/json
+
+{
+  "phone": "+233599744646"
+}
+
+
+### 2. Verify Reset OTP
+POST {{baseUrl}}/api/v1/auth/verify-reset-otp
+Content-Type: application/json
+
+{
+  "phone": "+233599744646",
+  "otp_code": "965842"
+}
+
+
+### 3. Reset Password
+POST {{baseUrl}}/api/v1/auth/reset-password
+Content-Type: application/json
+
+{
+  "reset_token": "paste-reset-token-from-verify-reset-otp-response-here",
+  "new_password": "NewSecret123!",
+  "confirm_password": "NewSecret123!"
+}
