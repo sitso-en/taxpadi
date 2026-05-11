@@ -22,3 +22,31 @@
 # virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
 hs_err_pid*
 replay_pid*
+
+
+# Mobile (React Native / Expo)
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
+mobile/build/
+mobile/.env
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
+
+# Environment files
+.env
+*.env
+!.env.example
+
+# Application properties (contains secrets)
+backend/api/src/main/resources/application.properties
+
+# OS files
+.DS_Store
+
+Thumbs.db.claude/
+CLAUDE.md
+.claude/

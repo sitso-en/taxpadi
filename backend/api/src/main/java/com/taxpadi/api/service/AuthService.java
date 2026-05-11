@@ -1,0 +1,471 @@
+package com.taxpadi.api.service;
+
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.LocalDateTime;
+import java.util.HexFormat;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.taxpadi.api.dto.auth.BiometricLoginRequest;
+import com.taxpadi.api.dto.auth.BiometricLoginResponse;
+import com.taxpadi.api.dto.auth.LoginRequest;
+import com.taxpadi.api.dto.auth.LoginResponse;
+import com.taxpadi.api.dto.auth.LogoutResponse;
+import com.taxpadi.api.dto.auth.RefreshTokenRequest;
+import com.taxpadi.api.dto.auth.RefreshTokenResponse;
+import com.taxpadi.api.dto.auth.RegisterBiometricRequest;
+import com.taxpadi.api.dto.auth.RegisterBiometricResponse;
+import com.taxpadi.api.dto.auth.RegisterRequest;
+import com.taxpadi.api.dto.auth.RegisterResponse;
+import com.taxpadi.api.dto.auth.ResendOtpRequest;
+import com.taxpadi.api.dto.auth.ResendOtpResponse;
+import com.taxpadi.api.dto.auth.UserSummary;
+import com.taxpadi.api.dto.auth.VerifyOtpRequest;
+import com.taxpadi.api.dto.auth.VerifyOtpResponse;
+import com.taxpadi.api.dto.auth.VerifyResetOtpResponse;
+import com.taxpadi.api.exception.ConflictException;
+import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.model.DeviceToken;
+import com.taxpadi.api.model.OtpPurpose;
+import com.taxpadi.api.model.OtpVerification;
+import com.taxpadi.api.model.RefreshToken;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.model.UserTaxProfile;
+import com.taxpadi.api.repository.DeviceTokenRepository;
+import com.taxpadi.api.repository.OtpVerificationRepository;
+import com.taxpadi.api.repository.RefreshTokenRepository;
+import com.taxpadi.api.repository.UserRepository;
+import com.taxpadi.api.repository.UserTaxProfileRepository;
+
+import io.jsonwebtoken.Claims;
+
+@Service
+public class AuthService {
+    private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+
+    private final UserTaxProfileRepository userTaxProfileRepository;
+    private final UserRepository userRepository;
+    private final OtpVerificationRepository otpVerificationRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final DeviceTokenRepository deviceTokenRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final SmsService smsService;
+    private final JwtService jwtService;
+
+    public AuthService(UserRepository userRepository, OtpVerificationRepository otpVerificationRepository,
+        UserTaxProfileRepository userTaxProfileRepository, RefreshTokenRepository refreshTokenRepository,
+        DeviceTokenRepository deviceTokenRepository,
+        BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService
+    ){
+        this.userRepository = userRepository;
+        this.userTaxProfileRepository = userTaxProfileRepository;
+        this.otpVerificationRepository = otpVerificationRepository;
+        this.refreshTokenRepository = refreshTokenRepository;
+        this.deviceTokenRepository = deviceTokenRepository;
+        this.passwordEncoder = bCryptPasswordEncoder;
+        this.smsService = smsService;
+        this.jwtService = jwtService;
+    }
+
+
+    public RegisterResponse register(RegisterRequest request){
+        String phone = request.getPhone();
+        String email = request.getEmail();
+        log.info("Registration attempt for phone={}", phone);
+
+        if(userRepository.findByPhone(phone).isPresent()){
+            log.warn("Registration failed — phone already taken: {}", phone);
+            throw new ConflictException("Phone number is already taken");
+        }
+
+        if(userRepository.findByEmail(email).isPresent()){
+            log.warn("Registration failed — email already taken: {}", email);
+            throw new ConflictException("Email is already taken");
+        }
+
+        String hashedPassword = passwordEncoder.encode(request.getPassword());
+
+        User user = new User();
+        user.setFullName(request.getFullName());
+        user.setPhone(phone);
+        user.setEmail(email);
+        user.setRegion(request.getRegion());
+        user.setTaxpayerCategory(request.getTaxpayerCategory());
+        user.setPasswordHash(hashedPassword);
+
+        userRepository.save(user);
+        log.info("User saved: userId={}, phone={}", user.getUserId(), phone);
+
+        UserTaxProfile profile = new UserTaxProfile();
+        profile.setUser(user);
+        userTaxProfileRepository.save(profile);
+        log.debug("Tax profile created for userId={}", user.getUserId());
+
+        String otpCode = String.valueOf((int)(Math.random()*900000) + 100000);
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
+
+        OtpVerification otp = new OtpVerification();
+        otp.setUser(user);
+        otp.setOtpCode(otpCode);
+        otp.setPurpose(OtpPurpose.REGISTER);
+        otp.setExpiresAt(expiresAt);
+        otpVerificationRepository.save(otp);
+        log.debug("OTP saved for userId={}, expiresAt={}", user.getUserId(), expiresAt);
+
+        smsService.sendOtp(phone, otpCode);
+        log.info("Registration complete for userId={}, OTP dispatched to phone={}", user.getUserId(), phone);
+
+        return new RegisterResponse(user.getUserId(),
+                user.getPhone(),
+                "OTP sent to your phone number"
+        );
+    }
+
+    public VerifyOtpResponse verifyOtp(VerifyOtpRequest request) {
+        String phone = request.getPhone();
+        OtpPurpose purpose = request.getPurpose();
+        log.info("OTP verification attempt for phone={}, purpose={}", phone, purpose);
+
+        User user = userRepository.findByPhone(phone)
+                .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
+
+        OtpVerification otp = otpVerificationRepository
+                .findByPurposeAndUserAndUsed(purpose, user, false)
+                .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
+
+        if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("OTP expired for userId={}", user.getUserId());
+            throw new IllegalStateException("OTP has expired. Please request a new one");
+        }
+
+        if (!otp.getOtpCode().equals(request.getOtpCode())) {
+            log.warn("Invalid OTP code submitted for userId={}", user.getUserId());
+            throw new IllegalArgumentException("Invalid OTP code");
+        }
+
+        otp.setUsed(true);
+        otpVerificationRepository.save(otp);
+
+        if (purpose == OtpPurpose.REGISTER) {
+            user.setVerified(true);
+            userRepository.save(user);
+            log.info("Account verified for userId={}", user.getUserId());
+        }
+
+        log.info("OTP verified successfully for userId={}, purpose={}", user.getUserId(), purpose);
+        return new VerifyOtpResponse(true, purpose);
+    }
+
+    @Transactional
+    public ResendOtpResponse resendOtp(ResendOtpRequest request) {
+        String phone = request.getPhone();
+        OtpPurpose purpose = request.getPurpose();
+        log.info("Resend OTP request for phone={}, purpose={}", phone, purpose);
+
+        User user = userRepository.findByPhone(phone)
+                .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
+
+        if (purpose == OtpPurpose.REGISTER && user.isVerified()) {
+            log.warn("Resend OTP for already-verified userId={}", user.getUserId());
+            throw new ConflictException("Account is already verified");
+        }
+
+        otpVerificationRepository.invalidateActiveOtps(user, purpose);
+        log.debug("Invalidated active OTPs for userId={}, purpose={}", user.getUserId(), purpose);
+
+        String otpCode = String.valueOf((int)(Math.random() * 900000) + 100000);
+        LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
+
+        OtpVerification otp = new OtpVerification();
+        otp.setUser(user);
+        otp.setOtpCode(otpCode);
+        otp.setPurpose(purpose);
+        otp.setExpiresAt(expiresAt);
+        otpVerificationRepository.save(otp);
+        log.debug("New OTP saved for userId={}, expiresAt={}", user.getUserId(), expiresAt);
+
+        smsService.sendOtp(phone, otpCode);
+        log.info("OTP resent to phone={} for purpose={}", phone, purpose);
+
+        return new ResendOtpResponse(phone, 10);
+    }
+
+    public LoginResponse login(LoginRequest request) {
+        String phone = request.getPhone();
+        log.info("Login attempt for phone={}", phone);
+
+        User user = userRepository.findByPhone(phone)
+                .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
+
+        if (!user.isActive()) {
+            log.warn("Login attempt on deactivated account userId={}", user.getUserId());
+            throw new IllegalStateException("Account is deactivated. Please contact support");
+        }
+
+        if (!user.isVerified()) {
+            log.warn("Login attempt on unverified account userId={}", user.getUserId());
+            throw new IllegalStateException("Account is not verified. Please verify your phone number first");
+        }
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
+            log.warn("Invalid password for userId={}", user.getUserId());
+            throw new IllegalArgumentException("Invalid phone number or password");
+        }
+
+        String accessToken = jwtService.generateAccessToken(user);
+
+        String rawRefreshToken = UUID.randomUUID().toString();
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(hashToken(rawRefreshToken));
+        refreshToken.setDeviceInfo(request.getDeviceInfo());
+        refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
+        refreshTokenRepository.save(refreshToken);
+
+        log.info("Login successful for userId={}", user.getUserId());
+
+        UserSummary userSummary = new UserSummary(
+                user.getUserId(),
+                user.getFullName(),
+                user.getPhone(),
+                user.getSubscriptionTier().name(),
+                false
+        );
+
+        return new LoginResponse(accessToken, rawRefreshToken, "Bearer", 900, false, userSummary);
+    }
+
+    public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
+        String hash = hashToken(request.getRefreshToken());
+        log.info("Refresh token attempt");
+
+        RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+
+        if (token.getRevoked()) {
+            log.warn("Revoked refresh token used for userId={}", token.getUser().getUserId());
+            throw new IllegalArgumentException("Refresh token has been revoked");
+        }
+
+        if (token.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("Expired refresh token used for userId={}", token.getUser().getUserId());
+            throw new IllegalArgumentException("Refresh token has expired. Please log in again");
+        }
+
+        String newAccessToken = jwtService.generateAccessToken(token.getUser());
+        log.info("Access token refreshed for userId={}", token.getUser().getUserId());
+
+        return new RefreshTokenResponse(newAccessToken, "Bearer", 900);
+    }
+
+    public LogoutResponse logout(RefreshTokenRequest request) {
+        String hash = hashToken(request.getRefreshToken());
+        log.info("Logout attempt");
+
+        RefreshToken token = refreshTokenRepository.findByTokenHash(hash)
+                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+
+        if (token.getRevoked()) {
+            log.warn("Already-revoked token used in logout for userId={}", token.getUser().getUserId());
+            throw new IllegalArgumentException("Refresh token already revoked");
+        }
+
+        token.setRevoked(true);
+        token.setRevokedAt(LocalDateTime.now());
+        refreshTokenRepository.save(token);
+
+        log.info("Logout successful for userId={}", token.getUser().getUserId());
+        return new LogoutResponse("Logged out successfully");
+    }
+
+    public RegisterBiometricResponse registerBiometric(RegisterBiometricRequest request, User user) {
+        log.info("Biometric registration for userId={}, device={}", user.getUserId(), request.getDeviceInfo());
+
+        String tokenHash = hashToken(request.getBiometricToken());
+
+        DeviceToken deviceToken = new DeviceToken();
+        deviceToken.setUser(user);
+        deviceToken.setTokenHash(tokenHash);
+        deviceToken.setDeviceInfo(request.getDeviceInfo());
+        deviceTokenRepository.save(deviceToken);
+
+        log.info("Biometric registered for userId={}", user.getUserId());
+        return new RegisterBiometricResponse(true, request.getDeviceInfo());
+    }
+
+    public BiometricLoginResponse biometricLogin(BiometricLoginRequest request) {
+        log.info("Biometric login attempt from device={}", request.getDeviceInfo());
+
+        String tokenHash = hashToken(request.getBiometricToken());
+
+        DeviceToken deviceToken = deviceTokenRepository
+                .findByTokenHashAndIsActive(tokenHash, true)
+                .orElseThrow(() -> new IllegalArgumentException("Biometric token not recognised. Please log in with your password"));
+
+        User user = deviceToken.getUser();
+
+        if (!user.isActive()) {
+            log.warn("Biometric login on deactivated account userId={}", user.getUserId());
+            throw new IllegalStateException("Account is deactivated. Please contact support");
+        }
+
+        String accessToken = jwtService.generateAccessToken(user);
+
+        String rawRefreshToken = UUID.randomUUID().toString();
+        RefreshToken refreshToken = new RefreshToken();
+        refreshToken.setUser(user);
+        refreshToken.setTokenHash(hashToken(rawRefreshToken));
+        refreshToken.setDeviceInfo(request.getDeviceInfo());
+        refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
+        refreshTokenRepository.save(refreshToken);
+
+        log.info("Biometric login successful for userId={}", user.getUserId());
+
+        UserSummary userSummary = new UserSummary(
+                user.getUserId(),
+                user.getFullName(),
+                user.getPhone(),
+                user.getSubscriptionTier().name(),
+                false
+        );
+
+        return new BiometricLoginResponse(accessToken, rawRefreshToken, "Bearer", 900, userSummary);
+    }
+
+    private String hashToken(String token) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(token.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException("SHA-256 not available", e);
+        }
+    }
+
+    @Transactional
+    public void forgotPassword(String phone){
+        OtpPurpose purpose = OtpPurpose.PASSWORD_RESET;
+
+        Optional<User> userOpt = userRepository.findByPhone(phone);
+        
+        if(userOpt.isEmpty()){
+            log.warn("User not found for this phone number={}: ", phone);
+        }else{
+            User user=userOpt.get();
+
+            otpVerificationRepository.invalidateActiveOtps(user, purpose);
+            log.debug("Invalidated active OTPs for userId={}, purpose={}", user.getUserId(), purpose);
+
+            String otpCode = String.valueOf((int)(Math.random() * 900000) + 100000);
+            LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
+
+            OtpVerification otp = new OtpVerification();
+            otp.setUser(user);
+            otp.setOtpCode(otpCode);
+            otp.setPurpose(purpose);
+            otp.setExpiresAt(expiresAt);
+            otpVerificationRepository.save(otp);
+            log.debug("New OTP saved for userId={}, expiresAt={}", user.getUserId(), expiresAt);
+
+            smsService.sendOtp(phone, otpCode);
+            log.info("OTP sent to phone={} for purpose={}", phone, purpose);
+
+            return;
+        }
+    }
+
+    public VerifyResetOtpResponse verifyResetOtp(String phone, String otpCode){
+        OtpPurpose purpose = OtpPurpose.PASSWORD_RESET;
+
+        log.info("OTP verification attempt for phone={}, purpose={}", phone, purpose);
+
+        User user = userRepository.findByPhone(phone)
+                .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
+
+        OtpVerification otp = otpVerificationRepository
+                .findByPurposeAndUserAndUsed(purpose, user, false)
+                .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
+
+        if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("OTP expired for userId={}", user.getUserId());
+            throw new IllegalStateException("OTP has expired. Please request a new one");
+        }
+
+        if (!otp.getOtpCode().equals(otpCode)) {
+            log.warn("Invalid OTP code submitted for userId={}", user.getUserId());
+            throw new IllegalArgumentException("Invalid OTP code");
+        }
+
+        otp.setUsed(true);
+
+        String token = jwtService.generateResetToken(user);
+
+        String hash = hashToken(token);
+
+        otp.setResetTokenHash(hash);
+
+        otpVerificationRepository.save(otp);
+
+        log.info("OTP verified successfully for userId={}, purpose={}", user.getUserId(), purpose);
+        return new VerifyResetOtpResponse(token, 15);
+    }
+
+
+    @Transactional
+    public void resetPassword(String resetToken, String newPassword, String confirmPassword){
+        if(!newPassword.equals(confirmPassword)){
+            log.warn("New password is not equal to Confirm password");
+            throw new IllegalStateException("Passwords do not match");
+        }
+
+        Claims claims = jwtService.validateResetToken(resetToken);
+        String userId = claims.getSubject();
+
+        Optional<User> userOpt = userRepository.findById(UUID.fromString(userId));
+
+        if(userOpt.isEmpty()){
+            log.warn("User ID not found={}", userId);
+            throw new NotFoundException("User not found");
+        }
+
+        User user = userOpt.get();
+        
+        Optional <OtpVerification> otpOpt = otpVerificationRepository.findByUserAndPurposeAndRestTokenHash(user, OtpPurpose.PASSWORD_RESET);
+        
+        
+        if(otpOpt.isEmpty()){
+            throw new IllegalStateException("The token was already used");
+        }
+        
+        OtpVerification otp = otpOpt.get();
+        
+
+        String hash = hashToken(resetToken);
+
+        if(!hash.equals(otp.getResetTokenHash())){
+            throw new IllegalStateException("Invalid or already used token");
+        }
+         
+
+        otp.setResetTokenHash(null);
+
+        otpVerificationRepository.save(otp);
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+
+        userRepository.save(user);
+
+        refreshTokenRepository.revokeAllByUser(user);
+
+        log.info("Password has been reset for user={}", user);
+    }
+}
