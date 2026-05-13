@@ -49,8 +49,8 @@ POST {{baseUrl}}/api/v1/auth/login
 Content-Type: application/json
 
 {
-  "phone": "+233201234567",
-  "password": "Secret123!",
+  "phone": "+233599744646",
+  "password": "NewSecret456!",
   "device_info": "Bruno Test Client"
 }
 
@@ -127,3 +127,91 @@ Content-Type: application/json
   "new_password": "NewSecret123!",
   "confirm_password": "NewSecret123!"
 }
+
+
+### ============================================================
+### GROUP 3 — USER
+### ============================================================
+
+
+### 1. Get Profile
+GET {{baseUrl}}/api/v1/users/me
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+
+
+### 2. Update Profile
+PUT {{baseUrl}}/api/v1/users/me
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+
+{
+  "full_name": "Jermaine Lamarr Cole",
+  "email": "jcole@gmail.com",
+  "region": "Greater Accra",
+  "tin": "12345678901"
+}
+
+
+### 3. Change Password
+PUT {{baseUrl}}/api/v1/users/me/password
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+
+{
+  "current_password": "Secret123!",
+  "new_password": "NewSecret456!",
+  "confirm_password": "NewSecret456!"
+}
+
+
+### 4. Deactivate Account
+DELETE {{baseUrl}}/api/v1/users/me
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+
+{
+  "password": "Secret123!",
+  "reason": "No longer needed"
+}
+
+
+### 5. Get Health Score (placeholder — returns 404)
+GET {{baseUrl}}/api/v1/users/me/health-score
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+
+
+### 6. Request Data Export
+POST {{baseUrl}}/api/v1/users/me/data-request
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+
+
+### 7. Permanent Account Deletion
+DELETE {{baseUrl}}/api/v1/users/me/permanent
+Content-Type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+
+{
+  "password": "Secret123!",
+  "confirmation": "DELETE MY ACCOUNT PERMANENTLY"
+}
+
+### ============================================================
+### GROUP 4 — SESSIONS
+### ============================================================
+
+
+### 1. List Active Sessions
+GET {{baseUrl}}/api/v1/users/me/sessions
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIzNDM2NTgzYS1lOGU4LTRkYzctYjVjNC01YTRiYjdkMjdiM2YiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NzQ1NiwiZXhwIjoxNzc4NjY4MzU2fQ.CWdzhktWR9XTbiUMuxjNegKVBd9U_VN4Watj_8KBqtk
+
+
+### 2. Revoke Specific Session
+DELETE {{baseUrl}}/api/v1/users/me/sessions/3436583a-e8e8-4dc7-b5c4-5a4bb7d27b3f
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIzNDM2NTgzYS1lOGU4LTRkYzctYjVjNC01YTRiYjdkMjdiM2YiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NzQ1NiwiZXhwIjoxNzc4NjY4MzU2fQ.CWdzhktWR9XTbiUMuxjNegKVBd9U_VN4Watj_8KBqtk
+
+
+### 3. Revoke All Other Sessions
+DELETE {{baseUrl}}/api/v1/users/me/sessions
+Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIzNDM2NTgzYS1lOGU4LTRkYzctYjVjNC01YTRiYjdkMjdiM2YiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NzQ1NiwiZXhwIjoxNzc4NjY4MzU2fQ.CWdzhktWR9XTbiUMuxjNegKVBd9U_VN4Watj_8KBqtk
+
+
