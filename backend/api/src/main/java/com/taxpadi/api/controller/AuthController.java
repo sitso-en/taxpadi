@@ -107,7 +107,7 @@ public class AuthController {
     public ResponseEntity<ApiResponse<VerifyResetOtpResponse>> verifyResetOtp(
             @RequestBody @Valid VerifyResetOtpRequest request) {
         VerifyResetOtpResponse data = authService.verifyResetOtp(request.getPhone(), request.getOtpCode());
-        return ResponseEntity.ok(new ApiResponse<>(true, data, "OTP sent for reset password"));
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "OTP verified. You may now reset your password."));
     }
 
 
