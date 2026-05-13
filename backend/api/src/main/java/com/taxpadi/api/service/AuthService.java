@@ -3,6 +3,7 @@ package com.taxpadi.api.service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Optional;
@@ -51,6 +52,7 @@ import io.jsonwebtoken.Claims;
 @Service
 public class AuthService {
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     private final UserTaxProfileRepository userTaxProfileRepository;
     private final UserRepository userRepository;
@@ -77,6 +79,7 @@ public class AuthService {
     }
 
 
+    @Transactional
     public RegisterResponse register(RegisterRequest request){
         String phone = request.getPhone();
         String email = request.getEmail();
@@ -87,7 +90,7 @@ public class AuthService {
             throw new ConflictException("Phone number is already taken");
         }
 
-        if(userRepository.findByEmail(email).isPresent()){
+        if(email != null && userRepository.findByEmail(email).isPresent()){
             log.warn("Registration failed — email already taken: {}", email);
             throw new ConflictException("Email is already taken");
         }
@@ -110,7 +113,7 @@ public class AuthService {
         userTaxProfileRepository.save(profile);
         log.debug("Tax profile created for userId={}", user.getUserId());
 
-        String otpCode = String.valueOf((int)(Math.random()*900000) + 100000);
+        String otpCode = String.valueOf(100000 + secureRandom.nextInt(900000));
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
 
         OtpVerification otp = new OtpVerification();
@@ -139,7 +142,7 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
 
         OtpVerification otp = otpVerificationRepository
-                .findByPurposeAndUserAndUsed(purpose, user, false)
+                .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
                 .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -182,7 +185,7 @@ public class AuthService {
         otpVerificationRepository.invalidateActiveOtps(user, purpose);
         log.debug("Invalidated active OTPs for userId={}, purpose={}", user.getUserId(), purpose);
 
-        String otpCode = String.valueOf((int)(Math.random() * 900000) + 100000);
+        String otpCode = String.valueOf(100000 + secureRandom.nextInt(900000));
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
 
         OtpVerification otp = new OtpVerification();
@@ -221,8 +224,7 @@ public class AuthService {
             throw new IllegalArgumentException("Invalid phone number or password");
         }
 
-        String accessToken = jwtService.generateAccessToken(user);
-
+        
         String rawRefreshToken = UUID.randomUUID().toString();
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
@@ -231,6 +233,8 @@ public class AuthService {
         refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
         refreshTokenRepository.save(refreshToken);
 
+        String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
+        
         log.info("Login successful for userId={}", user.getUserId());
 
         UserSummary userSummary = new UserSummary(
@@ -261,7 +265,7 @@ public class AuthService {
             throw new IllegalArgumentException("Refresh token has expired. Please log in again");
         }
 
-        String newAccessToken = jwtService.generateAccessToken(token.getUser());
+        String newAccessToken = jwtService.generateAccessToken(token.getUser(), token.getTokenId());
         log.info("Access token refreshed for userId={}", token.getUser().getUserId());
 
         return new RefreshTokenResponse(newAccessToken, "Bearer", 900);
@@ -318,8 +322,7 @@ public class AuthService {
             throw new IllegalStateException("Account is deactivated. Please contact support");
         }
 
-        String accessToken = jwtService.generateAccessToken(user);
-
+        
         String rawRefreshToken = UUID.randomUUID().toString();
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
@@ -327,6 +330,8 @@ public class AuthService {
         refreshToken.setDeviceInfo(request.getDeviceInfo());
         refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
         refreshTokenRepository.save(refreshToken);
+        
+        String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
 
         log.info("Biometric login successful for userId={}", user.getUserId());
 
@@ -365,7 +370,7 @@ public class AuthService {
             otpVerificationRepository.invalidateActiveOtps(user, purpose);
             log.debug("Invalidated active OTPs for userId={}, purpose={}", user.getUserId(), purpose);
 
-            String otpCode = String.valueOf((int)(Math.random() * 900000) + 100000);
+            String otpCode = String.valueOf(100000 + secureRandom.nextInt(900000));
             LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
 
             OtpVerification otp = new OtpVerification();
@@ -392,7 +397,7 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
 
         OtpVerification otp = otpVerificationRepository
-                .findByPurposeAndUserAndUsed(purpose, user, false)
+                .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
                 .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -439,21 +444,15 @@ public class AuthService {
 
         User user = userOpt.get();
         
-        Optional <OtpVerification> otpOpt = otpVerificationRepository.findByUserAndPurposeAndRestTokenHash(user, OtpPurpose.PASSWORD_RESET);
-        
-        
-        if(otpOpt.isEmpty()){
-            throw new IllegalStateException("The token was already used");
-        }
-        
-        OtpVerification otp = otpOpt.get();
-        
-
         String hash = hashToken(resetToken);
 
-        if(!hash.equals(otp.getResetTokenHash())){
-            throw new IllegalStateException("Invalid or already used token");
+        Optional<OtpVerification> otpOpt = otpVerificationRepository.findByUserAndPurposeAndResetTokenHash(user, OtpPurpose.PASSWORD_RESET, hash);
+
+        if(otpOpt.isEmpty()){
+            throw new IllegalArgumentException("The reset token is invalid or has already been used");
         }
+
+        OtpVerification otp = otpOpt.get();
          
 
         otp.setResetTokenHash(null);
