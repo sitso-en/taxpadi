@@ -9,7 +9,9 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 
 @Service
 public class SmsService {
@@ -31,14 +33,22 @@ public class SmsService {
             "recipients", List.of(phone)
         );
 
-        ResponseEntity<String> response = restClient.post()
-            .uri("https://sms.arkesel.com/api/v2/sms/send")
-            .header("api-key", apiKey)
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(body)
-            .retrieve()
-            .toEntity(String.class);
+        try {
+            ResponseEntity<String> response = restClient.post()
+                .uri("https://sms.arkesel.com/api/v2/sms/send")
+                .header("api-key", apiKey)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(body)
+                .retrieve()
+                .toEntity(String.class);
 
-        log.info("Arkesel response: status={}, body={}", response.getStatusCode(), response.getBody());
+            log.debug("Arkesel response: status={}", response.getStatusCode());
+        } catch (RestClientResponseException ex) {
+            log.error("Arkesel returned error status={}", ex.getStatusCode());
+            throw new RuntimeException("Failed to send OTP. Please try again.");
+        } catch (ResourceAccessException ex) {
+            log.error("Arkesel unreachable: {}", ex.getMessage());
+            throw new RuntimeException("SMS service is currently unavailable. Please try again.");
+        }
     }
 }
