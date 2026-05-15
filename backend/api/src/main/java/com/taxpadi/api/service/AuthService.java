@@ -39,11 +39,13 @@ import com.taxpadi.api.model.DeviceToken;
 import com.taxpadi.api.model.OtpPurpose;
 import com.taxpadi.api.model.OtpVerification;
 import com.taxpadi.api.model.RefreshToken;
+import com.taxpadi.api.model.TaxProfile;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.model.UserTaxProfile;
 import com.taxpadi.api.repository.DeviceTokenRepository;
 import com.taxpadi.api.repository.OtpVerificationRepository;
 import com.taxpadi.api.repository.RefreshTokenRepository;
+import com.taxpadi.api.repository.TaxProfileRepository;
 import com.taxpadi.api.repository.UserRepository;
 import com.taxpadi.api.repository.UserTaxProfileRepository;
 
@@ -55,6 +57,7 @@ public class AuthService {
     private static final SecureRandom secureRandom = new SecureRandom();
 
     private final UserTaxProfileRepository userTaxProfileRepository;
+    private final TaxProfileRepository taxProfileRepository;
     private final UserRepository userRepository;
     private final OtpVerificationRepository otpVerificationRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -64,12 +67,14 @@ public class AuthService {
     private final JwtService jwtService;
 
     public AuthService(UserRepository userRepository, OtpVerificationRepository otpVerificationRepository,
-        UserTaxProfileRepository userTaxProfileRepository, RefreshTokenRepository refreshTokenRepository,
+        UserTaxProfileRepository userTaxProfileRepository, TaxProfileRepository taxProfileRepository,
+        RefreshTokenRepository refreshTokenRepository,
         DeviceTokenRepository deviceTokenRepository,
         BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService
     ){
         this.userRepository = userRepository;
         this.userTaxProfileRepository = userTaxProfileRepository;
+        this.taxProfileRepository = taxProfileRepository;
         this.otpVerificationRepository = otpVerificationRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.deviceTokenRepository = deviceTokenRepository;
@@ -107,6 +112,16 @@ public class AuthService {
 
         userRepository.save(user);
         log.info("User saved: userId={}, phone={}", user.getUserId(), phone);
+
+        TaxProfile primaryProfile = new TaxProfile();
+        primaryProfile.setUser(user);
+        primaryProfile.setLabel("Personal");
+        primaryProfile.setTaxpayerCategory(user.getTaxpayerCategory());
+        primaryProfile.setIsPrimary(true);
+        taxProfileRepository.save(primaryProfile);
+        user.setActiveProfileId(primaryProfile.getProfileId());
+        userRepository.save(user);
+        log.debug("Primary tax profile created for userId={}", user.getUserId());
 
         UserTaxProfile profile = new UserTaxProfile();
         profile.setUser(user);
