@@ -2,6 +2,9 @@
 ### Base URL: http://localhost:8080
 
 @baseUrl = http://localhost:8080
+@accessToken = paste-access-token-here
+@refreshToken = paste-refresh-token-here
+@profileId = paste-profile-id-here
 
 
 ### ============================================================
@@ -60,7 +63,7 @@ POST {{baseUrl}}/api/v1/auth/refresh
 Content-Type: application/json
 
 {
-  "refresh_token": "paste-refresh-token-from-login-response-here"
+  "refresh_token": "{{refreshToken}}"
 }
 
 
@@ -69,7 +72,7 @@ POST {{baseUrl}}/api/v1/auth/logout
 Content-Type: application/json
 
 {
-  "refresh_token": "paste-refresh-token-from-login-response-here"
+  "refresh_token": "{{refreshToken}}"
 }
 
 
@@ -136,13 +139,13 @@ Content-Type: application/json
 
 ### 1. Get Profile
 GET {{baseUrl}}/api/v1/users/me
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+Authorization: Bearer {{accessToken}}
 
 
 ### 2. Update Profile
 PUT {{baseUrl}}/api/v1/users/me
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+Authorization: Bearer {{accessToken}}
 
 {
   "full_name": "Jermaine Lamarr Cole",
@@ -155,7 +158,7 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtY
 ### 3. Change Password
 PUT {{baseUrl}}/api/v1/users/me/password
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+Authorization: Bearer {{accessToken}}
 
 {
   "current_password": "Secret123!",
@@ -164,10 +167,11 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtY
 }
 
 
+
 ### 4. Deactivate Account
 DELETE {{baseUrl}}/api/v1/users/me
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+Authorization: Bearer {{accessToken}}
 
 {
   "password": "Secret123!",
@@ -177,18 +181,18 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtY
 
 ### 5. Get Health Score (placeholder — returns 404)
 GET {{baseUrl}}/api/v1/users/me/health-score
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+Authorization: Bearer {{accessToken}}
 
 
 ### 6. Request Data Export
 POST {{baseUrl}}/api/v1/users/me/data-request
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+Authorization: Bearer {{accessToken}}
 
 
 ### 7. Permanent Account Deletion
 DELETE {{baseUrl}}/api/v1/users/me/permanent
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxNWM2OWNmYi01OWIyLTRkODAtYmNlMS01YmY4M2U2Yjg0YjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NjM2MCwiZXhwIjoxNzc4NjY3MjYwfQ.-s5qqr2KqjHXkkI-buI3h553vaOI4H4io9FiioI1FWE
+Authorization: Bearer {{accessToken}}
 
 {
   "password": "Secret123!",
@@ -202,16 +206,60 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtY
 
 ### 1. List Active Sessions
 GET {{baseUrl}}/api/v1/users/me/sessions
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIzNDM2NTgzYS1lOGU4LTRkYzctYjVjNC01YTRiYjdkMjdiM2YiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NzQ1NiwiZXhwIjoxNzc4NjY4MzU2fQ.CWdzhktWR9XTbiUMuxjNegKVBd9U_VN4Watj_8KBqtk
+Authorization: Bearer {{accessToken}}
 
 
 ### 2. Revoke Specific Session
 DELETE {{baseUrl}}/api/v1/users/me/sessions/3436583a-e8e8-4dc7-b5c4-5a4bb7d27b3f
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIzNDM2NTgzYS1lOGU4LTRkYzctYjVjNC01YTRiYjdkMjdiM2YiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NzQ1NiwiZXhwIjoxNzc4NjY4MzU2fQ.CWdzhktWR9XTbiUMuxjNegKVBd9U_VN4Watj_8KBqtk
+Authorization: Bearer {{accessToken}}
 
 
 ### 3. Revoke All Other Sessions
 DELETE {{baseUrl}}/api/v1/users/me/sessions
-Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIzNDM2NTgzYS1lOGU4LTRkYzctYjVjNC01YTRiYjdkMjdiM2YiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODY2NzQ1NiwiZXhwIjoxNzc4NjY4MzU2fQ.CWdzhktWR9XTbiUMuxjNegKVBd9U_VN4Watj_8KBqtk
+Authorization: Bearer {{accessToken}}
 
 
+
+
+### ============================================================
+### GROUP 7 — MULTI-PROFILE
+### ============================================================
+
+
+### 1. Get All Profiles
+GET {{baseUrl}}/api/v1/profiles
+Authorization: Bearer {{accessToken}}
+
+
+### 2. Create Profile
+POST {{baseUrl}}/api/v1/profiles
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "label": "My Business",
+  "taxpayer_category": "sole_trader",
+  "tin": "C0012345678",
+  "tax_year_start": "2024-01-01"
+}
+
+
+### 3. Update Profile
+PUT {{baseUrl}}/api/v1/profiles/{{profileId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "label": "My Updated Business",
+  "tax_year_start": "2024-01-01"
+}
+
+
+### 4. Delete Profile
+DELETE {{baseUrl}}/api/v1/profiles/{{profileId}}
+Authorization: Bearer {{accessToken}}
+
+
+### 5. Switch Active Profile
+PUT {{baseUrl}}/api/v1/profiles/{{profileId}}/switch
+Authorization: Bearer {{accessToken}}
