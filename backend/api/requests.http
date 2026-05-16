@@ -465,3 +465,48 @@ GET {{baseUrl}}/api/v1/tax/paye/annual-return/2026
 Authorization: Bearer {{accessToken}}
 
 
+
+
+
+
+### GROUP 13 — WITHHOLDING TAX
+
+
+@whtTransactionId = paste-transaction-id-here
+
+
+### 1. Get WHT Transactions (all)
+GET {{baseUrl}}/api/v1/tax/withholding/transactions
+Authorization: Bearer {{accessToken}}
+
+
+### 2. Get WHT Transactions (unremitted only)
+GET {{baseUrl}}/api/v1/tax/withholding/transactions?remitted=false
+Authorization: Bearer {{accessToken}}
+
+
+### 3. Get WHT Transactions (filtered by category)
+GET {{baseUrl}}/api/v1/tax/withholding/transactions?category=contractor_payment
+Authorization: Bearer {{accessToken}}
+
+
+### 4. Get WHT Transactions (filtered by date range)
+GET {{baseUrl}}/api/v1/tax/withholding/transactions?date_from=2026-01-01&date_to=2026-05-31
+Authorization: Bearer {{accessToken}}
+
+
+### 5. Mark WHT Transaction as Remitted
+PUT {{baseUrl}}/api/v1/tax/withholding/transactions/{{whtTransactionId}}/remit
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "remitted_at": "2026-05-15T10:00:00"
+}
+
+
+### 6. Mark WHT Transaction as Remitted (defaults to now)
+PUT {{baseUrl}}/api/v1/tax/withholding/transactions/{{whtTransactionId}}/remit
+Authorization: Bearer {{accessToken}}
+
+
