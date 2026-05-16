@@ -1,7 +1,6 @@
 package com.taxpadi.api.service;
 
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
@@ -26,7 +25,6 @@ public class VatService {
     // VAT registration threshold warning at 80% of GHS 750,000
     private static final BigDecimal VAT_THRESHOLD = new BigDecimal("750000");
     private static final BigDecimal THRESHOLD_WARNING_PCT = new BigDecimal("0.80");
-    private static final BigDecimal VAT_RATE = new BigDecimal("0.20");
     private static final String EFFECTIVE_RATE = "20%";
 
     private final VatRecordRepository vatRecordRepository;
@@ -67,7 +65,7 @@ public class VatService {
             throw new ConflictException("A VAT record already exists for this period. Use the update endpoint.");
         }
 
-        BigDecimal outputVat = request.getTotalSales().multiply(VAT_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal outputVat = taxEngine.calculateVat(request.getTotalSales());
         BigDecimal netLiability = outputVat.subtract(request.getInputVat()).max(BigDecimal.ZERO);
 
         LocalDate dueDate = YearMonth.of(year, month).atEndOfMonth().plusMonths(1);
@@ -108,7 +106,7 @@ public class VatService {
         if (request.getTotalPurchases() != null) record.setTotalPurchases(request.getTotalPurchases());
         if (request.getInputVat() != null) record.setInputVat(request.getInputVat());
 
-        BigDecimal outputVat = record.getTotalSales().multiply(VAT_RATE).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal outputVat = taxEngine.calculateVat(record.getTotalSales());
         BigDecimal netLiability = outputVat.subtract(record.getInputVat()).max(BigDecimal.ZERO);
         record.setOutputVat(outputVat);
         record.setNetVatLiability(netLiability);
