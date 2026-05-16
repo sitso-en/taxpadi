@@ -121,6 +121,14 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(false, null, ex.getMessage()));
     }
 
+    // Explicit bad request (e.g. invalid field value) — 400
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadRequest(BadRequestException ex) {
+        log.warn("Bad request: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(false, null, ex.getMessage()));
+    }
+
     // Bad state (e.g. OTP expired) — 400
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalState(IllegalStateException ex) {
