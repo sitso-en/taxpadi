@@ -2,7 +2,7 @@
 ### Base URL: http://localhost:8080
 
 @baseUrl = http://localhost:8080
-@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiJhMjc2NGNlMC0xNjY3LTQ5MjUtOGUwYy05YjJlNDI4YmU2YmIiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODg5OTI1MiwiZXhwIjoxNzc4OTAwMTUyfQ.JUhaC546lCV2Cv_edVLWzLSsLdDbYjJaFo7DZUzvNJQ
+@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxYWIwM2NmZi1jY2ZhLTQ5NmMtOWU2OS03MWEyZGM3MmFlNzAiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODk2MjAxNiwiZXhwIjoxNzc4OTYyOTE2fQ.yvyPDyDUT094H05qa1RVz6jmlnVt7EbQfyKAmvZq4Qk
 @refreshToken = paste-refresh-token-here
 @profileId = paste-profile-id-here
 
@@ -371,6 +371,97 @@ Authorization: Bearer {{accessToken}}
 
 ### 6. Get VAT History (filtered by year)
 GET {{baseUrl}}/api/v1/tax/vat/history?year=2026
+Authorization: Bearer {{accessToken}}
+
+
+### ============================================================
+### GROUP 12 — PAYE
+### ============================================================
+
+@employeeId = 4c725b5b-30d9-4605-9c3d-b863c9848e91
+@payeRecordId = paste-paye-record-id-here
+
+
+### 1. Get All Employees (active)
+GET {{baseUrl}}/api/v1/tax/paye/employees
+Authorization: Bearer {{accessToken}}
+
+
+### 2. Get All Employees (all statuses)
+GET {{baseUrl}}/api/v1/tax/paye/employees?status=all
+Authorization: Bearer {{accessToken}}
+
+
+### 3. Add Employee
+POST {{baseUrl}}/api/v1/tax/paye/employees
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "full_name": "Smug Face",
+  "position": "Data Analyst",
+  "gross_salary": 35000.00,
+  "transport_allowance": 3000.00,
+  "housing_allowance": 5000.00,
+  "other_allowances": 0.00,
+  "social_security_no": "C0047829291",
+  "start_date": "2026-01-01"
+}
+
+
+### 4. Get Single Employee
+GET {{baseUrl}}/api/v1/tax/paye/employees/{{employeeId}}
+Authorization: Bearer {{accessToken}}
+
+
+### 5. Update Employee
+PUT {{baseUrl}}/api/v1/tax/paye/employees/{{employeeId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "gross_salary": 40000.00,
+  "transport_allowance": 3500.00
+}
+
+
+### 6. Deactivate Employee
+DELETE {{baseUrl}}/api/v1/tax/paye/employees/{{employeeId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "end_date": "2026-05-31"
+}
+
+
+### 7. Get PAYE Records (all)
+GET {{baseUrl}}/api/v1/tax/paye/records
+Authorization: Bearer {{accessToken}}
+
+
+### 8. Get PAYE Records (filtered by month and year)
+GET {{baseUrl}}/api/v1/tax/paye/records?month=5&year=2026
+Authorization: Bearer {{accessToken}}
+
+
+### 9. Get Monthly PAYE Summary
+GET {{baseUrl}}/api/v1/tax/paye/records/5/2026
+Authorization: Bearer {{accessToken}}
+
+
+### 10. Mark PAYE Record as Remitted
+PUT {{baseUrl}}/api/v1/tax/paye/records/{{payeRecordId}}/remit
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "remitted_at": "2026-05-15T10:00:00"
+}
+
+
+### 11. Get Annual PAYE Return
+GET {{baseUrl}}/api/v1/tax/paye/annual-return/2026
 Authorization: Bearer {{accessToken}}
 
 
