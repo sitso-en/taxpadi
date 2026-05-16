@@ -2,7 +2,7 @@
 ### Base URL: http://localhost:8080
 
 @baseUrl = http://localhost:8080
-@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIwZDExZmQyYS0xNjU5LTRjOGQtOGEyMi0zOGYxMmM0NGE2YWUiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODg5NzI4OSwiZXhwIjoxNzc4ODk4MTg5fQ.7shDpJziymTaBrQ7694s8BuqBpngezMOcwKXvIoehEI
+@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiJhMjc2NGNlMC0xNjY3LTQ5MjUtOGUwYy05YjJlNDI4YmU2YmIiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODg5OTI1MiwiZXhwIjoxNzc4OTAwMTUyfQ.JUhaC546lCV2Cv_edVLWzLSsLdDbYjJaFo7DZUzvNJQ
 @refreshToken = paste-refresh-token-here
 @profileId = paste-profile-id-here
 
@@ -324,16 +324,53 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/tax/rates
 Authorization: Bearer {{accessToken}}
 
-### ============================================================
-### GROUP 10 — TAX BRACKETS & RATES
-### ============================================================
 
-
-### 1. Get Income Tax Brackets
-GET {{baseUrl}}/api/v1/tax/brackets
+### ============================================================
+### GROUP 11 — VAT
+### ============================================================
+### 1. Get VAT Status (current month)
+GET {{baseUrl}}/api/v1/tax/vat/status
 Authorization: Bearer {{accessToken}}
 
 
-### 2. Get All Tax Rates
-GET {{baseUrl}}/api/v1/tax/rates
+### 2. Get VAT Status (specific month)
+GET {{baseUrl}}/api/v1/tax/vat/status?month=5&year=2026
 Authorization: Bearer {{accessToken}}
+
+
+### 3. Register VAT Record
+POST {{baseUrl}}/api/v1/tax/vat/register
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "month": 5,
+  "year": 2026,
+  "total_sales": 50000.00,
+  "total_purchases": 20000.00,
+  "input_vat": 3000.00
+}
+
+
+### 4. Update VAT Record
+PUT {{baseUrl}}/api/v1/tax/vat/2026/5
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "total_sales": 55000.00,
+  "total_purchases": 22000.00,
+  "input_vat": 3300.00
+}
+
+
+### 5. Get VAT History (all years)
+GET {{baseUrl}}/api/v1/tax/vat/history
+Authorization: Bearer {{accessToken}}
+
+
+### 6. Get VAT History (filtered by year)
+GET {{baseUrl}}/api/v1/tax/vat/history?year=2026
+Authorization: Bearer {{accessToken}}
+
+
