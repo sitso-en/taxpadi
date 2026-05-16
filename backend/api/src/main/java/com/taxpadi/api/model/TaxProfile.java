@@ -68,10 +68,6 @@ public class TaxProfile {
         return profileId;
     }
 
-    public void setProfileId(UUID profileId) {
-        this.profileId = profileId;
-    }
-
     public User getUser() {
         return user;
     }
@@ -124,16 +120,8 @@ public class TaxProfile {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
     public LocalDateTime getUpdatedAt() {
         return updatedAt;
-    }
-
-    public void setUpdatedAt(LocalDateTime updatedAt) {
-        this.updatedAt = updatedAt;
     }
 
 }
