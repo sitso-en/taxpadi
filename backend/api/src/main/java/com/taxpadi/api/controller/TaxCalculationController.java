@@ -18,15 +18,18 @@ import com.taxpadi.api.dto.tax.TaxLiabilityResponse;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.TaxCalculationService;
+import com.taxpadi.api.service.TaxRateService;
 
 @RestController
 @RequestMapping("/api/v1/tax")
 public class TaxCalculationController {
 
     private final TaxCalculationService taxCalculationService;
+    private final TaxRateService taxRateService;
 
-    public TaxCalculationController(TaxCalculationService taxCalculationService) {
+    public TaxCalculationController(TaxCalculationService taxCalculationService, TaxRateService taxRateService) {
         this.taxCalculationService = taxCalculationService;
+        this.taxRateService = taxRateService;
     }
 
     @GetMapping("/liability")
@@ -65,5 +68,15 @@ public class TaxCalculationController {
         User user = userDetails.getUser();
         RecalculateResponse data = taxCalculationService.recalculate(user);
         return ResponseEntity.ok(new ApiResponse<>(true, data, "Tax liability recalculated successfully."));
+    }
+
+    @GetMapping("/brackets")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getBrackets() {
+        return ResponseEntity.ok(new ApiResponse<>(true, taxRateService.getBrackets(), "Tax brackets retrieved successfully."));
+    }
+
+    @GetMapping("/rates")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> getRates() {
+        return ResponseEntity.ok(new ApiResponse<>(true, taxRateService.getRates(), "Tax rates retrieved successfully."));
     }
 }
