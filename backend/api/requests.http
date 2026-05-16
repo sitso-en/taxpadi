@@ -263,3 +263,48 @@ Authorization: Bearer {{accessToken}}
 ### 5. Switch Active Profile
 PUT {{baseUrl}}/api/v1/profiles/{{profileId}}/switch
 Authorization: Bearer {{accessToken}}
+
+
+### ============================================================
+### GROUP 9 — TAX CALCULATIONS
+### ============================================================
+
+
+### 1. Get Overall Tax Liability
+GET {{baseUrl}}/api/v1/tax/liability
+Authorization: Bearer {{accessToken}}
+
+
+### 2. Get Tax Liability by Type — Income Tax (annual)
+GET {{baseUrl}}/api/v1/tax/liability/income_tax
+Authorization: Bearer {{accessToken}}
+
+
+### 3. Get Tax Liability by Type — VAT (monthly)
+GET {{baseUrl}}/api/v1/tax/liability/vat?year=2026&month=5
+Authorization: Bearer {{accessToken}}
+
+
+### 4. Get Tax Liability by Type — PAYE (monthly)
+GET {{baseUrl}}/api/v1/tax/liability/paye?year=2026&month=5
+Authorization: Bearer {{accessToken}}
+
+
+### 5. Get Tax Liability by Type — Withholding
+GET {{baseUrl}}/api/v1/tax/liability/withholding
+Authorization: Bearer {{accessToken}}
+
+
+### 6. Get Tax Liability History (all types)
+GET {{baseUrl}}/api/v1/tax/liability/history
+Authorization: Bearer {{accessToken}}
+
+
+### 7. Get Tax Liability History (filtered by type)
+GET {{baseUrl}}/api/v1/tax/liability/history?tax_type=income_tax&page=1&limit=12
+Authorization: Bearer {{accessToken}}
+
+
+### 8. Recalculate Tax Liability
+POST {{baseUrl}}/api/v1/tax/liability/recalculate
+Authorization: Bearer {{accessToken}}
