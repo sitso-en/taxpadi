@@ -63,9 +63,10 @@ public class UserController {
     @PutMapping("/me")
     public ResponseEntity<ApiResponse<UpdateProfileResponse>> updateProfile(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody @Valid UpdateProfileRequest request) {
+            @RequestBody @Valid UpdateProfileRequest request,
+            HttpServletRequest httpRequest) {
         return ResponseEntity.ok(new ApiResponse<>(true,
-            userService.updateProfile(userDetails.getUser(), request),
+            userService.updateProfile(userDetails.getUser(), request, httpRequest.getRemoteAddr()),
             "Profile updated successfully."));
     }
 
@@ -74,7 +75,7 @@ public class UserController {
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestBody @Valid ChangePasswordRequest request,
             HttpServletRequest httpRequest) {
-        userService.changePassword(userDetails.getUser(), request, extractCurrentTokenId(httpRequest));
+        userService.changePassword(userDetails.getUser(), request, extractCurrentTokenId(httpRequest), httpRequest.getRemoteAddr());
         return ResponseEntity.ok(new ApiResponse<>(true, null,
             "Password changed successfully. All other sessions have been logged out."));
     }
@@ -82,8 +83,9 @@ public class UserController {
     @DeleteMapping("/me")
     public ResponseEntity<ApiResponse<Void>> deactivateAccount(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody @Valid DeactivateAccountRequest request) {
-        userService.deactivateAccount(userDetails.getUser(), request);
+            @RequestBody @Valid DeactivateAccountRequest request,
+            HttpServletRequest httpRequest) {
+        userService.deactivateAccount(userDetails.getUser(), request, httpRequest.getRemoteAddr());
         return ResponseEntity.ok(new ApiResponse<>(true, null,
             "Your account has been deactivated. Your data will be retained for 6 years in compliance with GRA audit requirements."));
     }

@@ -39,13 +39,16 @@ public class UserService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final AuditLogService auditLogService;
 
     public UserService(UserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository,
-                       BCryptPasswordEncoder passwordEncoder) {
+                       BCryptPasswordEncoder passwordEncoder,
+                       AuditLogService auditLogService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
+        this.auditLogService = auditLogService;
     }
 
     public UserProfileResponse getProfile(User user) {
@@ -66,7 +69,7 @@ public class UserService {
     }
 
     @Transactional
-    public UpdateProfileResponse updateProfile(User user, UpdateProfileRequest request) {
+    public UpdateProfileResponse updateProfile(User user, UpdateProfileRequest request, String ipAddress) {
         if (request.getFullName() != null) user.setFullName(request.getFullName());
         if (request.getRegion() != null) user.setRegion(request.getRegion());
 
@@ -87,6 +90,7 @@ public class UserService {
         }
 
         userRepository.save(user);
+        auditLogService.log(user, "PROFILE_UPDATED", "Profile fields updated", ipAddress);
         log.info("Profile updated for userId={}", user.getUserId());
         return new UpdateProfileResponse(
             user.getUserId(), user.getFullName(), user.getEmail(),
@@ -95,7 +99,7 @@ public class UserService {
     }
 
     @Transactional
-    public void changePassword(User user, ChangePasswordRequest request, UUID currentTokenId) {
+    public void changePassword(User user, ChangePasswordRequest request, UUID currentTokenId, String ipAddress) {
         if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
             throw new IllegalArgumentException("Current password is incorrect");
         }
@@ -105,17 +109,19 @@ public class UserService {
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
         userRepository.save(user);
         refreshTokenRepository.revokeAllByUserExcept(user, currentTokenId);
+        auditLogService.log(user, "PASSWORD_CHANGED", "Password changed, all other sessions revoked", ipAddress);
         log.info("Password changed for userId={}, other sessions revoked", user.getUserId());
     }
 
     @Transactional
-    public void deactivateAccount(User user, DeactivateAccountRequest request) {
+    public void deactivateAccount(User user, DeactivateAccountRequest request, String ipAddress) {
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw new IllegalArgumentException("Password is incorrect");
         }
         user.setActive(false);
         userRepository.save(user);
         refreshTokenRepository.revokeAllByUser(user);
+        auditLogService.log(user, "ACCOUNT_DEACTIVATED", "Account deactivated by user", ipAddress);
         log.info("Account deactivated for userId={}", user.getUserId());
     }
 
