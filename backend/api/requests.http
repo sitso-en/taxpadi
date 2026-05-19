@@ -2,7 +2,7 @@
 ### Base URL: http://localhost:8080
 
 @baseUrl = http://localhost:8080
-@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIxYWIwM2NmZi1jY2ZhLTQ5NmMtOWU2OS03MWEyZGM3MmFlNzAiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3ODk2MjAxNiwiZXhwIjoxNzc4OTYyOTE2fQ.yvyPDyDUT094H05qa1RVz6jmlnVt7EbQfyKAmvZq4Qk
+@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIzYzVmMDU5My1kOTYxLTRlNDYtYWRjYi05YjVmZWRjZDU2ZDYiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3OTE1MDA3MywiZXhwIjoxNzc5MTUwOTczfQ.Nxw_z1-6D76Px_lML5zBJbF6bAmmLBqBG0KWvTJmj7M
 @refreshToken = paste-refresh-token-here
 @profileId = paste-profile-id-here
 
@@ -508,5 +508,92 @@ Authorization: Bearer {{accessToken}}
 ### 6. Mark WHT Transaction as Remitted (defaults to now)
 PUT {{baseUrl}}/api/v1/tax/withholding/transactions/{{whtTransactionId}}/remit
 Authorization: Bearer {{accessToken}}
+
+
+### ============================================================
+### GROUP 14 — TAX RETURNS
+### ============================================================
+
+@returnId = paste-return-id-here
+
+
+### 1. Get All Tax Returns
+GET {{baseUrl}}/api/v1/tax/returns
+Authorization: Bearer {{accessToken}}
+
+
+### 2. Get Tax Returns (filtered)
+GET {{baseUrl}}/api/v1/tax/returns?tax_type=income_tax&status=draft&year=2026
+Authorization: Bearer {{accessToken}}
+
+
+### 3. Generate Tax Return — Income Tax
+POST {{baseUrl}}/api/v1/tax/returns/generate
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "tax_type": "income_tax",
+  "tax_year": 2026
+}
+
+
+### 4. Generate Tax Return — VAT (monthly)
+POST {{baseUrl}}/api/v1/tax/returns/generate
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "tax_type": "vat",
+  "tax_year": 2026,
+  "month": 5
+}
+
+
+### 5. Generate Tax Return — PAYE (monthly)
+POST {{baseUrl}}/api/v1/tax/returns/generate
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "tax_type": "paye",
+  "tax_year": 2026,
+  "month": 5
+}
+
+
+### 6. Get Single Tax Return
+GET {{baseUrl}}/api/v1/tax/returns/{{returnId}}
+Authorization: Bearer {{accessToken}}
+
+
+### 7. Preview Tax Return
+GET {{baseUrl}}/api/v1/tax/returns/{{returnId}}/preview
+Authorization: Bearer {{accessToken}}
+
+
+### 8. Submit Tax Return
+PUT {{baseUrl}}/api/v1/tax/returns/{{returnId}}/submit
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "gra_reference": "GRA-2026-123456"
+}
+
+
+### 9. Submit Tax Return (no reference)
+PUT {{baseUrl}}/api/v1/tax/returns/{{returnId}}/submit
+Authorization: Bearer {{accessToken}}
+
+
+### 10. Amend Rejected Tax Return
+PUT {{baseUrl}}/api/v1/tax/returns/{{returnId}}/amend
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "amendment_reason": "Incorrect gross income figure. Corrected based on updated bank statement."
+}
 
 
