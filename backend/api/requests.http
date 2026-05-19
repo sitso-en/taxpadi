@@ -2,7 +2,7 @@
 ### Base URL: http://localhost:8080
 
 @baseUrl = http://localhost:8080
-@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiIzYzVmMDU5My1kOTYxLTRlNDYtYWRjYi05YjVmZWRjZDU2ZDYiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3OTE1MDA3MywiZXhwIjoxNzc5MTUwOTczfQ.Nxw_z1-6D76Px_lML5zBJbF6bAmmLBqBG0KWvTJmj7M
+@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiJlZTgwNDYyNi05OWM1LTQ3YmQtOWZjYy0yNWQ4NGFlNzhhMmYiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3OTE1OTk5NCwiZXhwIjoxNzc5MTYwODk0fQ.vJKYryffuf1i4FKVkycU2nE2yURN_gCO6ZUW7gm4d00
 @refreshToken = paste-refresh-token-here
 @profileId = paste-profile-id-here
 
@@ -595,5 +595,14 @@ Authorization: Bearer {{accessToken}}
 {
   "amendment_reason": "Incorrect gross income figure. Corrected based on updated bank statement."
 }
+
+
+### ============================================================
+### Audit Log
+### ============================================================
+
+### 1. Get Audit Log
+GET {{baseUrl}}/api/v1/audit-log?page=1&limit=20
+Authorization: Bearer {{accessToken}}
 
 
