@@ -49,13 +49,16 @@ public class TaxReturnService {
     private final TaxReturnRepository taxReturnRepository;
     private final TaxCalculationRepository taxCalculationRepository;
     private final TaxDeadlineRepository taxDeadlineRepository;
+    private final AuditLogService auditLogService;
 
     public TaxReturnService(TaxReturnRepository taxReturnRepository,
                             TaxCalculationRepository taxCalculationRepository,
-                            TaxDeadlineRepository taxDeadlineRepository) {
+                            TaxDeadlineRepository taxDeadlineRepository,
+                            AuditLogService auditLogService) {
         this.taxReturnRepository = taxReturnRepository;
         this.taxCalculationRepository = taxCalculationRepository;
         this.taxDeadlineRepository = taxDeadlineRepository;
+        this.auditLogService = auditLogService;
     }
 
     // ── List returns ─────────────────────────────────────────────────────────
@@ -89,7 +92,7 @@ public class TaxReturnService {
     // ── Generate return ──────────────────────────────────────────────────────
 
     @Transactional
-    public Map<String, Object> generate(User user, GenerateReturnRequest request) {
+    public Map<String, Object> generate(User user, GenerateReturnRequest request, String ipAddress) {
         if (request.getTaxType() == null || !VALID_TAX_TYPES.contains(request.getTaxType())) {
             throw new BadRequestException("tax_type must be one of: income_tax, vat, paye, withholding.");
         }
@@ -139,6 +142,7 @@ public class TaxReturnService {
         taxReturn.setTaxLiability(calc.getTaxLiability());
         taxReturn.setStatus("draft");
         taxReturnRepository.save(taxReturn);
+        auditLogService.log(user, "TAX_RETURN_GENERATED", taxType + " return generated for " + taxYear, ipAddress);
 
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("return_id", taxReturn.getReturnId());
@@ -231,7 +235,7 @@ public class TaxReturnService {
     // ── Submit ───────────────────────────────────────────────────────────────
 
     @Transactional
-    public Map<String, Object> submit(User user, UUID returnId, SubmitReturnRequest request) {
+    public Map<String, Object> submit(User user, UUID returnId, SubmitReturnRequest request, String ipAddress) {
         TaxReturn r = findForUser(user, returnId);
 
         if (!"draft".equals(r.getStatus())) {
@@ -254,6 +258,8 @@ public class TaxReturnService {
                 taxDeadlineRepository.save(deadline);
             });
 
+        auditLogService.log(user, "TAX_RETURN_SUBMITTED", r.getTaxType() + " return submitted, GRA ref: " + r.getGraReference(), ipAddress);
+
         return Map.of(
             "return_id", r.getReturnId(),
             "tax_type", r.getTaxType(),
@@ -267,7 +273,7 @@ public class TaxReturnService {
     // ── Amend ────────────────────────────────────────────────────────────────
 
     @Transactional
-    public Map<String, Object> amend(User user, UUID returnId, AmendReturnRequest request) {
+    public Map<String, Object> amend(User user, UUID returnId, AmendReturnRequest request, String ipAddress) {
         TaxReturn r = findForUser(user, returnId);
 
         if (!"rejected".equals(r.getStatus())) {
@@ -281,6 +287,7 @@ public class TaxReturnService {
         r.setAmendmentReason(request.getAmendmentReason());
         r.setAmendedAt(LocalDateTime.now());
         taxReturnRepository.save(r);
+        auditLogService.log(user, "TAX_RETURN_AMENDED", r.getTaxType() + " return amended: " + request.getAmendmentReason(), ipAddress);
 
         return Map.of(
             "return_id", r.getReturnId(),

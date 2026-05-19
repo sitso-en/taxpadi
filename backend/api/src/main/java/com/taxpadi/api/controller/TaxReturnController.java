@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.*;
 import java.util.Map;
 import java.util.UUID;
 
+import jakarta.servlet.http.HttpServletRequest;
+
 @RestController
 @RequestMapping("/api/v1/tax/returns")
 public class TaxReturnController {
@@ -40,10 +42,11 @@ public class TaxReturnController {
     @PostMapping("/generate")
     public ResponseEntity<ApiResponse<Map<String, Object>>> generate(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody GenerateReturnRequest request) {
+            @RequestBody GenerateReturnRequest request,
+            HttpServletRequest httpRequest) {
         User user = userDetails.getUser();
         return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(true,
-            taxReturnService.generate(user, request),
+            taxReturnService.generate(user, request, httpRequest.getRemoteAddr()),
             "Tax return generated. Please review before submitting."));
     }
 
@@ -71,10 +74,11 @@ public class TaxReturnController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> submit(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody(required = false) SubmitReturnRequest request) {
+            @RequestBody(required = false) SubmitReturnRequest request,
+            HttpServletRequest httpRequest) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
-            taxReturnService.submit(user, id, request),
+            taxReturnService.submit(user, id, request, httpRequest.getRemoteAddr()),
             "Tax return marked as submitted."));
     }
 
@@ -82,10 +86,11 @@ public class TaxReturnController {
     public ResponseEntity<ApiResponse<Map<String, Object>>> amend(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody AmendReturnRequest request) {
+            @RequestBody AmendReturnRequest request,
+            HttpServletRequest httpRequest) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
-            taxReturnService.amend(user, id, request),
+            taxReturnService.amend(user, id, request, httpRequest.getRemoteAddr()),
             "Tax return reset to draft. Please correct the figures and resubmit."));
     }
 }
