@@ -65,12 +65,14 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final SmsService smsService;
     private final JwtService jwtService;
+    private final AuditLogService auditLogService;
 
     public AuthService(UserRepository userRepository, OtpVerificationRepository otpVerificationRepository,
         UserTaxProfileRepository userTaxProfileRepository, TaxProfileRepository taxProfileRepository,
         RefreshTokenRepository refreshTokenRepository,
         DeviceTokenRepository deviceTokenRepository,
-        BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService
+        BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService,
+        AuditLogService auditLogService
     ){
         this.userRepository = userRepository;
         this.userTaxProfileRepository = userTaxProfileRepository;
@@ -81,6 +83,7 @@ public class AuthService {
         this.passwordEncoder = bCryptPasswordEncoder;
         this.smsService = smsService;
         this.jwtService = jwtService;
+        this.auditLogService = auditLogService;
     }
 
 
@@ -217,7 +220,7 @@ public class AuthService {
         return new ResendOtpResponse(phone, 10);
     }
 
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request, String ipAddress) {
         String phone = request.getPhone();
         log.info("Login attempt for phone={}", phone);
 
@@ -236,6 +239,7 @@ public class AuthService {
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             log.warn("Invalid password for userId={}", user.getUserId());
+            auditLogService.log(user, "LOGIN_FAILED", "Invalid password attempt", ipAddress);
             throw new IllegalArgumentException("Invalid phone number or password");
         }
 
@@ -250,6 +254,7 @@ public class AuthService {
 
         String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
         
+        auditLogService.log(user, "LOGIN", "Login from device: " + request.getDeviceInfo(), ipAddress);
         log.info("Login successful for userId={}", user.getUserId());
 
         UserSummary userSummary = new UserSummary(
@@ -286,7 +291,7 @@ public class AuthService {
         return new RefreshTokenResponse(newAccessToken, "Bearer", 900);
     }
 
-    public LogoutResponse logout(RefreshTokenRequest request) {
+    public LogoutResponse logout(RefreshTokenRequest request, String ipAddress) {
         String hash = hashToken(request.getRefreshToken());
         log.info("Logout attempt");
 
@@ -302,11 +307,12 @@ public class AuthService {
         token.setRevokedAt(LocalDateTime.now());
         refreshTokenRepository.save(token);
 
+        auditLogService.log(token.getUser(), "LOGOUT", "Session revoked", ipAddress);
         log.info("Logout successful for userId={}", token.getUser().getUserId());
         return new LogoutResponse("Logged out successfully");
     }
 
-    public RegisterBiometricResponse registerBiometric(RegisterBiometricRequest request, User user) {
+    public RegisterBiometricResponse registerBiometric(RegisterBiometricRequest request, User user, String ipAddress) {
         log.info("Biometric registration for userId={}, device={}", user.getUserId(), request.getDeviceInfo());
 
         String tokenHash = hashToken(request.getBiometricToken());
@@ -317,11 +323,12 @@ public class AuthService {
         deviceToken.setDeviceInfo(request.getDeviceInfo());
         deviceTokenRepository.save(deviceToken);
 
+        auditLogService.log(user, "BIOMETRIC_REGISTERED", "Device: " + request.getDeviceInfo(), ipAddress);
         log.info("Biometric registered for userId={}", user.getUserId());
         return new RegisterBiometricResponse(true, request.getDeviceInfo());
     }
 
-    public BiometricLoginResponse biometricLogin(BiometricLoginRequest request) {
+    public BiometricLoginResponse biometricLogin(BiometricLoginRequest request, String ipAddress) {
         log.info("Biometric login attempt from device={}", request.getDeviceInfo());
 
         String tokenHash = hashToken(request.getBiometricToken());
@@ -348,6 +355,7 @@ public class AuthService {
         
         String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
 
+        auditLogService.log(user, "BIOMETRIC_LOGIN", "Device: " + request.getDeviceInfo(), ipAddress);
         log.info("Biometric login successful for userId={}", user.getUserId());
 
         UserSummary userSummary = new UserSummary(
@@ -441,7 +449,7 @@ public class AuthService {
 
 
     @Transactional
-    public void resetPassword(String resetToken, String newPassword, String confirmPassword){
+    public void resetPassword(String resetToken, String newPassword, String confirmPassword, String ipAddress){
         if(!newPassword.equals(confirmPassword)){
             log.warn("New password is not equal to Confirm password");
             throw new IllegalStateException("Passwords do not match");
@@ -480,6 +488,7 @@ public class AuthService {
 
         refreshTokenRepository.revokeAllByUser(user);
 
+        auditLogService.log(user, "PASSWORD_RESET", "Password reset successfully", ipAddress);
         log.info("Password has been reset for user={}", user);
     }
 }
