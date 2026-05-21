@@ -48,7 +48,7 @@ taxpadi/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/your-username/taxpadi.git
+git clone https://github.com/sitso-en/taxpadi.git
 cd taxpadi
 ```
 
@@ -58,20 +58,20 @@ cd taxpadi
 docker compose up -d
 ```
 
-This starts PostgreSQL on `localhost:5432` and Redis on `localhost:6379`.
+This starts PostgreSQL on `localhost:5434` and Redis on `localhost:6379`.
 
 ### 3. Configure the backend
 
 Copy the environment template and fill in your API keys:
 
 ```bash
-cp backend/.env.example backend/.env
+cp backend/api/src/main/resources/application-example.properties backend/api/src/main/resources/application.properties
 ```
 
 Then run the backend:
 
 ```bash
-cd backend
+cd backend/api
 ./mvnw spring-boot:run
 ```
 

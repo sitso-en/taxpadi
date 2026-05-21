@@ -30,6 +30,7 @@ import com.taxpadi.api.dto.auth.VerifyResetOtpResponse;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.AuthService;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 
 @RestController
@@ -62,8 +63,9 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody @Valid LoginRequest request) {
-        LoginResponse data = authService.login(request);
+    public ResponseEntity<ApiResponse<LoginResponse>> login(@RequestBody @Valid LoginRequest request,
+            HttpServletRequest httpRequest) {
+        LoginResponse data = authService.login(request, httpRequest.getRemoteAddr());
         return ResponseEntity.ok(new ApiResponse<>(true, data, "Login successful"));
     }
 
@@ -74,23 +76,26 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<ApiResponse<LogoutResponse>> logout(@RequestBody @Valid RefreshTokenRequest request) {
-        LogoutResponse data = authService.logout(request);
+    public ResponseEntity<ApiResponse<LogoutResponse>> logout(@RequestBody @Valid RefreshTokenRequest request,
+            HttpServletRequest httpRequest) {
+        LogoutResponse data = authService.logout(request, httpRequest.getRemoteAddr());
         return ResponseEntity.ok(new ApiResponse<>(true, data, "Logged out successfully"));
     }
 
     @PostMapping("/biometric/register")
     public ResponseEntity<ApiResponse<RegisterBiometricResponse>> registerBiometric(
             @RequestBody @Valid RegisterBiometricRequest request,
-            @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
-        RegisterBiometricResponse data = authService.registerBiometric(request, userDetails.getUser());
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            HttpServletRequest httpRequest) {
+        RegisterBiometricResponse data = authService.registerBiometric(request, userDetails.getUser(), httpRequest.getRemoteAddr());
         return ResponseEntity.ok(new ApiResponse<>(true, data, "Biometric registered successfully"));
     }
 
     @PostMapping("/biometric/login")
     public ResponseEntity<ApiResponse<BiometricLoginResponse>> biometricLogin(
-            @RequestBody @Valid BiometricLoginRequest request) {
-        BiometricLoginResponse data = authService.biometricLogin(request);
+            @RequestBody @Valid BiometricLoginRequest request,
+            HttpServletRequest httpRequest) {
+        BiometricLoginResponse data = authService.biometricLogin(request, httpRequest.getRemoteAddr());
         return ResponseEntity.ok(new ApiResponse<>(true, data, "Biometric login successful"));
     }
 
@@ -107,14 +112,15 @@ public class AuthController {
     public ResponseEntity<ApiResponse<VerifyResetOtpResponse>> verifyResetOtp(
             @RequestBody @Valid VerifyResetOtpRequest request) {
         VerifyResetOtpResponse data = authService.verifyResetOtp(request.getPhone(), request.getOtpCode());
-        return ResponseEntity.ok(new ApiResponse<>(true, data, "OTP sent for reset password"));
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "OTP verified. You may now reset your password."));
     }
 
 
     @PostMapping("/reset-password")
     public ResponseEntity<ApiResponse<Void>> resetPassword(
-            @RequestBody @Valid  ResetPasswordRequest request) {
-        authService.resetPassword(request.getResetToken(), request.getNewPassword(), request.getConfirmPassword());
+            @RequestBody @Valid ResetPasswordRequest request,
+            HttpServletRequest httpRequest) {
+        authService.resetPassword(request.getResetToken(), request.getNewPassword(), request.getConfirmPassword(), httpRequest.getRemoteAddr());
         return ResponseEntity.ok(new ApiResponse<>(true, null, "Password reset successfully. Please log in with your new password."));
     }
     
