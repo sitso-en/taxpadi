@@ -193,7 +193,6 @@ public class PayeService {
         );
     }
 
-    // ── PAYE Records ─────────────────────────────────────────────────────────
 
     public Map<String, Object> getRecords(User user, Integer month, Integer year,
                                           UUID employeeId, Boolean remitted, int page, int limit) {
