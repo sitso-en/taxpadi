@@ -54,3 +54,5 @@ backend/api/src/main/resources/application.properties
 Thumbs.db.claude/
 CLAUDE.md
 .claude/
+
+google-services.json
