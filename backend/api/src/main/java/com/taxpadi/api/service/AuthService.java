@@ -66,13 +66,14 @@ public class AuthService {
     private final SmsService smsService;
     private final JwtService jwtService;
     private final AuditLogService auditLogService;
+    private final EmailService emailService;
 
     public AuthService(UserRepository userRepository, OtpVerificationRepository otpVerificationRepository,
         UserTaxProfileRepository userTaxProfileRepository, TaxProfileRepository taxProfileRepository,
         RefreshTokenRepository refreshTokenRepository,
         DeviceTokenRepository deviceTokenRepository,
         BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService,
-        AuditLogService auditLogService
+        AuditLogService auditLogService, EmailService emailService
     ){
         this.userRepository = userRepository;
         this.userTaxProfileRepository = userTaxProfileRepository;
@@ -84,6 +85,7 @@ public class AuthService {
         this.smsService = smsService;
         this.jwtService = jwtService;
         this.auditLogService = auditLogService;
+        this.emailService = emailService;
     }
 
 
@@ -179,6 +181,9 @@ public class AuthService {
         if (purpose == OtpPurpose.REGISTER) {
             user.setVerified(true);
             userRepository.save(user);
+            if (user.getEmail() != null) {
+                emailService.sendWelcome(user.getEmail(), user.getFullName());
+            }
             log.info("Account verified for userId={}", user.getUserId());
         }
 
@@ -489,6 +494,9 @@ public class AuthService {
         refreshTokenRepository.revokeAllByUser(user);
 
         auditLogService.log(user, "PASSWORD_RESET", "Password reset successfully", ipAddress);
+        if (user.getEmail() != null) {
+            emailService.sendPasswordReset(user.getEmail(), user.getFullName());
+        }
         log.info("Password has been reset for user={}", user);
     }
 }
