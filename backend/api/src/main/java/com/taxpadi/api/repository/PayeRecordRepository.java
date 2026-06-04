@@ -30,4 +30,6 @@ public interface PayeRecordRepository extends JpaRepository<PayeRecord, UUID> {
     List<PayeRecord> findAllByEmployee(Employee employee);
 
     Optional<PayeRecord> findByPayeIdAndUser(UUID payeId, User user);
+
+    boolean existsByEmployeeAndMonthAndYear(Employee employee, Integer month, Integer year);
 }
