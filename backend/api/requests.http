@@ -2,15 +2,16 @@
 ### Base URL: http://localhost:8080
 
 @baseUrl = http://localhost:8080
-@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiJlZTgwNDYyNi05OWM1LTQ3YmQtOWZjYy0yNWQ4NGFlNzhhMmYiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc3OTE1OTk5NCwiZXhwIjoxNzc5MTYwODk0fQ.vJKYryffuf1i4FKVkycU2nE2yURN_gCO6ZUW7gm4d00
-@refreshToken = paste-refresh-token-here
+@accessToken = eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJjZjI5Yzc1ZS1kYTRjLTQyYjAtYTkwYS0yZDc5MjA0NTgzNjYiLCJqdGkiOiJjYWE4YjBhYi0yYzI1LTRiYWMtOGVjNi03ZDBlMmI1NjkzYjEiLCJwaG9uZSI6IisyMzM1OTk3NDQ2NDYiLCJyb2xlIjoiVVNFUiIsImlhdCI6MTc4MDI0MTU3MiwiZXhwIjoxNzgwMjQyNDcyfQ.2A5uM5WvNF7YtFx-FriFIHif-9-3jh7DfY9h8lhlP-Y
 @profileId = paste-profile-id-here
 @notificationId = paste-notification-id-here
+@invoiceId = 62db7921-668b-4ad8-92f2-30b39127675c
+@referralId = paste-referral-id-here
+@transactionId = paste-transaction-id-here
+@refreshToken = paste-refresh-token-here
 
 
-### ============================================================
 ### GROUP 1 — AUTH
-### ============================================================
 
 
 ### 1. Register
@@ -98,9 +99,7 @@ Content-Type: application/json
 }
 
 
-### ============================================================
 ### GROUP 2 — PASSWORD
-### ============================================================
 
 
 ### 1. Forgot Password
@@ -133,9 +132,7 @@ Content-Type: application/json
 }
 
 
-### ============================================================
 ### GROUP 3 — USER
-### ============================================================
 
 
 ### 1. Get Profile
@@ -200,9 +197,7 @@ Authorization: Bearer {{accessToken}}
   "confirmation": "DELETE MY ACCOUNT PERMANENTLY"
 }
 
-### ============================================================
 ### GROUP 4 — SESSIONS
-### ============================================================
 
 
 ### 1. List Active Sessions
@@ -222,9 +217,7 @@ Authorization: Bearer {{accessToken}}
 
 
 
-### ============================================================
 ### GROUP 7 — MULTI-PROFILE
-### ============================================================
 
 
 ### 1. Get All Profiles
@@ -266,9 +259,7 @@ PUT {{baseUrl}}/api/v1/profiles/{{profileId}}/switch
 Authorization: Bearer {{accessToken}}
 
 
-### ============================================================
 ### GROUP 9 — TAX CALCULATIONS
-### ============================================================
 
 
 ### 1. Get Overall Tax Liability
@@ -311,9 +302,7 @@ POST {{baseUrl}}/api/v1/tax/liability/recalculate
 Authorization: Bearer {{accessToken}}
 
 
-### ============================================================                                                                                                                              
 ### GROUP 10 — TAX BRACKETS & RATES
-### ============================================================                                                                                                                              
                                                                                                                                                                                             
 
 ### 1. Get Income Tax Brackets
@@ -675,3 +664,317 @@ Authorization: Bearer {{accessToken}}
 }
 
 
+
+
+### GROUP 20: INVOICES
+
+### 1. Get All Invoices
+GET {{baseUrl}}/api/v1/invoices?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 2. Get All Invoices (filtered by status)
+GET {{baseUrl}}/api/v1/invoices?status=unpaid&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 3. Get Invoice Stats
+GET {{baseUrl}}/api/v1/invoices/stats
+Authorization: Bearer {{accessToken}}
+
+### 4. Create Invoice
+POST {{baseUrl}}/api/v1/invoices
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "client_name": "Sitsofe Nkrumah",
+  "client_email": "exl.mayres@gmail.com",
+  "client_phone": "+233551448215",
+  "description": "Web development services - May 2026",
+  "subtotal": 8000.00,
+  "due_date": "2026-06-15"
+}
+
+### 5. Get Single Invoice
+GET {{baseUrl}}/api/v1/invoices/{{invoiceId}}
+Authorization: Bearer {{accessToken}}
+
+### 6. Update Invoice
+PUT {{baseUrl}}/api/v1/invoices/{{invoiceId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "client_name": "Sitsofe Nkrumah",
+  "description": "Web development services - May 2026 (maintenance)",
+  "subtotal": 15000.00,
+  "due_date": "2026-06-20"
+}
+
+### 7. Mark Invoice as Paid
+PUT {{baseUrl}}/api/v1/invoices/{{invoiceId}}/paid
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{}
+
+### 8. Cancel Invoice
+PUT {{baseUrl}}/api/v1/invoices/{{invoiceId}}/cancel
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "reason": "Client requested cancellation"
+}
+
+### 9. Get Invoice PDF URL
+GET {{baseUrl}}/api/v1/invoices/{{invoiceId}}/pdf
+Authorization: Bearer {{accessToken}}
+
+### 10. Send Invoice via WhatsApp
+POST {{baseUrl}}/api/v1/invoices/{{invoiceId}}/send
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "channel": "whatsapp"
+}
+
+### 11. Send Invoice via Email
+POST {{baseUrl}}/api/v1/invoices/{{invoiceId}}/send
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "channel": "email"
+}
+
+### 12. Send Invoice via Download
+POST {{baseUrl}}/api/v1/invoices/{{invoiceId}}/send
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "channel": "download"
+}
+
+### 13. Download Invoice PDF (public — no auth required)
+GET {{baseUrl}}/api/v1/invoices/{{invoiceId}}/pdf/download
+
+
+###GROUP 23: REFERRAL OFFERS
+
+### 1. Get All Referral Offers
+GET {{baseUrl}}/api/v1/referrals?page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+### 2. Get Referral Offers (filtered by type)
+GET {{baseUrl}}/api/v1/referrals?offer_type=loan&page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+### 3. Check Eligibility
+POST {{baseUrl}}/api/v1/referrals/check-eligibility
+Authorization: Bearer {{accessToken}}
+
+### 4. Mark Offer as Viewed
+PUT {{baseUrl}}/api/v1/referrals/{{referralId}}/viewed
+Authorization: Bearer {{accessToken}}
+
+### 5. Mark Offer as Clicked (returns deep link)
+PUT {{baseUrl}}/api/v1/referrals/{{referralId}}/clicked
+Authorization: Bearer {{accessToken}}
+
+### 6. Dismiss Offer
+PUT {{baseUrl}}/api/v1/referrals/{{referralId}}/dismiss
+Authorization: Bearer {{accessToken}}
+
+### 7. Mark Offer as Converted (partner webhook)
+POST {{baseUrl}}/api/v1/referrals/{{referralId}}/converted
+Content-Type: application/json
+
+{
+  "partner_reference": "FIDO-REF-2026-001",
+  "product_name": "SME Business Loan",
+  "amount": 15000.00
+}
+
+
+### GROUP 8: TRANSACTIONS
+
+### 1. Get All Transactions (no filters)
+GET {{baseUrl}}/api/v1/transactions?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 2. Get Transactions (filtered by type)
+GET {{baseUrl}}/api/v1/transactions?type=income&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 3. Get Transactions (filtered by category and date range)
+GET {{baseUrl}}/api/v1/transactions?category=sales_income&date_from=2026-01-01&date_to=2026-12-31&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 4. Get Transactions (tax deductible expenses only)
+GET {{baseUrl}}/api/v1/transactions?type=expense&tax_deductible=true&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 5. Create Transaction (income)
+POST {{baseUrl}}/api/v1/transactions
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "type": "income",
+  "amount": 5000.00,
+  "category": "sales_income",
+  "description": "Payment from client for website design",
+  "tax_deductible": false,
+  "withholding_applicable": false,
+  "transaction_date": "2026-05-28"
+}
+
+### 6. Create Transaction (expense with withholding)
+POST {{baseUrl}}/api/v1/transactions
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "type": "income",
+  "amount": 2000.00,
+  "category": "services",
+  "description": "Consulting fee received",
+  "tax_deductible": false,
+  "withholding_applicable": true,
+  "transaction_date": "2026-05-28"
+}
+
+### 7. Get Single Transaction
+GET {{baseUrl}}/api/v1/transactions/{{transactionId}}
+Authorization: Bearer {{accessToken}}
+
+### 8. Update Transaction
+PUT {{baseUrl}}/api/v1/transactions/{{transactionId}}
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "amount": 5500.00,
+  "description": "Payment from client for website design (revised)",
+  "tax_deductible": true
+}
+
+### 9. Delete Transaction
+DELETE {{baseUrl}}/api/v1/transactions/{{transactionId}}
+Authorization: Bearer {{accessToken}}
+
+### 10. Validate Statement File Before Import
+POST {{baseUrl}}/api/v1/transactions/import/validate
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=----FormBoundary
+
+------FormBoundary
+Content-Disposition: form-data; name="provider"
+
+mtn_momo
+------FormBoundary
+Content-Disposition: form-data; name="file"; filename="statement.csv"
+Content-Type: text/csv
+
+date,description,credit,debit
+2026-01-15,Payment from Kwame,500.00,
+2026-01-17,Office rent,,200.00
+2026-01-20,Transfer from savings,300.00,
+------FormBoundary--
+
+### 11. Import Statement
+POST {{baseUrl}}/api/v1/transactions/import
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=----FormBoundary
+
+------FormBoundary
+Content-Disposition: form-data; name="provider"
+
+mtn_momo
+------FormBoundary
+Content-Disposition: form-data; name="statement_from"
+
+2026-01-01
+------FormBoundary
+Content-Disposition: form-data; name="statement_to"
+
+2026-01-31
+------FormBoundary
+Content-Disposition: form-data; name="file"; filename="momo_jan2026.csv"
+Content-Type: text/csv
+
+date,description,credit,debit
+2026-01-15,Payment from Kwame,500.00,
+2026-01-17,Office rent,,200.00
+2026-01-20,Commission received,300.00,
+------FormBoundary--
+
+### 12. Get Import History
+GET {{baseUrl}}/api/v1/transactions/import/history
+Authorization: Bearer {{accessToken}}
+
+
+### GROUP 21: TAXBOT
+
+### 1. Ask TaxBot a question
+POST {{baseUrl}}/api/v1/taxbot/ask
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "question": "What is the current VAT registration threshold in Ghana?"
+}
+
+### 2. Ask TaxBot — PAYE question
+POST {{baseUrl}}/api/v1/taxbot/ask
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "question": "How do I calculate PAYE for an employee earning GHS 5000 per month?"
+}
+
+### 3. Get TaxBot conversation history
+GET {{baseUrl}}/api/v1/taxbot/history?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+
+### GROUP 22: REPORTS & EXPORT
+
+### 1. Get Financial Summary (current month)
+GET {{baseUrl}}/api/v1/reports/summary
+Authorization: Bearer {{accessToken}}
+
+### 2. Get Financial Summary (last week)
+GET {{baseUrl}}/api/v1/reports/summary?period=week
+Authorization: Bearer {{accessToken}}
+
+### 3. Get Financial Summary (custom date range)
+GET {{baseUrl}}/api/v1/reports/summary?date_from=2026-01-01&date_to=2026-05-31
+Authorization: Bearer {{accessToken}}
+
+### 4. Export Data (JSON)
+GET {{baseUrl}}/api/v1/reports/export?format=json&date_from=2026-01-01&date_to=2026-05-31
+Authorization: Bearer {{accessToken}}
+
+### 5. Export Data (PDF — stub, requires S3)
+GET {{baseUrl}}/api/v1/reports/export?format=pdf&date_from=2026-01-01&date_to=2026-05-31
+Authorization: Bearer {{accessToken}}
+
+### 6. Get Income Statement (default 6 months)
+GET {{baseUrl}}/api/v1/reports/income-statement
+Authorization: Bearer {{accessToken}}
+
+### 7. Get Income Statement (3 months)
+GET {{baseUrl}}/api/v1/reports/income-statement?months=3
+Authorization: Bearer {{accessToken}}
+
+### 8. Get Tax History (all available years)
+GET {{baseUrl}}/api/v1/reports/tax-history
+Authorization: Bearer {{accessToken}}
+
+### 9. Get Tax History (specific range)
+GET {{baseUrl}}/api/v1/reports/tax-history?year_from=2025&year_to=2026
+Authorization: Bearer {{accessToken}}
