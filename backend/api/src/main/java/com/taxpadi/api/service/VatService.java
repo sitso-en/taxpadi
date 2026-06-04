@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.List;
+import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ import com.taxpadi.api.exception.ConflictException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.model.VatRecord;
+import com.taxpadi.api.repository.TransactionRepository;
 import com.taxpadi.api.repository.VatRecordRepository;
 
 @Service
@@ -29,10 +31,13 @@ public class VatService {
 
     private final VatRecordRepository vatRecordRepository;
     private final GhanaTaxEngine taxEngine;
+    private final TransactionRepository transactionRepository;
 
-    public VatService(VatRecordRepository vatRecordRepository, GhanaTaxEngine taxEngine) {
+    public VatService(VatRecordRepository vatRecordRepository, GhanaTaxEngine taxEngine,
+            TransactionRepository transactionRepository) {
         this.vatRecordRepository = vatRecordRepository;
         this.taxEngine = taxEngine;
+        this.transactionRepository = transactionRepository;
     }
 
     public VatStatusResponse getStatus(User user, Integer month, Integer year) {
@@ -43,7 +48,13 @@ public class VatService {
             .findByUserAndMonthAndYear(user, resolvedMonth, resolvedYear)
             .orElseThrow(() -> new NotFoundException("No VAT record found for this period."));
 
-        String warning = buildThresholdWarning(record.getTotalSales());
+        LocalDate yearStart = LocalDate.of(resolvedYear, 1, 1);
+        LocalDate yearEnd = LocalDate.of(resolvedYear, 12, 31);
+        BigDecimal annualRevenue = Optional.ofNullable(
+            transactionRepository.sumAmountByUserAndTypeAndDateRange(user, "income", yearStart, yearEnd))
+            .orElse(BigDecimal.ZERO);
+
+        String warning = buildThresholdWarning(annualRevenue);
 
         return new VatStatusResponse(
             record.getMonth(), record.getYear(),

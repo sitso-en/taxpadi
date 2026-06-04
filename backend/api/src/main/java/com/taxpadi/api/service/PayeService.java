@@ -202,6 +202,7 @@ public class PayeService {
 
         Page<PayeRecord> results;
         if (month != null && year != null) {
+            generateMonthlyRecords(user, month, year);
             results = payeRecordRepository.findAllByUserAndMonthAndYear(user, month, year, pageable);
         } else if (year != null) {
             results = payeRecordRepository.findAllByUserAndYear(user, year, pageable);
@@ -241,8 +242,10 @@ public class PayeService {
     public Map<String, Object> getMonthlySummary(User user, int month, int year) {
         if (month < 1 || month > 12) throw new BadRequestException("Month must be between 1 and 12.");
 
+        generateMonthlyRecords(user, month, year);
+
         List<PayeRecord> records = payeRecordRepository.findAllByUserAndMonthAndYear(user, month, year);
-        if (records.isEmpty()) throw new NotFoundException("No PAYE records found for this month and year.");
+        if (records.isEmpty()) throw new NotFoundException("No active employees found. Add employees before viewing PAYE records.");
 
         LocalDate dueDate = LocalDate.of(year, month, 1).plusMonths(1).withDayOfMonth(15);
         long daysUntilDue = LocalDate.now().until(dueDate).getDays();
@@ -358,6 +361,31 @@ public class PayeService {
             ),
             "ready_for_submission", readyForSubmission
         );
+    }
+
+    // ── Record generation ────────────────────────────────────────────────────
+
+    @Transactional
+    public void generateMonthlyRecords(User user, int month, int year) {
+        List<Employee> activeEmployees = employeeRepository.findAllByUserAndIsActive(user, true);
+        for (Employee emp : activeEmployees) {
+            if (payeRecordRepository.existsByEmployeeAndMonthAndYear(emp, month, year)) {
+                continue;
+            }
+            BigDecimal taxableSalary = computeTaxableSalary(emp);
+            BigDecimal payeDeducted = taxEngine.calculatePaye(taxableSalary);
+
+            PayeRecord record = new PayeRecord();
+            record.setUser(user);
+            record.setEmployee(emp);
+            record.setMonth(month);
+            record.setYear(year);
+            record.setGrossSalary(emp.getGrossSalary());
+            record.setTaxableSalary(taxableSalary);
+            record.setPayeDeducted(payeDeducted);
+            record.setRemitted(false);
+            payeRecordRepository.save(record);
+        }
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────
