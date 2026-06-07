@@ -51,7 +51,8 @@ public class DeviceToken {
     }
 
 
-    // --- Getters and Setters ---
+    
+
 
     public UUID getTokenId() { return tokenId; }
 
