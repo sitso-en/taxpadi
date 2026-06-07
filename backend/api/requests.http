@@ -9,11 +9,15 @@
 @referralId = paste-referral-id-here
 @transactionId = paste-transaction-id-here
 @refreshToken = paste-refresh-token-here
+@returnId = paste-return-id-here
+
+
+
+
+
 
 
 ### GROUP 1 — AUTH
-
-
 ### 1. Register
 POST {{baseUrl}}/api/v1/auth/register
 Content-Type: application/json
@@ -99,9 +103,14 @@ Content-Type: application/json
 }
 
 
+
+
+
+
+
+
+
 ### GROUP 2 — PASSWORD
-
-
 ### 1. Forgot Password
 POST {{baseUrl}}/api/v1/auth/forgot-password
 Content-Type: application/json
@@ -132,9 +141,18 @@ Content-Type: application/json
 }
 
 
+
+
+
+
+
+
+
+
+
+
+
 ### GROUP 3 — USER
-
-
 ### 1. Get Profile
 GET {{baseUrl}}/api/v1/users/me
 Authorization: Bearer {{accessToken}}
@@ -197,9 +215,17 @@ Authorization: Bearer {{accessToken}}
   "confirmation": "DELETE MY ACCOUNT PERMANENTLY"
 }
 
+
+
+
+
+
+
+
+
+
+
 ### GROUP 4 — SESSIONS
-
-
 ### 1. List Active Sessions
 GET {{baseUrl}}/api/v1/users/me/sessions
 Authorization: Bearer {{accessToken}}
@@ -217,9 +243,14 @@ Authorization: Bearer {{accessToken}}
 
 
 
+
+
+
+
+
+
+
 ### GROUP 7 — MULTI-PROFILE
-
-
 ### 1. Get All Profiles
 GET {{baseUrl}}/api/v1/profiles
 Authorization: Bearer {{accessToken}}
@@ -259,9 +290,15 @@ PUT {{baseUrl}}/api/v1/profiles/{{profileId}}/switch
 Authorization: Bearer {{accessToken}}
 
 
+
+
+
+
+
+
+
+
 ### GROUP 9 — TAX CALCULATIONS
-
-
 ### 1. Get Overall Tax Liability
 GET {{baseUrl}}/api/v1/tax/liability
 Authorization: Bearer {{accessToken}}
@@ -302,9 +339,14 @@ POST {{baseUrl}}/api/v1/tax/liability/recalculate
 Authorization: Bearer {{accessToken}}
 
 
-### GROUP 10 — TAX BRACKETS & RATES
-                                                                                                                                                                                            
 
+
+
+
+
+
+
+### GROUP 10 — TAX BRACKETS & RATES                                                                                                                                                                            
 ### 1. Get Income Tax Brackets
 GET {{baseUrl}}/api/v1/tax/brackets
 Authorization: Bearer {{accessToken}}
@@ -315,9 +357,14 @@ GET {{baseUrl}}/api/v1/tax/rates
 Authorization: Bearer {{accessToken}}
 
 
-### ============================================================
+
+
+
+
+
+
+
 ### GROUP 11 — VAT
-### ============================================================
 ### 1. Get VAT Status (current month)
 GET {{baseUrl}}/api/v1/tax/vat/status
 Authorization: Bearer {{accessToken}}
@@ -364,10 +411,14 @@ GET {{baseUrl}}/api/v1/tax/vat/history?year=2026
 Authorization: Bearer {{accessToken}}
 
 
-### ============================================================
-### GROUP 12 — PAYE
-### ============================================================
 
+
+
+
+
+
+
+### GROUP 12 — PAYE
 @employeeId = 4c725b5b-30d9-4605-9c3d-b863c9848e91
 @payeRecordId = paste-paye-record-id-here
 
@@ -459,9 +510,10 @@ Authorization: Bearer {{accessToken}}
 
 
 
+
+
+
 ### GROUP 13 — WITHHOLDING TAX
-
-
 @whtTransactionId = paste-transaction-id-here
 
 
@@ -500,13 +552,14 @@ PUT {{baseUrl}}/api/v1/tax/withholding/transactions/{{whtTransactionId}}/remit
 Authorization: Bearer {{accessToken}}
 
 
-### ============================================================
+
+
+
+
+
+
+
 ### GROUP 14 — TAX RETURNS
-### ============================================================
-
-@returnId = paste-return-id-here
-
-
 ### 1. Get All Tax Returns
 GET {{baseUrl}}/api/v1/tax/returns
 Authorization: Bearer {{accessToken}}
@@ -587,16 +640,14 @@ Authorization: Bearer {{accessToken}}
 }
 
 
-### Audit Log
 
-### 1. Get Audit Log
-GET {{baseUrl}}/api/v1/audit-log?page=1&limit=20
-Authorization: Bearer {{accessToken}}
+
+
+
 
 
 
 ### Notifications
-
 ### 1. Register FCM Device Token
 POST {{baseUrl}}/api/v1/notifications/register
 Content-Type: application/json
@@ -666,8 +717,12 @@ Authorization: Bearer {{accessToken}}
 
 
 
-### GROUP 20: INVOICES
 
+
+
+
+
+### GROUP 20: INVOICES
 ### 1. Get All Invoices
 GET {{baseUrl}}/api/v1/invoices?page=1&limit=20
 Authorization: Bearer {{accessToken}}
@@ -761,8 +816,15 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/invoices/{{invoiceId}}/pdf/download
 
 
-###GROUP 23: REFERRAL OFFERS
 
+
+
+
+
+
+
+
+###GROUP 23: REFERRAL OFFERS
 ### 1. Get All Referral Offers
 GET {{baseUrl}}/api/v1/referrals?page=1&limit=10
 Authorization: Bearer {{accessToken}}
@@ -798,8 +860,15 @@ Content-Type: application/json
 }
 
 
-### GROUP 8: TRANSACTIONS
 
+
+
+
+
+
+
+
+### GROUP 8: TRANSACTIONS
 ### 1. Get All Transactions (no filters)
 GET {{baseUrl}}/api/v1/transactions?page=1&limit=20
 Authorization: Bearer {{accessToken}}
@@ -916,8 +985,16 @@ GET {{baseUrl}}/api/v1/transactions/import/history
 Authorization: Bearer {{accessToken}}
 
 
-### GROUP 21: TAXBOT
 
+
+
+
+
+
+
+
+
+### GROUP 21: TAXBOT
 ### 1. Ask TaxBot a question
 POST {{baseUrl}}/api/v1/taxbot/ask
 Content-Type: application/json
@@ -941,8 +1018,15 @@ GET {{baseUrl}}/api/v1/taxbot/history?page=1&limit=20
 Authorization: Bearer {{accessToken}}
 
 
-### GROUP 22: REPORTS & EXPORT
 
+
+
+
+
+
+
+
+### GROUP 22: REPORTS & EXPORT
 ### 1. Get Financial Summary (current month)
 GET {{baseUrl}}/api/v1/reports/summary
 Authorization: Bearer {{accessToken}}
@@ -977,4 +1061,165 @@ Authorization: Bearer {{accessToken}}
 
 ### 9. Get Tax History (specific range)
 GET {{baseUrl}}/api/v1/reports/tax-history?year_from=2025&year_to=2026
+Authorization: Bearer {{accessToken}}
+
+
+
+
+
+
+
+
+### GROUP 23: REFERRAL OFFERS
+### 1. Get referral offers (all)
+GET {{baseUrl}}/api/v1/referrals
+Authorization: Bearer {{accessToken}}
+
+### 2. Get referral offers (filtered by type)
+GET {{baseUrl}}/api/v1/referrals?offer_type=loan&page=1&limit=10
+Authorization: Bearer {{accessToken}}
+
+### 3. Check eligibility for referral offers
+POST {{baseUrl}}/api/v1/referrals/check-eligibility
+Authorization: Bearer {{accessToken}}
+
+### 4. Mark offer as viewed
+PUT {{baseUrl}}/api/v1/referrals/{{referralId}}/viewed
+Authorization: Bearer {{accessToken}}
+
+### 5. Mark offer as clicked (get deep link)
+PUT {{baseUrl}}/api/v1/referrals/{{referralId}}/clicked
+Authorization: Bearer {{accessToken}}
+
+### 6. Dismiss offer
+PUT {{baseUrl}}/api/v1/referrals/{{referralId}}/dismiss
+Authorization: Bearer {{accessToken}}
+
+### 7. Mark offer as converted (partner webhook)
+POST {{baseUrl}}/api/v1/referrals/{{referralId}}/converted
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "partner_reference": "PARTNER-REF-001",
+  "converted_at": "2026-06-05T10:00:00",
+  "product_name": "Quick Loan GHS 5000",
+  "amount": 5000.00
+}
+
+
+
+
+
+
+
+
+
+### GROUP 24: NOTIFICATIONS
+### 1. Register FCM token (Android)
+POST {{baseUrl}}/api/v1/notifications/register
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fcm_token": "fcm-token-sample-android-abc123",
+  "device_info": "Samsung Galaxy S23",
+  "platform": "android"
+}
+
+### 2. Register FCM token (iOS)
+POST {{baseUrl}}/api/v1/notifications/register
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fcm_token": "fcm-token-sample-ios-xyz789",
+  "device_info": "iPhone 15",
+  "platform": "ios"
+}
+
+### 3. Unregister FCM token
+DELETE {{baseUrl}}/api/v1/notifications/register
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "fcm_token": "fcm-token-sample-android-abc123"
+}
+
+### 4. Get all notifications
+GET {{baseUrl}}/api/v1/notifications?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 5. Get unread notification count
+GET {{baseUrl}}/api/v1/notifications/unread-count
+Authorization: Bearer {{accessToken}}
+
+### 6. Get single notification
+GET {{baseUrl}}/api/v1/notifications/{{notificationId}}
+Authorization: Bearer {{accessToken}}
+
+### 7. Mark notification as read
+PUT {{baseUrl}}/api/v1/notifications/{{notificationId}}/read
+Authorization: Bearer {{accessToken}}
+
+### 8. Mark all notifications as read
+PUT {{baseUrl}}/api/v1/notifications/read-all
+Authorization: Bearer {{accessToken}}
+
+### 9. Delete a notification
+DELETE {{baseUrl}}/api/v1/notifications/{{notificationId}}
+Authorization: Bearer {{accessToken}}
+
+### 10. Clear all notifications
+DELETE {{baseUrl}}/api/v1/notifications
+Authorization: Bearer {{accessToken}}
+
+### 11. Get notification preferences
+GET {{baseUrl}}/api/v1/notifications/preferences
+Authorization: Bearer {{accessToken}}
+
+### 12. Update notification preferences (all on)
+PUT {{baseUrl}}/api/v1/notifications/preferences
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "deadline_reminders": true,
+  "penalty_alerts": true,
+  "vault_suggestions": true,
+  "referral_offers": true,
+  "payment_confirmations": true,
+  "system_updates": true
+}
+
+### 13. Update notification preferences (partial update)
+PUT {{baseUrl}}/api/v1/notifications/preferences
+Content-Type: application/json
+Authorization: Bearer {{accessToken}}
+
+{
+  "vault_suggestions": false,
+  "referral_offers": false
+}
+
+
+
+
+
+
+
+
+
+### GROUP 25: AUDIT LOG
+### 1. Get audit logs (all)
+GET {{baseUrl}}/api/v1/audit-log?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 2. Get audit logs (filtered by action)
+GET {{baseUrl}}/api/v1/audit-log?action=LOGIN&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 3. Get audit logs (filtered by date range)
+GET {{baseUrl}}/api/v1/audit-log?date_from=2026-01-01&date_to=2026-06-05&page=1&limit=20
 Authorization: Bearer {{accessToken}}
