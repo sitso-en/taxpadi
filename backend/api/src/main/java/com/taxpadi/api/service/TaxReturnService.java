@@ -1,25 +1,7 @@
 package com.taxpadi.api.service;
 
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.YearMonth;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.taxpadi.api.dto.taxreturn.AmendReturnRequest;
-import com.taxpadi.api.dto.taxreturn.GenerateReturnRequest;
-import com.taxpadi.api.dto.taxreturn.SubmitReturnRequest;
-import com.taxpadi.api.dto.taxreturn.TaxReturnSummaryDto;
+import com.taxpadi.api.dto.common.PaginationInfo;
+import com.taxpadi.api.dto.taxreturn.*;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.ForbiddenException;
 import com.taxpadi.api.exception.NotFoundException;
@@ -29,13 +11,25 @@ import com.taxpadi.api.model.User;
 import com.taxpadi.api.repository.TaxCalculationRepository;
 import com.taxpadi.api.repository.TaxDeadlineRepository;
 import com.taxpadi.api.repository.TaxReturnRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.YearMonth;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 public class TaxReturnService {
 
     private static final List<String> VALID_TAX_TYPES = List.of("income_tax", "vat", "paye", "withholding");
 
-    // Ghana 2025 annual income tax brackets for preview breakdown
     private static final BigDecimal[][] INCOME_TAX_BRACKETS = {
         { new BigDecimal("5880"),   new BigDecimal("0.00"),  new BigDecimal("0") },
         { new BigDecimal("1320"),   new BigDecimal("0.05"),  new BigDecimal("5") },
@@ -61,10 +55,8 @@ public class TaxReturnService {
         this.auditLogService = auditLogService;
     }
 
-    // ── List returns ─────────────────────────────────────────────────────────
-
-    public Map<String, Object> getReturns(User user, String taxType, String status,
-                                          Integer year, int page, int limit) {
+    public TaxReturnListResponse getReturns(User user, String taxType, String status,
+                                            Integer year, int page, int limit) {
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 100);
         Page<TaxReturn> results = taxReturnRepository.findAllByFilters(
@@ -78,21 +70,14 @@ public class TaxReturnService {
                 r.getStatus(), r.getSubmittedAt(), r.getGraReference(), r.getCreatedAt()
             )).toList();
 
-        return Map.of(
-            "returns", returns,
-            "pagination", Map.of(
-                "total", results.getTotalElements(),
-                "page", page,
-                "limit", safeLimit,
-                "total_pages", results.getTotalPages()
-            )
+        return new TaxReturnListResponse(
+            returns,
+            new PaginationInfo(results.getTotalElements(), page, safeLimit, results.getTotalPages())
         );
     }
 
-    // ── Generate return ──────────────────────────────────────────────────────
-
     @Transactional
-    public Map<String, Object> generate(User user, GenerateReturnRequest request, String ipAddress) {
+    public GenerateReturnResponse generate(User user, GenerateReturnRequest request, String ipAddress) {
         if (request.getTaxType() == null || !VALID_TAX_TYPES.contains(request.getTaxType())) {
             throw new BadRequestException("tax_type must be one of: income_tax, vat, paye, withholding.");
         }
@@ -104,10 +89,10 @@ public class TaxReturnService {
             throw new BadRequestException("month is required for VAT and PAYE returns.");
         }
 
-        LocalDate periodStart;
-        LocalDate periodEnd;
         String taxType = request.getTaxType();
         int taxYear = request.getTaxYear();
+        LocalDate periodStart;
+        LocalDate periodEnd;
 
         if (taxType.equals("vat") || taxType.equals("paye")) {
             YearMonth ym = YearMonth.of(taxYear, request.getMonth());
@@ -118,13 +103,11 @@ public class TaxReturnService {
             periodEnd = LocalDate.of(taxYear, 12, 31);
         }
 
-        // Check for duplicate
         if (taxReturnRepository.findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
                 user, taxType, periodStart, periodEnd).isPresent()) {
             throw new BadRequestException("A return already exists for this tax type and period.");
         }
 
-        // Pull from tax_calculations
         TaxCalculation calc = taxCalculationRepository
             .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, taxType, periodStart, periodEnd)
             .orElseThrow(() -> new NotFoundException("No transactions found for this period."));
@@ -144,98 +127,86 @@ public class TaxReturnService {
         taxReturnRepository.save(taxReturn);
         auditLogService.log(user, "TAX_RETURN_GENERATED", taxType + " return generated for " + taxYear, ipAddress);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("return_id", taxReturn.getReturnId());
-        result.put("tax_type", taxReturn.getTaxType());
-        result.put("tax_year", taxReturn.getTaxYear());
-        result.put("period_start", taxReturn.getPeriodStart());
-        result.put("period_end", taxReturn.getPeriodEnd());
-        result.put("gross_income", taxReturn.getGrossIncome());
-        result.put("total_deductions", taxReturn.getTotalDeductions());
-        result.put("taxable_income", taxReturn.getTaxableIncome());
-        result.put("tax_liability", taxReturn.getTaxLiability());
-        result.put("status", "draft");
-        result.put("created_at", taxReturn.getCreatedAt());
-        return result;
+        GenerateReturnResponse response = new GenerateReturnResponse();
+        response.setReturnId(taxReturn.getReturnId());
+        response.setTaxType(taxReturn.getTaxType());
+        response.setTaxYear(taxReturn.getTaxYear());
+        response.setPeriodStart(taxReturn.getPeriodStart());
+        response.setPeriodEnd(taxReturn.getPeriodEnd());
+        response.setGrossIncome(taxReturn.getGrossIncome());
+        response.setTotalDeductions(taxReturn.getTotalDeductions());
+        response.setTaxableIncome(taxReturn.getTaxableIncome());
+        response.setTaxLiability(taxReturn.getTaxLiability());
+        response.setStatus("draft");
+        response.setCreatedAt(taxReturn.getCreatedAt());
+        return response;
     }
 
-    // ── Get single return ────────────────────────────────────────────────────
-
-    public Map<String, Object> getReturn(User user, UUID returnId) {
+    public TaxReturnDetailResponse getReturn(User user, UUID returnId) {
         TaxReturn r = findForUser(user, returnId);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("return_id", r.getReturnId());
-        result.put("tax_type", r.getTaxType());
-        result.put("tax_year", r.getTaxYear());
-        result.put("period_start", r.getPeriodStart());
-        result.put("period_end", r.getPeriodEnd());
-        result.put("gross_income", r.getGrossIncome());
-        result.put("total_deductions", r.getTotalDeductions());
-        result.put("taxable_income", r.getTaxableIncome());
-        result.put("tax_liability", r.getTaxLiability());
-        result.put("status", r.getStatus());
-        result.put("submitted_at", r.getSubmittedAt());
-        result.put("gra_reference", r.getGraReference());
-        result.put("payment", Map.of("paid", false, "payment_id", "", "amount_paid", "", "paid_at", ""));
-        result.put("created_at", r.getCreatedAt());
-        result.put("updated_at", r.getUpdatedAt());
-        return result;
+        TaxReturnDetailResponse response = new TaxReturnDetailResponse();
+        response.setReturnId(r.getReturnId());
+        response.setTaxType(r.getTaxType());
+        response.setTaxYear(r.getTaxYear());
+        response.setPeriodStart(r.getPeriodStart());
+        response.setPeriodEnd(r.getPeriodEnd());
+        response.setGrossIncome(r.getGrossIncome());
+        response.setTotalDeductions(r.getTotalDeductions());
+        response.setTaxableIncome(r.getTaxableIncome());
+        response.setTaxLiability(r.getTaxLiability());
+        response.setStatus(r.getStatus());
+        response.setSubmittedAt(r.getSubmittedAt());
+        response.setGraReference(r.getGraReference());
+        response.setPayment(new PaymentInfo(false, "", "", ""));
+        response.setCreatedAt(r.getCreatedAt());
+        response.setUpdatedAt(r.getUpdatedAt());
+        return response;
     }
 
-    // ── Preview ──────────────────────────────────────────────────────────────
-
-    public Map<String, Object> preview(User user, UUID returnId) {
+    public PreviewResponse preview(User user, UUID returnId) {
         TaxReturn r = findForUser(user, returnId);
 
         if (!"draft".equals(r.getStatus())) {
             throw new BadRequestException("This return has already been submitted.");
         }
 
-        List<Map<String, Object>> warnings = new ArrayList<>();
+        List<PreviewWarning> warnings = new ArrayList<>();
         if (user.getTin() == null || user.getTin().isBlank()) {
-            warnings.add(Map.of(
-                "code", "TIN_MISSING",
-                "message", "Your TIN is not set. You can still submit but GRA may follow up."
+            warnings.add(new PreviewWarning(
+                "TIN_MISSING",
+                "Your TIN is not set. You can still submit but GRA may follow up."
             ));
         }
 
-        List<Map<String, Object>> bracketBreakdown = new ArrayList<>();
+        List<BracketBreakdownItem> bracketBreakdown = new ArrayList<>();
         if (r.getTaxType().equals("income_tax") || r.getTaxType().equals("paye")) {
             bracketBreakdown = computeBracketBreakdown(r.getTaxableIncome());
         }
 
-        return Map.of(
-            "return_id", r.getReturnId(),
-            "taxpayer", Map.of(
-                "full_name", user.getFullName(),
-                "tin", user.getTin() != null ? user.getTin() : "",
-                "phone", user.getPhone(),
-                "region", user.getRegion(),
-                "taxpayer_category", user.getTaxpayerCategory()
-            ),
-            "return_details", Map.of(
-                "tax_type", r.getTaxType(),
-                "tax_year", r.getTaxYear(),
-                "period_start", r.getPeriodStart(),
-                "period_end", r.getPeriodEnd()
-            ),
-            "financials", Map.of(
-                "gross_income", r.getGrossIncome(),
-                "total_deductions", r.getTotalDeductions(),
-                "taxable_income", r.getTaxableIncome(),
-                "tax_liability", r.getTaxLiability(),
-                "bracket_breakdown", bracketBreakdown
-            ),
-            "warnings", warnings,
-            "ready_to_submit", warnings.isEmpty()
-        );
+        PreviewResponse response = new PreviewResponse();
+        response.setReturnId(r.getReturnId());
+        response.setTaxpayer(new TaxpayerInfo(
+            user.getFullName(),
+            user.getTin() != null ? user.getTin() : "",
+            user.getPhone(),
+            user.getRegion(),
+            user.getTaxpayerCategory() != null ? user.getTaxpayerCategory().name().toLowerCase() : null
+        ));
+        response.setReturnDetails(new ReturnDetails(
+            r.getTaxType(), r.getTaxYear(), r.getPeriodStart(), r.getPeriodEnd()
+        ));
+        response.setFinancials(new Financials(
+            r.getGrossIncome(), r.getTotalDeductions(), r.getTaxableIncome(),
+            r.getTaxLiability(), bracketBreakdown
+        ));
+        response.setWarnings(warnings);
+        response.setReadyToSubmit(warnings.isEmpty());
+        return response;
     }
 
-    // ── Submit ───────────────────────────────────────────────────────────────
-
     @Transactional
-    public Map<String, Object> submit(User user, UUID returnId, SubmitReturnRequest request, String ipAddress) {
+    public SubmitReturnResponse submit(User user, UUID returnId, SubmitReturnRequest request, String ipAddress) {
         TaxReturn r = findForUser(user, returnId);
 
         if (!"draft".equals(r.getStatus())) {
@@ -248,7 +219,6 @@ public class TaxReturnService {
             ? request.getSubmittedAt() : LocalDateTime.now());
         taxReturnRepository.save(r);
 
-        // Mark matching deadline as completed
         taxDeadlineRepository
             .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
                 user, r.getTaxType(), r.getPeriodStart(), r.getPeriodEnd())
@@ -258,22 +228,21 @@ public class TaxReturnService {
                 taxDeadlineRepository.save(deadline);
             });
 
-        auditLogService.log(user, "TAX_RETURN_SUBMITTED", r.getTaxType() + " return submitted, GRA ref: " + r.getGraReference(), ipAddress);
+        auditLogService.log(user, "TAX_RETURN_SUBMITTED",
+            r.getTaxType() + " return submitted, GRA ref: " + r.getGraReference(), ipAddress);
 
-        return Map.of(
-            "return_id", r.getReturnId(),
-            "tax_type", r.getTaxType(),
-            "status", "submitted",
-            "gra_reference", r.getGraReference() != null ? r.getGraReference() : "",
-            "submitted_at", r.getSubmittedAt(),
-            "next_step", "Proceed to payment to complete your tax obligation."
-        );
+        SubmitReturnResponse response = new SubmitReturnResponse();
+        response.setReturnId(r.getReturnId());
+        response.setTaxType(r.getTaxType());
+        response.setStatus("submitted");
+        response.setGraReference(r.getGraReference());
+        response.setSubmittedAt(r.getSubmittedAt());
+        response.setNextStep("Proceed to payment to complete your tax obligation.");
+        return response;
     }
 
-    // ── Amend ────────────────────────────────────────────────────────────────
-
     @Transactional
-    public Map<String, Object> amend(User user, UUID returnId, AmendReturnRequest request, String ipAddress) {
+    public AmendReturnResponse amend(User user, UUID returnId, AmendReturnRequest request, String ipAddress) {
         TaxReturn r = findForUser(user, returnId);
 
         if (!"rejected".equals(r.getStatus())) {
@@ -287,18 +256,17 @@ public class TaxReturnService {
         r.setAmendmentReason(request.getAmendmentReason());
         r.setAmendedAt(LocalDateTime.now());
         taxReturnRepository.save(r);
-        auditLogService.log(user, "TAX_RETURN_AMENDED", r.getTaxType() + " return amended: " + request.getAmendmentReason(), ipAddress);
+        auditLogService.log(user, "TAX_RETURN_AMENDED",
+            r.getTaxType() + " return amended: " + request.getAmendmentReason(), ipAddress);
 
-        return Map.of(
-            "return_id", r.getReturnId(),
-            "tax_type", r.getTaxType(),
-            "status", "draft",
-            "amendment_reason", r.getAmendmentReason(),
-            "amended_at", r.getAmendedAt()
-        );
+        AmendReturnResponse response = new AmendReturnResponse();
+        response.setReturnId(r.getReturnId());
+        response.setTaxType(r.getTaxType());
+        response.setStatus("draft");
+        response.setAmendmentReason(r.getAmendmentReason());
+        response.setAmendedAt(r.getAmendedAt());
+        return response;
     }
-
-    // ── Helpers ──────────────────────────────────────────────────────────────
 
     private TaxReturn findForUser(User user, UUID returnId) {
         TaxReturn r = taxReturnRepository.findByReturnIdAndUser(returnId, user)
@@ -309,8 +277,8 @@ public class TaxReturnService {
         return r;
     }
 
-    private List<Map<String, Object>> computeBracketBreakdown(BigDecimal taxableIncome) {
-        List<Map<String, Object>> breakdown = new ArrayList<>();
+    private List<BracketBreakdownItem> computeBracketBreakdown(BigDecimal taxableIncome) {
+        List<BracketBreakdownItem> breakdown = new ArrayList<>();
         if (taxableIncome == null || taxableIncome.compareTo(BigDecimal.ZERO) <= 0) return breakdown;
 
         BigDecimal remaining = taxableIncome;
@@ -327,10 +295,10 @@ public class TaxReturnService {
             BigDecimal tax = taxable.multiply(rate).setScale(2, RoundingMode.HALF_UP);
             BigDecimal upper = lower.add(taxable);
 
-            breakdown.add(Map.of(
-                "bracket", "GHS " + lower.toPlainString() + " - GHS " + upper.toPlainString(),
-                "rate", ratePercent.toPlainString() + "%",
-                "tax", tax
+            breakdown.add(new BracketBreakdownItem(
+                "GHS " + lower.toPlainString() + " - GHS " + upper.toPlainString(),
+                ratePercent.toPlainString() + "%",
+                tax
             ));
 
             lower = upper;
