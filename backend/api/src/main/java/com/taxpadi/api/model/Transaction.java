@@ -20,7 +20,7 @@ public class Transaction {
     private User user;
 
     @Column(nullable = false, length = 10)
-    private String type; // income | expense
+    private String type; //income or expense
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
@@ -32,7 +32,7 @@ public class Transaction {
     private String description;
 
     @Column(name = "entry_method", nullable = false, length = 20)
-    private String entryMethod; // manual | voice | scan | import | invoice
+    private String entryMethod; // manual/ voice/scan/import/invoice
 
     @Column(name = "receipt_url", length = 500)
     private String receiptUrl;
