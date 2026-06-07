@@ -1,5 +1,20 @@
 package com.taxpadi.api.service;
 
+import com.taxpadi.api.dto.report.Averages;
+import com.taxpadi.api.dto.report.CategoryTotal;
+import com.taxpadi.api.dto.report.ExportResponse;
+import com.taxpadi.api.dto.report.ExpenseBreakdown;
+import com.taxpadi.api.dto.report.IncomeBreakdown;
+import com.taxpadi.api.dto.report.IncomeStatementResponse;
+import com.taxpadi.api.dto.report.MonthlySummaryItem;
+import com.taxpadi.api.dto.report.RecordsIncluded;
+import com.taxpadi.api.dto.report.ReportTaxHistoryResponse;
+import com.taxpadi.api.dto.report.SummaryResponse;
+import com.taxpadi.api.dto.report.TaxCompliance;
+import com.taxpadi.api.dto.report.TaxLiabilityBreakdown;
+import com.taxpadi.api.dto.report.TaxTypeEntry;
+import com.taxpadi.api.dto.report.TaxpayerSummary;
+import com.taxpadi.api.dto.report.YearHistoryEntry;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.TaxCalculation;
@@ -13,9 +28,16 @@ import org.springframework.stereotype.Service;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,21 +55,19 @@ public class ReportService {
         this.taxReturnRepository = taxReturnRepository;
     }
 
-
-    public Map<String, Object> getSummary(User user, String period, LocalDate dateFrom, LocalDate dateTo) {
+    public SummaryResponse getSummary(User user, String period, LocalDate dateFrom, LocalDate dateTo) {
         LocalDate[] range = resolveDateRange(period, dateFrom, dateTo);
         LocalDate from = range[0];
         LocalDate to   = range[1];
 
-        BigDecimal incomeTotal   = nvl(transactionRepository.sumAmountByUserAndTypeAndDateRange(user, "income",  from, to));
-        BigDecimal expenseTotal  = nvl(transactionRepository.sumAmountByUserAndTypeAndDateRange(user, "expense", from, to));
-        BigDecimal deductible    = nvl(transactionRepository.sumDeductibleExpensesByUserAndDateRange(user, from, to));
-        BigDecimal netProfit     = incomeTotal.subtract(expenseTotal);
+        BigDecimal incomeTotal  = nvl(transactionRepository.sumAmountByUserAndTypeAndDateRange(user, "income",  from, to));
+        BigDecimal expenseTotal = nvl(transactionRepository.sumAmountByUserAndTypeAndDateRange(user, "expense", from, to));
+        BigDecimal deductible   = nvl(transactionRepository.sumDeductibleExpensesByUserAndDateRange(user, from, to));
+        BigDecimal netProfit    = incomeTotal.subtract(expenseTotal);
 
         List<Object[]> incomeRows  = transactionRepository.sumByCategoryAndType(user, "income",  from, to);
         List<Object[]> expenseRows = transactionRepository.sumByCategoryAndType(user, "expense", from, to);
 
-        //income tax liability for the year that covers this period
         BigDecimal incomeTax = BigDecimal.ZERO;
         LocalDate yearStart = LocalDate.of(from.getYear(), 1, 1);
         LocalDate yearEnd   = LocalDate.of(from.getYear(), 12, 31);
@@ -57,33 +77,18 @@ public class ReportService {
             incomeTax = nvl(calc.get().getTaxLiability());
         }
 
-        Map<String, Object> income = new LinkedHashMap<>();
-        income.put("total", incomeTotal);
-        income.put("by_category", categoryList(incomeRows));
-
-        Map<String, Object> expenses = new LinkedHashMap<>();
-        expenses.put("total", expenseTotal);
-        expenses.put("deductible_total", deductible);
-        expenses.put("by_category", categoryList(expenseRows));
-
-        Map<String, Object> taxLiability = new LinkedHashMap<>();
-        taxLiability.put("income_tax", incomeTax);
-        taxLiability.put("vat", BigDecimal.ZERO);
-        taxLiability.put("total", incomeTax);
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("period_start", from);
-        result.put("period_end", to);
-        result.put("income", income);
-        result.put("expenses", expenses);
-        result.put("net_profit", netProfit);
-        result.put("tax_liability", taxLiability);
-        return result;
+        SummaryResponse response = new SummaryResponse();
+        response.setPeriodStart(from);
+        response.setPeriodEnd(to);
+        response.setIncome(new IncomeBreakdown(incomeTotal, categoryList(incomeRows)));
+        response.setExpenses(new ExpenseBreakdown(expenseTotal, deductible, categoryList(expenseRows)));
+        response.setNetProfit(netProfit);
+        response.setTaxLiability(new TaxLiabilityBreakdown(incomeTax, BigDecimal.ZERO, incomeTax));
+        return response;
     }
 
-
-    public Map<String, Object> exportData(User user, String format, LocalDate dateFrom, LocalDate dateTo,
-                                          boolean includeTransactions, boolean includeTaxReturns) {
+    public ExportResponse exportData(User user, String format, LocalDate dateFrom, LocalDate dateTo,
+                                     boolean includeTransactions, boolean includeTaxReturns) {
         if (ChronoUnit.DAYS.between(dateFrom, dateTo) > 3 * 365L) {
             throw new BadRequestException("Export date range cannot exceed 3 years.");
         }
@@ -91,35 +96,30 @@ public class ReportService {
             throw new BadRequestException("Format must be one of: json, pdf, excel.");
         }
 
-        long txCount      = includeTransactions ? transactionRepository.countByUserAndDateRange(user, dateFrom, dateTo) : 0;
-        long returnCount  = includeTaxReturns   ? taxReturnRepository.findAllByUserAndYearRange(user, dateFrom.getYear(), dateTo.getYear()).size() : 0;
+        long txCount     = includeTransactions ? transactionRepository.countByUserAndDateRange(user, dateFrom, dateTo) : 0;
+        long returnCount = includeTaxReturns   ? taxReturnRepository.findAllByUserAndYearRange(user, dateFrom.getYear(), dateTo.getYear()).size() : 0;
 
-        Map<String, Object> records = new LinkedHashMap<>();
-        records.put("transactions",  includeTransactions ? txCount      : 0);
-        records.put("tax_returns",   includeTaxReturns   ? returnCount  : 0);
-        records.put("payments",      0); //payment endpointssssssssss
-        records.put("certificates",  0); //i am  waiting for compliance certificate endpoints
+        RecordsIncluded recordsIncluded = new RecordsIncluded(
+            includeTransactions ? txCount     : 0,
+            includeTaxReturns   ? returnCount : 0,
+            0,
+            0
+        );
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("export_id",     UUID.randomUUID());
-        result.put("format",        format);
-        result.put("period_start",  dateFrom);
-        result.put("period_end",    dateTo);
-        result.put("records_included", records);
+        ExportResponse response = new ExportResponse();
+        response.setExportId(UUID.randomUUID());
+        response.setFormat(format);
+        response.setPeriodStart(dateFrom);
+        response.setPeriodEnd(dateTo);
+        response.setRecordsIncluded(recordsIncluded);
 
-        if ("json".equals(format)) {
-            result.put("file_url",   null);
-            result.put("expires_at", null);
-        } else {
-            result.put("file_url",   null);
-            result.put("expires_at", null);
-            result.put("note",       format.toUpperCase() + " export requires S3 configuration. Use format=json for immediate data.");
+        if (!"json".equals(format)) {
+            response.setNote(format.toUpperCase() + " export requires S3 configuration. Use format=json for immediate data.");
         }
-        return result;
+        return response;
     }
 
-
-    public Map<String, Object> getIncomeStatement(User user, int months) {
+    public IncomeStatementResponse getIncomeStatement(User user, int months) {
         if (months < 1 || months > 12) {
             throw new BadRequestException("Months must be between 1 and 12.");
         }
@@ -139,7 +139,7 @@ public class ReportService {
         Map<String, BigDecimal> incMap = toMonthMap(monthlyIncome);
         Map<String, BigDecimal> expMap = toMonthMap(monthlyExpenses);
 
-        List<Map<String, Object>> monthlySummary = new ArrayList<>();
+        List<MonthlySummaryItem> monthlySummary = new ArrayList<>();
         BigDecimal sumInc = BigDecimal.ZERO, sumExp = BigDecimal.ZERO;
         int count = 0;
 
@@ -149,13 +149,10 @@ public class ReportService {
             BigDecimal inc = incMap.getOrDefault(key, BigDecimal.ZERO);
             BigDecimal exp = expMap.getOrDefault(key, BigDecimal.ZERO);
 
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("month",          cursor.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + cursor.getYear());
-            row.put("total_income",   inc);
-            row.put("total_expenses", exp);
-            row.put("net_profit",     inc.subtract(exp));
-            row.put("tax_compliant",  true);
-            monthlySummary.add(row);
+            monthlySummary.add(new MonthlySummaryItem(
+                cursor.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH) + " " + cursor.getYear(),
+                inc, exp, inc.subtract(exp), true
+            ));
 
             sumInc = sumInc.add(inc);
             sumExp = sumExp.add(exp);
@@ -164,46 +161,30 @@ public class ReportService {
         }
 
         int divisor = count == 0 ? 1 : count;
-        BigDecimal avgIncome  = sumInc.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP);
-        BigDecimal avgExp     = sumExp.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP);
-        BigDecimal avgProfit  = avgIncome.subtract(avgExp);
+        BigDecimal avgIncome = sumInc.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP);
+        BigDecimal avgExp    = sumExp.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP);
 
         List<TaxReturn> returns = taxReturnRepository.findAllByUserAndYearRange(user, from.getYear(), to.getYear());
         boolean allFiled = !returns.isEmpty() && returns.stream().allMatch(r -> "submitted".equals(r.getStatus()));
         String score = returns.isEmpty() ? "No Data" : allFiled ? "Good" : "Needs Attention";
 
-        Map<String, Object> averages = new LinkedHashMap<>();
-        averages.put("average_monthly_income",   avgIncome);
-        averages.put("average_monthly_expenses", avgExp);
-        averages.put("average_monthly_profit",   avgProfit);
-
-        Map<String, Object> compliance = new LinkedHashMap<>();
-        compliance.put("all_returns_filed",  allFiled);
-        compliance.put("all_payments_made",  false);//waiting for payment endpoints
-        compliance.put("compliance_score",   score);
-
-        Map<String, Object> taxpayer = new LinkedHashMap<>();
-        taxpayer.put("full_name",          user.getFullName());
-        taxpayer.put("tin",                user.getTin());
-        taxpayer.put("phone",              user.getPhone());
-        taxpayer.put("taxpayer_category",  user.getTaxpayerCategory());
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("statement_id",    UUID.randomUUID());
-        result.put("period_start",    from);
-        result.put("period_end",      to);
-        result.put("months_covered",  months);
-        result.put("taxpayer",        taxpayer);
-        result.put("monthly_summary", monthlySummary);
-        result.put("averages",        averages);
-        result.put("tax_compliance",  compliance);
-        result.put("pdf_url",         null); // requires S3
-        result.put("generated_at",    java.time.LocalDateTime.now());
-        return result;
+        IncomeStatementResponse response = new IncomeStatementResponse();
+        response.setStatementId(UUID.randomUUID());
+        response.setPeriodStart(from);
+        response.setPeriodEnd(to);
+        response.setMonthsCovered(months);
+        response.setTaxpayer(new TaxpayerSummary(
+            user.getFullName(), user.getTin(), user.getPhone(),
+            user.getTaxpayerCategory() != null ? user.getTaxpayerCategory().name() : null
+        ));
+        response.setMonthlySummary(monthlySummary);
+        response.setAverages(new Averages(avgIncome, avgExp, avgIncome.subtract(avgExp)));
+        response.setTaxCompliance(new TaxCompliance(allFiled, false, score));
+        response.setGeneratedAt(LocalDateTime.now());
+        return response;
     }
 
-
-    public Map<String, Object> getTaxHistory(User user, Integer yearFrom, Integer yearTo) {
+    public ReportTaxHistoryResponse getTaxHistory(User user, Integer yearFrom, Integer yearTo) {
         int currentYear = LocalDate.now().getYear();
         int toYear   = yearTo   != null ? yearTo   : currentYear;
         int fromYear = yearFrom != null ? yearFrom : toYear - 4;
@@ -213,36 +194,26 @@ public class ReportService {
         Map<Integer, List<TaxReturn>> byYear = returns.stream()
             .collect(Collectors.groupingBy(TaxReturn::getTaxYear));
 
-        List<Map<String, Object>> history = byYear.entrySet().stream()
+        List<YearHistoryEntry> history = byYear.entrySet().stream()
             .sorted(Map.Entry.<Integer, List<TaxReturn>>comparingByKey().reversed())
             .map(entry -> {
-                int year = entry.getKey();
-                List<TaxReturn> yearReturns = entry.getValue();
-
-                List<Map<String, Object>> taxTypes = yearReturns.stream().map(r -> {
-                    Map<String, Object> tt = new LinkedHashMap<>();
-                    tt.put("tax_type",      r.getTaxType());
-                    tt.put("return_status", r.getStatus());
-                    tt.put("tax_liability", r.getTaxLiability());
-                    tt.put("amount_paid",   null); //ia m waiting for the payment endpoints
-                    tt.put("filed_on",      r.getSubmittedAt());
-                    tt.put("paid_on",       null); //payment endpoints
-                    tt.put("compliant",     "submitted".equals(r.getStatus()));
+                List<TaxTypeEntry> taxTypes = entry.getValue().stream().map(r -> {
+                    TaxTypeEntry tt = new TaxTypeEntry();
+                    tt.setTaxType(r.getTaxType());
+                    tt.setReturnStatus(r.getStatus());
+                    tt.setTaxLiability(r.getTaxLiability());
+                    tt.setFiledOn(r.getSubmittedAt());
+                    tt.setCompliant("submitted".equals(r.getStatus()));
                     return tt;
                 }).toList();
 
-                boolean overallCompliant = yearReturns.stream().allMatch(r -> "submitted".equals(r.getStatus()));
+                boolean overallCompliant = entry.getValue().stream()
+                    .allMatch(r -> "submitted".equals(r.getStatus()));
 
-                Map<String, Object> yearMap = new LinkedHashMap<>();
-                yearMap.put("year",             year);
-                yearMap.put("tax_types",         taxTypes);
-                yearMap.put("overall_compliant", overallCompliant);
-                return yearMap;
+                return new YearHistoryEntry(entry.getKey(), taxTypes, overallCompliant);
             }).toList();
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("history", history);
-        return result;
+        return new ReportTaxHistoryResponse(history);
     }
 
 
@@ -262,14 +233,12 @@ public class ReportService {
         };
     }
 
-    private List<Map<String, Object>> categoryList(List<Object[]> rows) {
-        return rows.stream().map(row -> {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("category", row[0]);
-            item.put("total",    row[1]);
-            item.put("count",    row[2]);
-            return item;
-        }).toList();
+    private List<CategoryTotal> categoryList(List<Object[]> rows) {
+        return rows.stream().map(row -> new CategoryTotal(
+            (String) row[0],
+            row[1] == null ? BigDecimal.ZERO : (BigDecimal) row[1],
+            ((Number) row[2]).longValue()
+        )).toList();
     }
 
     private Map<String, BigDecimal> toMonthMap(List<Object[]> rows) {
