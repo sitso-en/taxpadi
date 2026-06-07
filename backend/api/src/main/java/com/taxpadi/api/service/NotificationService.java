@@ -1,8 +1,6 @@
 package com.taxpadi.api.service;
 
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.data.domain.Page;
@@ -12,6 +10,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.taxpadi.api.dto.common.PaginationInfo;
+import com.taxpadi.api.dto.notification.NotificationItem;
+import com.taxpadi.api.dto.notification.NotificationListResponse;
+import com.taxpadi.api.dto.notification.NotificationPreferences;
+import com.taxpadi.api.dto.notification.NotificationPreferencesResponse;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.DeviceToken;
 import com.taxpadi.api.model.Notification;
@@ -39,7 +42,6 @@ public class NotificationService {
         this.firebaseMessaging = firebaseMessaging;
     }
 
-
     public void registerFcmToken(User user, String fcmToken, String deviceInfo, String platform) {
         DeviceToken device = new DeviceToken();
         device.setUser(user);
@@ -56,35 +58,19 @@ public class NotificationService {
         deviceTokenRepository.save(device);
     }
 
-
-    public Map<String, Object> getNotifications(User user, int page, int limit) {
+    public NotificationListResponse getNotifications(User user, int page, int limit) {
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 100);
 
         Page<Notification> results = notificationRepository
             .findAllByUserOrderByCreatedAtDesc(user, PageRequest.of(safePage, safeLimit));
 
-        List<Map<String, Object>> notifications = results.getContent().stream()
-            .map(i -> {
-                Map<String, Object> notif = new LinkedHashMap<>();
-                notif.put("notification_id", i.getNotificationId());
-                notif.put("title", i.getTitle());
-                notif.put("body", i.getBody());
-                notif.put("type", i.getType());
-                notif.put("read", i.getRead());
-                notif.put("action_url", i.getActionUrl());
-                notif.put("created_at", i.getCreatedAt());
-                return notif;
-            }).toList();
+        List<NotificationItem> notifications = results.getContent().stream()
+            .map(this::toItem).toList();
 
-        return Map.of(
-            "notifications", notifications,
-            "pagination", Map.of(
-                "total", results.getTotalElements(),
-                "page", page,
-                "limit", safeLimit,
-                "total_pages", results.getTotalPages()
-            )
+        return new NotificationListResponse(
+            notifications,
+            new PaginationInfo(results.getTotalElements(), page, safeLimit, results.getTotalPages())
         );
     }
 
@@ -92,21 +78,10 @@ public class NotificationService {
         return notificationRepository.countByUserAndReadFalse(user);
     }
 
-
-
-    public Map<String, Object> getNotification(User user, UUID id) {
+    public NotificationItem getNotification(User user, UUID id) {
         Notification n = notificationRepository.findByNotificationIdAndUser(id, user)
             .orElseThrow(() -> new NotFoundException("Notification not found"));
-
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("notification_id", n.getNotificationId());
-        result.put("title", n.getTitle());
-        result.put("body", n.getBody());
-        result.put("type", n.getType());
-        result.put("read", n.getRead());
-        result.put("action_url", n.getActionUrl());
-        result.put("created_at", n.getCreatedAt());
-        return result;
+        return toItem(n);
     }
 
     @Transactional
@@ -141,17 +116,37 @@ public class NotificationService {
         notificationRepository.deleteAllByUser(user);
     }
 
-
-    public Map<String, Boolean> getPreferences(User user) {
-        return user.getNotificationPreferences();
+    public NotificationPreferencesResponse getPreferences(User user) {
+        return new NotificationPreferencesResponse(toPreferencesDto(user.getNotificationPreferences()));
     }
 
     @Transactional
-    public void updatePreferences(User user, Map<String, Boolean> prefs) {
+    public NotificationPreferencesResponse updatePreferences(User user, NotificationPreferences request) {
+        java.util.Map<String, Boolean> prefs = user.getNotificationPreferences();
+        if (prefs == null) prefs = new java.util.HashMap<>();
+        if (request.getDeadlineReminders()    != null) prefs.put("deadline_reminders",    request.getDeadlineReminders());
+        if (request.getPenaltyAlerts()        != null) prefs.put("penalty_alerts",        request.getPenaltyAlerts());
+        if (request.getVaultSuggestions()     != null) prefs.put("vault_suggestions",     request.getVaultSuggestions());
+        if (request.getReferralOffers()       != null) prefs.put("referral_offers",       request.getReferralOffers());
+        if (request.getPaymentConfirmations() != null) prefs.put("payment_confirmations", request.getPaymentConfirmations());
+        if (request.getSystemUpdates()        != null) prefs.put("system_updates",        request.getSystemUpdates());
         user.setNotificationPreferences(prefs);
         userRepository.save(user);
+        return new NotificationPreferencesResponse(toPreferencesDto(prefs));
     }
 
+    private NotificationPreferences toPreferencesDto(java.util.Map<String, Boolean> prefs) {
+        NotificationPreferences dto = new NotificationPreferences();
+        if (prefs != null) {
+            dto.setDeadlineReminders(prefs.getOrDefault("deadline_reminders", true));
+            dto.setPenaltyAlerts(prefs.getOrDefault("penalty_alerts", true));
+            dto.setVaultSuggestions(prefs.getOrDefault("vault_suggestions", true));
+            dto.setReferralOffers(prefs.getOrDefault("referral_offers", true));
+            dto.setPaymentConfirmations(prefs.getOrDefault("payment_confirmations", true));
+            dto.setSystemUpdates(prefs.getOrDefault("system_updates", true));
+        }
+        return dto;
+    }
 
     public void send(User user, String title, String body, NotificationType type, String actionUrl) {
         Notification n = new Notification();
@@ -179,8 +174,20 @@ public class NotificationService {
                     .build();
                 firebaseMessaging.send(message);
             } catch (Exception e) {
-                //dont fail if push delivery fails cause the notification is already saved to the db
+                // don't fail if push delivery fails — notification is already saved to the db
             }
         }
+    }
+
+    private NotificationItem toItem(Notification n) {
+        NotificationItem item = new NotificationItem();
+        item.setNotificationId(n.getNotificationId());
+        item.setTitle(n.getTitle());
+        item.setBody(n.getBody());
+        item.setType(n.getType());
+        item.setRead(n.getRead());
+        item.setActionUrl(n.getActionUrl());
+        item.setCreatedAt(n.getCreatedAt());
+        return item;
     }
 }

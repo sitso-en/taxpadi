@@ -3,6 +3,7 @@ package com.taxpadi.api.service;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -13,13 +14,28 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taxpadi.api.dto.common.PaginationInfo;
+import com.taxpadi.api.dto.paye.AddEmployeeResponse;
+import com.taxpadi.api.dto.paye.AnnualReturnResponse;
+import com.taxpadi.api.dto.paye.AnnualTotals;
 import com.taxpadi.api.dto.paye.CreateEmployeeRequest;
 import com.taxpadi.api.dto.paye.DeactivateEmployeeRequest;
+import com.taxpadi.api.dto.paye.DeactivateEmployeeResponse;
+import com.taxpadi.api.dto.paye.EmployeeAnnualSummary;
 import com.taxpadi.api.dto.paye.EmployeeDetailDto;
+import com.taxpadi.api.dto.paye.EmployeeListResponse;
 import com.taxpadi.api.dto.paye.EmployeeSummaryDto;
+import com.taxpadi.api.dto.paye.GrandTotals;
+import com.taxpadi.api.dto.paye.MonthlyBreakdownItem;
+import com.taxpadi.api.dto.paye.MonthlySummaryResponse;
+import com.taxpadi.api.dto.paye.PayeMonthlyTotals;
 import com.taxpadi.api.dto.paye.PayeRecordDto;
+import com.taxpadi.api.dto.paye.PayeRecordListResponse;
+import com.taxpadi.api.dto.paye.PayeRemitResponse;
+import com.taxpadi.api.dto.paye.PayeSummaryDto;
 import com.taxpadi.api.dto.paye.RemitRequest;
 import com.taxpadi.api.dto.paye.UpdateEmployeeRequest;
+import com.taxpadi.api.dto.paye.UpdateEmployeeResponse;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.Employee;
@@ -43,9 +59,8 @@ public class PayeService {
         this.taxEngine = taxEngine;
     }
 
-    // ── Employees ────────────────────────────────────────────────────────────
 
-    public Map<String, Object> getEmployees(User user, String status, int page, int limit) {
+    public EmployeeListResponse getEmployees(User user, String status, int page, int limit) {
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 100);
         PageRequest pageable = PageRequest.of(safePage, safeLimit);
@@ -60,19 +75,14 @@ public class PayeService {
             .map(e -> toSummary(e, computePaye(e)))
             .toList();
 
-        return Map.of(
-            "employees", employees,
-            "pagination", Map.of(
-                "total", results.getTotalElements(),
-                "page", page,
-                "limit", safeLimit,
-                "total_pages", results.getTotalPages()
-            )
+        PaginationInfo pagination = new PaginationInfo(
+            results.getTotalElements(), page, safeLimit, results.getTotalPages()
         );
+        return new EmployeeListResponse(employees, pagination);
     }
 
     @Transactional
-    public Map<String, Object> addEmployee(User user, CreateEmployeeRequest request) {
+    public AddEmployeeResponse addEmployee(User user, CreateEmployeeRequest request) {
         if (request.getFullName() == null || request.getFullName().isBlank()) {
             throw new BadRequestException("full_name is required.");
         }
@@ -96,16 +106,15 @@ public class PayeService {
         employeeRepository.save(emp);
 
         BigDecimal monthlyPaye = computePaye(emp);
-        boolean ssnitWarning = emp.getSocialSecurityNo() == null;
 
-        return Map.of(
-            "employee_id", emp.getEmployeeId(),
-            "full_name", emp.getFullName(),
-            "gross_salary", emp.getGrossSalary(),
-            "monthly_paye", monthlyPaye,
-            "ssnit_warning", ssnitWarning,
-            "created_at", emp.getCreatedAt()
-        );
+        AddEmployeeResponse response = new AddEmployeeResponse();
+        response.setEmployeeId(emp.getEmployeeId());
+        response.setFullName(emp.getFullName());
+        response.setGrossSalary(emp.getGrossSalary());
+        response.setMonthlyPaye(monthlyPaye);
+        response.setSsnitWarning(emp.getSocialSecurityNo() == null);
+        response.setCreatedAt(emp.getCreatedAt());
+        return response;
     }
 
     public EmployeeDetailDto getEmployee(User user, UUID employeeId) {
@@ -137,7 +146,7 @@ public class PayeService {
     }
 
     @Transactional
-    public Map<String, Object> updateEmployee(User user, UUID employeeId, UpdateEmployeeRequest request) {
+    public UpdateEmployeeResponse updateEmployee(User user, UUID employeeId, UpdateEmployeeRequest request) {
         Employee emp = employeeRepository.findByEmployeeIdAndUser(employeeId, user)
             .orElseThrow(() -> new NotFoundException("No employee found with this ID."));
 
@@ -159,18 +168,18 @@ public class PayeService {
         employeeRepository.save(emp);
         BigDecimal monthlyPaye = computePaye(emp);
 
-        return Map.of(
-            "employee_id", emp.getEmployeeId(),
-            "full_name", emp.getFullName(),
-            "gross_salary", emp.getGrossSalary(),
-            "monthly_paye", monthlyPaye,
-            "paye_recalculated", recalculated,
-            "updated_at", emp.getUpdatedAt()
-        );
+        UpdateEmployeeResponse response = new UpdateEmployeeResponse();
+        response.setEmployeeId(emp.getEmployeeId());
+        response.setFullName(emp.getFullName());
+        response.setGrossSalary(emp.getGrossSalary());
+        response.setMonthlyPaye(monthlyPaye);
+        response.setPayeRecalculated(recalculated);
+        response.setUpdatedAt(emp.getUpdatedAt());
+        return response;
     }
 
     @Transactional
-    public Map<String, Object> deactivateEmployee(User user, UUID employeeId, DeactivateEmployeeRequest request) {
+    public DeactivateEmployeeResponse deactivateEmployee(User user, UUID employeeId, DeactivateEmployeeRequest request) {
         Employee emp = employeeRepository.findByEmployeeIdAndUser(employeeId, user)
             .orElseThrow(() -> new NotFoundException("No employee found with this ID."));
 
@@ -185,17 +194,16 @@ public class PayeService {
         emp.setEndDate(request.getEndDate());
         employeeRepository.save(emp);
 
-        return Map.of(
-            "employee_id", emp.getEmployeeId(),
-            "full_name", emp.getFullName(),
-            "is_active", false,
-            "end_date", emp.getEndDate()
-        );
+        DeactivateEmployeeResponse response = new DeactivateEmployeeResponse();
+        response.setEmployeeId(emp.getEmployeeId());
+        response.setFullName(emp.getFullName());
+        response.setActive(false);
+        response.setEndDate(emp.getEndDate());
+        return response;
     }
 
-
-    public Map<String, Object> getRecords(User user, Integer month, Integer year,
-                                          UUID employeeId, Boolean remitted, int page, int limit) {
+    public PayeRecordListResponse getRecords(User user, Integer month, Integer year,
+                                             UUID employeeId, Boolean remitted, int page, int limit) {
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 100);
         PageRequest pageable = PageRequest.of(safePage, safeLimit);
@@ -219,27 +227,20 @@ public class PayeService {
         List<PayeRecordDto> records = results.getContent().stream().map(this::toRecordDto).toList();
 
         BigDecimal totalDeducted = sum(results.getContent(), PayeRecord::getPayeDeducted);
-        BigDecimal totalRemitted = results.getContent().stream()
+        BigDecimal totalRemitted2 = results.getContent().stream()
             .filter(PayeRecord::getRemitted).map(PayeRecord::getPayeDeducted)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return Map.of(
-            "records", records,
-            "summary", Map.of(
-                "total_paye_deducted", totalDeducted,
-                "total_remitted", totalRemitted,
-                "total_outstanding", totalDeducted.subtract(totalRemitted)
-            ),
-            "pagination", Map.of(
-                "total", results.getTotalElements(),
-                "page", page,
-                "limit", safeLimit,
-                "total_pages", results.getTotalPages()
-            )
+        PayeSummaryDto summary = new PayeSummaryDto(
+            totalDeducted, totalRemitted2, totalDeducted.subtract(totalRemitted2)
         );
+        PaginationInfo pagination = new PaginationInfo(
+            results.getTotalElements(), page, safeLimit, results.getTotalPages()
+        );
+        return new PayeRecordListResponse(records, summary, pagination);
     }
 
-    public Map<String, Object> getMonthlySummary(User user, int month, int year) {
+    public MonthlySummaryResponse getMonthlySummary(User user, int month, int year) {
         if (month < 1 || month > 12) throw new BadRequestException("Month must be between 1 and 12.");
 
         generateMonthlyRecords(user, month, year);
@@ -258,24 +259,22 @@ public class PayeService {
         BigDecimal totalRemitted = records.stream().filter(PayeRecord::getRemitted)
             .map(PayeRecord::getPayeDeducted).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return Map.of(
-            "month", month,
-            "year", year,
-            "remittance_due_date", dueDate,
-            "days_until_due", daysUntilDue,
-            "employees", employeeDtos,
-            "totals", Map.of(
-                "total_gross_salary", totalGross,
-                "total_taxable_salary", totalTaxable,
-                "total_paye_deducted", totalDeducted,
-                "total_remitted", totalRemitted,
-                "total_outstanding", totalDeducted.subtract(totalRemitted)
-            )
+        PayeMonthlyTotals totals = new PayeMonthlyTotals(
+            totalGross, totalTaxable, totalDeducted, totalRemitted, totalDeducted.subtract(totalRemitted)
         );
+
+        MonthlySummaryResponse response = new MonthlySummaryResponse();
+        response.setMonth(month);
+        response.setYear(year);
+        response.setRemittanceDueDate(dueDate);
+        response.setDaysUntilDue(daysUntilDue);
+        response.setEmployees(employeeDtos);
+        response.setTotals(totals);
+        return response;
     }
 
     @Transactional
-    public Map<String, Object> remit(User user, UUID payeId, RemitRequest request) {
+    public PayeRemitResponse remit(User user, UUID payeId, RemitRequest request) {
         PayeRecord record = payeRecordRepository.findByPayeIdAndUser(payeId, user)
             .orElseThrow(() -> new NotFoundException("No PAYE record found with this ID."));
 
@@ -287,38 +286,33 @@ public class PayeService {
         record.setRemittedAt(request.getRemittedAt() != null ? request.getRemittedAt() : LocalDateTime.now());
         payeRecordRepository.save(record);
 
-        return Map.of(
-            "paye_id", record.getPayeId(),
-            "employee_name", record.getEmployee().getFullName(),
-            "month", record.getMonth(),
-            "year", record.getYear(),
-            "paye_deducted", record.getPayeDeducted(),
-            "remitted", true,
-            "remitted_at", record.getRemittedAt()
-        );
+        PayeRemitResponse response = new PayeRemitResponse();
+        response.setPayeId(record.getPayeId());
+        response.setEmployeeName(record.getEmployee().getFullName());
+        response.setMonth(record.getMonth());
+        response.setYear(record.getYear());
+        response.setPayeDeducted(record.getPayeDeducted());
+        response.setRemitted(true);
+        response.setRemittedAt(record.getRemittedAt());
+        return response;
     }
 
-    public Map<String, Object> getAnnualReturn(User user, int year) {
+    public AnnualReturnResponse getAnnualReturn(User user, int year) {
         List<PayeRecord> allRecords = payeRecordRepository.findAllByUserAndYear(user, year);
         if (allRecords.isEmpty()) throw new NotFoundException("No PAYE records found for this year.");
 
         LocalDate deadline = LocalDate.of(year + 1, 4, 30);
         long daysUntilDeadline = LocalDate.now().until(deadline).getDays();
 
-        // Group by employee
         Map<UUID, List<PayeRecord>> byEmployee = new LinkedHashMap<>();
         for (PayeRecord r : allRecords) {
-            byEmployee.computeIfAbsent(r.getEmployee().getEmployeeId(), k -> new java.util.ArrayList<>()).add(r);
+            byEmployee.computeIfAbsent(r.getEmployee().getEmployeeId(), k -> new ArrayList<>()).add(r);
         }
 
-        List<Map<String, Object>> employeeSummaries = byEmployee.values().stream().map(records -> {
+        List<EmployeeAnnualSummary> employeeSummaries = byEmployee.values().stream().map(records -> {
             Employee emp = records.get(0).getEmployee();
-            List<Map<String, Object>> monthlyBreakdown = records.stream().map(r -> Map.<String, Object>of(
-                "month", r.getMonth(),
-                "gross_salary", r.getGrossSalary(),
-                "taxable_salary", r.getTaxableSalary(),
-                "paye_deducted", r.getPayeDeducted(),
-                "remitted", r.getRemitted()
+            List<MonthlyBreakdownItem> monthlyBreakdown = records.stream().map(r -> new MonthlyBreakdownItem(
+                r.getMonth(), r.getGrossSalary(), r.getTaxableSalary(), r.getPayeDeducted(), r.getRemitted()
             )).toList();
 
             BigDecimal totalGross = sum(records, PayeRecord::getGrossSalary);
@@ -327,43 +321,39 @@ public class PayeService {
             BigDecimal totalRemitted = records.stream().filter(PayeRecord::getRemitted)
                 .map(PayeRecord::getPayeDeducted).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-            return Map.<String, Object>of(
-                "employee_id", emp.getEmployeeId(),
-                "full_name", emp.getFullName(),
-                "social_security_no", emp.getSocialSecurityNo() != null ? emp.getSocialSecurityNo() : "",
-                "monthly_breakdown", monthlyBreakdown,
-                "annual_totals", Map.of(
-                    "total_gross_salary", totalGross,
-                    "total_taxable_salary", totalTaxable,
-                    "total_paye_deducted", totalDeducted,
-                    "total_remitted", totalRemitted,
-                    "outstanding", totalDeducted.subtract(totalRemitted)
-                )
-            );
+            EmployeeAnnualSummary summary = new EmployeeAnnualSummary();
+            summary.setEmployeeId(emp.getEmployeeId());
+            summary.setFullName(emp.getFullName());
+            summary.setSocialSecurityNo(emp.getSocialSecurityNo());
+            summary.setMonthlyBreakdown(monthlyBreakdown);
+            summary.setAnnualTotals(new AnnualTotals(
+                totalGross, totalTaxable, totalDeducted, totalRemitted, totalDeducted.subtract(totalRemitted)
+            ));
+            return summary;
         }).toList();
 
         BigDecimal grandTotalDeducted = sum(allRecords, PayeRecord::getPayeDeducted);
         BigDecimal grandTotalRemitted = allRecords.stream().filter(PayeRecord::getRemitted)
             .map(PayeRecord::getPayeDeducted).reduce(BigDecimal.ZERO, BigDecimal::add);
-        boolean readyForSubmission = grandTotalDeducted.compareTo(grandTotalRemitted) == 0;
 
-        return Map.of(
-            "year", year,
-            "submission_deadline", deadline,
-            "days_until_deadline", daysUntilDeadline,
-            "employees", employeeSummaries,
-            "grand_totals", Map.of(
-                "total_employees", byEmployee.size(),
-                "total_gross_salary", sum(allRecords, PayeRecord::getGrossSalary),
-                "total_paye_deducted", grandTotalDeducted,
-                "total_remitted", grandTotalRemitted,
-                "outstanding", grandTotalDeducted.subtract(grandTotalRemitted)
-            ),
-            "ready_for_submission", readyForSubmission
+        GrandTotals grandTotals = new GrandTotals(
+            byEmployee.size(),
+            sum(allRecords, PayeRecord::getGrossSalary),
+            grandTotalDeducted,
+            grandTotalRemitted,
+            grandTotalDeducted.subtract(grandTotalRemitted)
         );
+
+        AnnualReturnResponse response = new AnnualReturnResponse();
+        response.setYear(year);
+        response.setSubmissionDeadline(deadline);
+        response.setDaysUntilDeadline(daysUntilDeadline);
+        response.setEmployees(employeeSummaries);
+        response.setGrandTotals(grandTotals);
+        response.setReadyForSubmission(grandTotalDeducted.compareTo(grandTotalRemitted) == 0);
+        return response;
     }
 
-    // ── Record generation ────────────────────────────────────────────────────
 
     @Transactional
     public void generateMonthlyRecords(User user, int month, int year) {
@@ -388,13 +378,7 @@ public class PayeService {
         }
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────
 
-    /**
-     * Taxable salary = gross - transport allowance (exempt up to GHS 600/month per GRA).
-     * Housing allowance is partially exempt — simplified here as fully taxable since
-     * the exact exempt portion requires employment contract details.
-     */
     private BigDecimal computeTaxableSalary(Employee emp) {
         BigDecimal transportExempt = emp.getTransportAllowance().min(new BigDecimal("600"));
         return emp.getGrossSalary()

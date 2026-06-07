@@ -1,13 +1,11 @@
 package com.taxpadi.api.service;
 
-import com.taxpadi.api.dto.tax.TaxBracketDto;
-import com.taxpadi.api.dto.tax.WhtRateDto;
+import com.taxpadi.api.dto.tax.*;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class TaxRateService {
@@ -37,47 +35,35 @@ public class TaxRateService {
         new WhtRateDto("director_fees",    "20%",  "Fees to resident directors and board members")
     );
 
-    public Map<String, Object> getBrackets() {
-        return Map.of(
-            "tax_year", TAX_YEAR,
-            "currency", CURRENCY,
-            "income_tax_brackets", INCOME_TAX_BRACKETS,
-            "last_updated", LocalDateTime.now()
-        );
+    public TaxBracketsResponse getBrackets() {
+        TaxBracketsResponse response = new TaxBracketsResponse();
+        response.setTaxYear(TAX_YEAR);
+        response.setCurrency(CURRENCY);
+        response.setIncomeTaxBrackets(INCOME_TAX_BRACKETS);
+        response.setLastUpdated(LocalDateTime.now());
+        return response;
     }
 
-    public Map<String, Object> getRates() {
-        return Map.of(
-            "tax_year", TAX_YEAR,
-            "currency", CURRENCY,
-            "income_tax", Map.of(
-                "brackets", INCOME_TAX_BRACKETS,
-                "filing_deadline", "April 30"
-            ),
-            "vat", Map.of(
-                "standard_rate", "15%",
-                "nhil_levy", "2.5%",
-                "getfund_levy", "2.5%",
-                "effective_rate", "20%",
-                "registration_threshold_goods", 750000.00,
-                "registration_threshold_services", "All service suppliers must register",
-                "filing_frequency", "monthly",
-                "filing_deadline", "Last working day of the following month"
-            ),
-            "paye", Map.of(
-                "brackets", INCOME_TAX_BRACKETS,
-                "remittance_deadline", "15th of the following month",
-                "annual_return_deadline", "April 30"
-            ),
-            "withholding", Map.of(
-                "rates", WHT_RATES
-            ),
-            "penalties", Map.of(
-                "late_payment_rate", "125% of statutory rate, compounded monthly",
-                "paye_late_remittance", "125% of statutory rate, compounded monthly"
-            ),
-            "last_updated", LocalDateTime.now()
-        );
+    public TaxRatesResponse getRates() {
+        TaxRatesResponse response = new TaxRatesResponse();
+        response.setTaxYear(TAX_YEAR);
+        response.setCurrency(CURRENCY);
+        response.setIncomeTax(new IncomeTaxRateInfo(INCOME_TAX_BRACKETS, "April 30"));
+        response.setVat(new VatRateInfo(
+            "15%", "2.5%", "2.5%", "20%",
+            new BigDecimal("750000"),
+            "All service suppliers must register",
+            "monthly",
+            "Last working day of the following month"
+        ));
+        response.setPaye(new PayeRateInfo(INCOME_TAX_BRACKETS, "15th of the following month", "April 30"));
+        response.setWithholding(new WithholdingRatesInfo(WHT_RATES));
+        response.setPenalties(new PenaltiesInfo(
+            "125% of statutory rate, compounded monthly",
+            "125% of statutory rate, compounded monthly"
+        ));
+        response.setLastUpdated(LocalDateTime.now());
+        return response;
     }
 
     private static BigDecimal bd(String val) {

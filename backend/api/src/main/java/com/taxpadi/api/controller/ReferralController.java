@@ -1,23 +1,15 @@
 package com.taxpadi.api.controller;
 
-import java.util.Map;
-import java.util.UUID;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.taxpadi.api.common.ApiResponse;
+import com.taxpadi.api.dto.referral.*;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.ReferralService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/referrals")
@@ -30,7 +22,7 @@ public class ReferralController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getOffers(
+    public ResponseEntity<ApiResponse<ReferralListResponse>> getOffers(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(required = false) String offer_type,
             @RequestParam(defaultValue = "1") int page,
@@ -42,7 +34,7 @@ public class ReferralController {
     }
 
     @PostMapping("/check-eligibility")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> checkEligibility(
+    public ResponseEntity<ApiResponse<EligibilityResponse>> checkEligibility(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
@@ -51,7 +43,7 @@ public class ReferralController {
     }
 
     @PutMapping("/{id}/viewed")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> markViewed(
+    public ResponseEntity<ApiResponse<OfferStatusResponse>> markViewed(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id) {
         User user = userDetails.getUser();
@@ -61,7 +53,7 @@ public class ReferralController {
     }
 
     @PutMapping("/{id}/clicked")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> markClicked(
+    public ResponseEntity<ApiResponse<ClickedOfferResponse>> markClicked(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id) {
         User user = userDetails.getUser();
@@ -71,7 +63,7 @@ public class ReferralController {
     }
 
     @PutMapping("/{id}/dismiss")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> dismiss(
+    public ResponseEntity<ApiResponse<OfferStatusResponse>> dismiss(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id) {
         User user = userDetails.getUser();
@@ -81,11 +73,11 @@ public class ReferralController {
     }
 
     @PostMapping("/{id}/converted")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> markConverted(
+    public ResponseEntity<ApiResponse<ConvertedOfferResponse>> markConverted(
             @PathVariable UUID id,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody MarkConvertedRequest request) {
         return ResponseEntity.ok(new ApiResponse<>(true,
-            referralService.markConverted(id, body),
+            referralService.markConverted(id, request),
             "Conversion confirmed."));
     }
 }

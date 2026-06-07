@@ -1,7 +1,9 @@
 package com.taxpadi.api.controller;
 
 import com.taxpadi.api.common.ApiResponse;
+import com.taxpadi.api.dto.withholding.WhtListResponse;
 import com.taxpadi.api.dto.withholding.WhtRemitRequest;
+import com.taxpadi.api.dto.withholding.WhtRemitResponse;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.WithholdingService;
@@ -11,7 +13,6 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -25,7 +26,7 @@ public class WithholdingController {
     }
 
     @GetMapping("/transactions")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getTransactions(
+    public ResponseEntity<ApiResponse<WhtListResponse>> getTransactions(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(required = false) Boolean remitted,
             @RequestParam(required = false) String category,
@@ -40,7 +41,7 @@ public class WithholdingController {
     }
 
     @PutMapping("/transactions/{id}/remit")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> remit(
+    public ResponseEntity<ApiResponse<WhtRemitResponse>> remit(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
             @RequestBody(required = false) WhtRemitRequest request) {

@@ -1,7 +1,7 @@
 package com.taxpadi.api.service;
 
-import com.taxpadi.api.dto.withholding.WhtRemitRequest;
-import com.taxpadi.api.dto.withholding.WhtTransactionDto;
+import com.taxpadi.api.dto.common.PaginationInfo;
+import com.taxpadi.api.dto.withholding.*;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.Transaction;
@@ -16,7 +16,6 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -28,9 +27,9 @@ public class WithholdingService {
         this.transactionRepository = transactionRepository;
     }
 
-    public Map<String, Object> getTransactions(User user, Boolean remitted, String category,
-                                               LocalDate dateFrom, LocalDate dateTo,
-                                               int page, int limit) {
+    public WhtListResponse getTransactions(User user, Boolean remitted, String category,
+                                           LocalDate dateFrom, LocalDate dateTo,
+                                           int page, int limit) {
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 100);
 
@@ -42,30 +41,25 @@ public class WithholdingService {
             .map(this::toDto).toList();
 
         BigDecimal totalWithheld = sum(results.getContent(), Transaction::getWithholdingAmount);
-        
         BigDecimal totalRemitted = results.getContent().stream()
             .filter(Transaction::getWithholdingRemitted)
             .map(Transaction::getWithholdingAmount)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return Map.of(
-            "transactions", transactions,
-            "summary", Map.of(
-                "total_withheld", totalWithheld,
-                "total_remitted", totalRemitted,
-                "total_outstanding", totalWithheld.subtract(totalRemitted)
-            ),
-            "pagination", Map.of(
-                "total", results.getTotalElements(),
-                "page", page,
-                "limit", safeLimit,
-                "total_pages", results.getTotalPages()
-            )
-        );
+        WhtSummary summary = new WhtSummary();
+        summary.setTotalWithheld(totalWithheld);
+        summary.setTotalRemitted(totalRemitted);
+        summary.setTotalOutstanding(totalWithheld.subtract(totalRemitted));
+
+        WhtListResponse response = new WhtListResponse();
+        response.setTransactions(transactions);
+        response.setSummary(summary);
+        response.setPagination(new PaginationInfo(results.getTotalElements(), page, safeLimit, results.getTotalPages()));
+        return response;
     }
 
     @Transactional
-    public Map<String, Object> remit(User user, UUID transactionId, WhtRemitRequest request) {
+    public WhtRemitResponse remit(User user, UUID transactionId, WhtRemitRequest request) {
         Transaction tx = transactionRepository.findByTransactionIdAndUser(transactionId, user)
             .orElseThrow(() -> new NotFoundException("No withholding transaction found with this ID."));
 
@@ -82,15 +76,15 @@ public class WithholdingService {
         );
         transactionRepository.save(tx);
 
-        return Map.of(
-            "transaction_id", tx.getTransactionId(),
-            "description", tx.getDescription() != null ? tx.getDescription() : "",
-            "category", tx.getCategory(),
-            "amount", tx.getAmount(),
-            "withholding_amount", tx.getWithholdingAmount(),
-            "remitted", true,
-            "remitted_at", tx.getWithholdingRemittedAt()
-        );
+        WhtRemitResponse response = new WhtRemitResponse();
+        response.setTransactionId(tx.getTransactionId());
+        response.setDescription(tx.getDescription() != null ? tx.getDescription() : "");
+        response.setCategory(tx.getCategory());
+        response.setAmount(tx.getAmount());
+        response.setWithholdingAmount(tx.getWithholdingAmount());
+        response.setRemitted(true);
+        response.setRemittedAt(tx.getWithholdingRemittedAt());
+        return response;
     }
 
     private WhtTransactionDto toDto(Transaction tx) {
@@ -109,13 +103,13 @@ public class WithholdingService {
 
     private String deriveRate(String category) {
         return switch (category.toLowerCase()) {
-            case "dividend"                 -> "8%";
-            case "interest"                 -> "8%";
-            case "rent"                     -> "8%";
-            case "royalty"                  -> "15%";
-            case "contractor_payment"       -> "5%";
-            case "non_resident_contractor"  -> "20%";
-            default                         -> "N/A";
+            case "dividend"                -> "8%";
+            case "interest"                -> "8%";
+            case "rent"                    -> "8%";
+            case "royalty"                 -> "15%";
+            case "contractor_payment"      -> "5%";
+            case "non_resident_contractor" -> "20%";
+            default                        -> "N/A";
         };
     }
 

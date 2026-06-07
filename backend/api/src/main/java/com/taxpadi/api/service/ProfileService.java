@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -28,7 +27,7 @@ public class ProfileService {
         this.userRepository = userRepository;
     }
 
-    public Map<String, Object> getProfiles(User user) {
+    public ProfileListResponse getProfiles(User user) {
         List<TaxProfile> profiles = taxProfileRepository.findAllByUser(user);
         List<ProfileSummaryDto> summaries = profiles.stream()
             .map(p -> new ProfileSummaryDto(
@@ -39,7 +38,7 @@ public class ProfileService {
                 p.getProfileId().equals(user.getActiveProfileId()),
                 p.getCreatedAt()
             )).toList();
-        return Map.of("profiles", summaries, "total", summaries.size());
+        return new ProfileListResponse(summaries, summaries.size());
     }
 
     @Transactional

@@ -1,6 +1,9 @@
-package com.taxpadi.api.service;                                                                                                                                                              
-                                                                                                                                                                                            
-import com.taxpadi.api.exception.BadRequestException;                                                                                                                                         
+package com.taxpadi.api.service;
+
+import com.taxpadi.api.dto.taxbot.TaxbotAskResponse;
+import com.taxpadi.api.dto.taxbot.TaxbotConversationItem;
+import com.taxpadi.api.dto.taxbot.TaxbotHistoryResponse;
+import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.TooManyRequestsException;
 import com.taxpadi.api.model.TaxbotConversation;
 import com.taxpadi.api.model.User;
@@ -12,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -40,7 +42,7 @@ public class TaxbotService {
         this.restClient = RestClient.create();
     }
 
-    public Map<String, Object> ask(User user, String question) {
+    public TaxbotAskResponse ask(User user, String question) {
         if (question == null || question.isBlank()) {
             throw new BadRequestException("Question cannot be empty.");
         }
@@ -49,11 +51,9 @@ public class TaxbotService {
         }
 
         LocalDateTime now = LocalDateTime.now();
-
         LocalDateTime dayStart = now.toLocalDate().atStartOfDay();
 
         int todayCount = conversationRepository.countByUserAndCreatedAtBetween(user, dayStart, now);
-
         if (todayCount >= RATE_LIMIT) {
             throw new TooManyRequestsException("Daily TaxBot limit of " + RATE_LIMIT + " questions reached.");
         }
@@ -65,7 +65,6 @@ public class TaxbotService {
             "messages", List.of(Map.of("role", "user", "content", question))
         );
 
-        //this one came from anthropic
         @SuppressWarnings("unchecked")
         Map<String, Object> response = restClient.post()
             .uri("https://api.anthropic.com/v1/messages")
@@ -75,7 +74,6 @@ public class TaxbotService {
             .body(requestBody)
             .retrieve()
             .body(Map.class);
-
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> content = (List<Map<String, Object>>) response.get("content");
@@ -87,33 +85,21 @@ public class TaxbotService {
         conversation.setAnswer(answer);
         conversationRepository.save(conversation);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("question", question);
-        result.put("answer", answer);
-        return result;
+        return new TaxbotAskResponse(conversation.getConversationId(), question, answer, conversation.getCreatedAt());
     }
 
-    
-
-    public Map<String, Object> getHistory(User user, int page, int limit) {
+    public TaxbotHistoryResponse getHistory(User user, int page, int limit) {
         Page<TaxbotConversation> convPage = conversationRepository
             .findAllByUserOrderByCreatedAtDesc(user, PageRequest.of(page - 1, limit));
 
-        List<Map<String, Object>> items = convPage.getContent().stream().map(c -> {
-            Map<String, Object> item = new LinkedHashMap<>();
-            item.put("conversation_id", c.getConversationId());
-            item.put("question", c.getQuestion());
-            item.put("answer", c.getAnswer());
-            item.put("created_at", c.getCreatedAt());
-            return item;
-        }).toList();
+        List<TaxbotConversationItem> items = convPage.getContent().stream()
+            .map(c -> new TaxbotConversationItem(
+                c.getConversationId(),
+                c.getQuestion(),
+                c.getAnswer(),
+                c.getCreatedAt()
+            )).toList();
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("conversations", items);
-        result.put("page", page);
-        result.put("limit", limit);
-        result.put("total", convPage.getTotalElements());
-        result.put("total_pages", convPage.getTotalPages());
-        return result;
+        return new TaxbotHistoryResponse(items, page, limit, convPage.getTotalElements(), convPage.getTotalPages());
     }
 }

@@ -1,24 +1,21 @@
 package com.taxpadi.api.controller;
 
-import java.util.Map;
-import java.util.UUID;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.taxpadi.api.common.ApiResponse;
+import com.taxpadi.api.dto.notification.NotificationItem;
+import com.taxpadi.api.dto.notification.NotificationListResponse;
+import com.taxpadi.api.dto.notification.NotificationPreferences;
+import com.taxpadi.api.dto.notification.NotificationPreferencesResponse;
+import com.taxpadi.api.dto.notification.RegisterFcmRequest;
+import com.taxpadi.api.dto.notification.UnreadCountResponse;
+import com.taxpadi.api.dto.notification.UnregisterFcmRequest;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.NotificationService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/notifications")
@@ -33,28 +30,23 @@ public class NotificationController {
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Void>> register(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody Map<String, String> body) {
+            @RequestBody RegisterFcmRequest request) {
         User user = userDetails.getUser();
-        notificationService.registerFcmToken(
-            user,
-            body.get("fcm_token"),
-            body.get("device_info"),
-            body.get("platform")
-        );
+        notificationService.registerFcmToken(user, request.getFcmToken(), request.getDeviceInfo(), request.getPlatform());
         return ResponseEntity.ok(new ApiResponse<>(true, null, "Device registered for notifications."));
     }
 
     @DeleteMapping("/register")
     public ResponseEntity<ApiResponse<Void>> unregister(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody Map<String, String> body) {
+            @RequestBody UnregisterFcmRequest request) {
         User user = userDetails.getUser();
-        notificationService.unregisterFcmToken(user, body.get("fcm_token"));
+        notificationService.unregisterFcmToken(user, request.getFcmToken());
         return ResponseEntity.ok(new ApiResponse<>(true, null, "Device unregistered from notifications."));
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getNotifications(
+    public ResponseEntity<ApiResponse<NotificationListResponse>> getNotifications(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
@@ -65,17 +57,16 @@ public class NotificationController {
     }
 
     @GetMapping("/unread-count")
-    public ResponseEntity<ApiResponse<Map<String, Long>>> getUnreadCount(
+    public ResponseEntity<ApiResponse<UnreadCountResponse>> getUnreadCount(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
         User user = userDetails.getUser();
-        long count = notificationService.getUnreadCount(user);
         return ResponseEntity.ok(new ApiResponse<>(true,
-            Map.of("unread_count", count),
+            new UnreadCountResponse(notificationService.getUnreadCount(user)),
             "Unread count retrieved successfully."));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getNotification(
+    public ResponseEntity<ApiResponse<NotificationItem>> getNotification(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id) {
         User user = userDetails.getUser();
@@ -119,7 +110,7 @@ public class NotificationController {
     }
 
     @GetMapping("/preferences")
-    public ResponseEntity<ApiResponse<Map<String, Boolean>>> getPreferences(
+    public ResponseEntity<ApiResponse<NotificationPreferencesResponse>> getPreferences(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
@@ -128,11 +119,12 @@ public class NotificationController {
     }
 
     @PutMapping("/preferences")
-    public ResponseEntity<ApiResponse<Void>> updatePreferences(
+    public ResponseEntity<ApiResponse<NotificationPreferencesResponse>> updatePreferences(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody Map<String, Boolean> prefs) {
+            @RequestBody NotificationPreferences prefs) {
         User user = userDetails.getUser();
-        notificationService.updatePreferences(user, prefs);
-        return ResponseEntity.ok(new ApiResponse<>(true, null, "Notification preferences updated successfully."));
+        return ResponseEntity.ok(new ApiResponse<>(true,
+            notificationService.updatePreferences(user, prefs),
+            "Notification preferences updated successfully."));
     }
 }

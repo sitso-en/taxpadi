@@ -1,8 +1,17 @@
 package com.taxpadi.api.controller;
 
 import java.time.LocalDate;
-import java.util.Map;
 import java.util.UUID;
+
+import com.taxpadi.api.dto.transaction.CreateTransactionRequest;
+import com.taxpadi.api.dto.transaction.CreateTransactionResponse;
+import com.taxpadi.api.dto.transaction.ImportHistoryListResponse;
+import com.taxpadi.api.dto.transaction.ImportStatementResponse;
+import com.taxpadi.api.dto.transaction.TransactionDetailResponse;
+import com.taxpadi.api.dto.transaction.TransactionListResponse;
+import com.taxpadi.api.dto.transaction.UpdateTransactionRequest;
+import com.taxpadi.api.dto.transaction.UpdateTransactionResponse;
+import com.taxpadi.api.dto.transaction.ValidateImportResponse;
 
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -34,7 +43,7 @@ public class TransactionController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getTransactions(
+    public ResponseEntity<ApiResponse<TransactionListResponse>> getTransactions(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(required = false) String type,
             @RequestParam(required = false) String category,
@@ -53,9 +62,9 @@ public class TransactionController {
     }
 
     @PostMapping
-    public ResponseEntity<ApiResponse<Map<String, Object>>> createTransaction(
+    public ResponseEntity<ApiResponse<CreateTransactionResponse>> createTransaction(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody CreateTransactionRequest body) {
         User user = userDetails.getUser();
         return ResponseEntity.status(201).body(new ApiResponse<>(true,
             transactionService.createTransaction(user, body),
@@ -63,7 +72,7 @@ public class TransactionController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getTransaction(
+    public ResponseEntity<ApiResponse<TransactionDetailResponse>> getTransaction(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id) {
         User user = userDetails.getUser();
@@ -73,10 +82,10 @@ public class TransactionController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> updateTransaction(
+    public ResponseEntity<ApiResponse<UpdateTransactionResponse>> updateTransaction(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody Map<String, Object> body) {
+            @RequestBody UpdateTransactionRequest body) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             transactionService.updateTransaction(user, id, body),
@@ -93,7 +102,7 @@ public class TransactionController {
     }
 
     @PostMapping("/import/validate")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> validateImport(
+    public ResponseEntity<ApiResponse<ValidateImportResponse>> validateImport(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam MultipartFile file,
             @RequestParam String provider) {
@@ -104,7 +113,7 @@ public class TransactionController {
     }
 
     @PostMapping("/import")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> importStatement(
+    public ResponseEntity<ApiResponse<ImportStatementResponse>> importStatement(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam MultipartFile file,
             @RequestParam String provider,
@@ -117,7 +126,7 @@ public class TransactionController {
     }
 
     @GetMapping("/import/history")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getImportHistory(
+    public ResponseEntity<ApiResponse<ImportHistoryListResponse>> getImportHistory(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
