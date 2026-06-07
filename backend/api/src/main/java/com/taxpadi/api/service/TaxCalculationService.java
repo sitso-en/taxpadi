@@ -1,5 +1,6 @@
 package com.taxpadi.api.service;
 
+import com.taxpadi.api.dto.common.PaginationInfo;
 import com.taxpadi.api.dto.tax.*;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.TaxCalculation;
@@ -100,7 +101,7 @@ public class TaxCalculationService {
         );
     }
 
-    public Map<String, Object> getHistory(User user, String taxType, int page, int limit) {
+    public TaxHistoryResponse getHistory(User user, String taxType, int page, int limit) {
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 60);
         PageRequest pageable = PageRequest.of(safePage, safeLimit);
@@ -122,14 +123,9 @@ public class TaxCalculationService {
                 c.getCalculatedAt()
             )).toList();
 
-        return Map.of(
-            "history", history,
-            "pagination", Map.of(
-                "total", results.getTotalElements(),
-                "page", page,
-                "limit", safeLimit,
-                "total_pages", results.getTotalPages()
-            )
+        return new TaxHistoryResponse(
+            history,
+            new PaginationInfo(results.getTotalElements(), page, safeLimit, results.getTotalPages())
         );
     }
 
@@ -152,7 +148,7 @@ public class TaxCalculationService {
                     case "income_tax"  -> taxEngine.calculateIncomeTax(taxableIncome);
                     case "vat"         -> taxEngine.calculateVat(taxableIncome);
                     case "paye"        -> taxEngine.calculatePaye(taxableIncome);
-                    case "withholding" -> c.getTaxLiability(); // WHT is pre-computed per transaction
+                    case "withholding" -> c.getTaxLiability();
                     default            -> BigDecimal.ZERO;
                 };
 
