@@ -34,6 +34,8 @@ build/
 
 ### Secrets ###
 *firebase-adminsdk*.json
+
 firebase-service-account.json
+
 google-services.json
 application.properties
