@@ -1,20 +1,15 @@
 package com.taxpadi.api.controller;
 
-import java.util.Map;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import org.springframework.web.bind.annotation.RestController;
-
 import com.taxpadi.api.common.ApiResponse;
+import com.taxpadi.api.dto.taxbot.TaxbotAskRequest;
+import com.taxpadi.api.dto.taxbot.TaxbotAskResponse;
+import com.taxpadi.api.dto.taxbot.TaxbotHistoryResponse;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.TaxbotService;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/v1/taxbot")
@@ -27,17 +22,17 @@ public class TaxbotController {
     }
 
     @PostMapping("/ask")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> ask(
+    public ResponseEntity<ApiResponse<TaxbotAskResponse>> ask(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody Map<String, String> body) {
+            @RequestBody TaxbotAskRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
-            taxbotService.ask(user, body.get("question")),
+            taxbotService.ask(user, request.getQuestion()),
             "TaxBot response generated successfully."));
     }
 
     @GetMapping("/history")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getHistory(
+    public ResponseEntity<ApiResponse<TaxbotHistoryResponse>> getHistory(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
