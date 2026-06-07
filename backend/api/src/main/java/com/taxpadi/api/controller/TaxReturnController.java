@@ -5,15 +5,13 @@ import com.taxpadi.api.dto.taxreturn.*;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.TaxReturnService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
-
-import jakarta.servlet.http.HttpServletRequest;
 
 @RestController
 @RequestMapping("/api/v1/tax/returns")
@@ -26,7 +24,7 @@ public class TaxReturnController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getReturns(
+    public ResponseEntity<ApiResponse<TaxReturnListResponse>> getReturns(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(required = false) String tax_type,
             @RequestParam(required = false) String status,
@@ -40,7 +38,7 @@ public class TaxReturnController {
     }
 
     @PostMapping("/generate")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> generate(
+    public ResponseEntity<ApiResponse<GenerateReturnResponse>> generate(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestBody GenerateReturnRequest request,
             HttpServletRequest httpRequest) {
@@ -51,7 +49,7 @@ public class TaxReturnController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getReturn(
+    public ResponseEntity<ApiResponse<TaxReturnDetailResponse>> getReturn(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id) {
         User user = userDetails.getUser();
@@ -61,7 +59,7 @@ public class TaxReturnController {
     }
 
     @GetMapping("/{id}/preview")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> preview(
+    public ResponseEntity<ApiResponse<PreviewResponse>> preview(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id) {
         User user = userDetails.getUser();
@@ -71,7 +69,7 @@ public class TaxReturnController {
     }
 
     @PutMapping("/{id}/submit")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> submit(
+    public ResponseEntity<ApiResponse<SubmitReturnResponse>> submit(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
             @RequestBody(required = false) SubmitReturnRequest request,
@@ -83,7 +81,7 @@ public class TaxReturnController {
     }
 
     @PutMapping("/{id}/amend")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> amend(
+    public ResponseEntity<ApiResponse<AmendReturnResponse>> amend(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
             @RequestBody AmendReturnRequest request,
