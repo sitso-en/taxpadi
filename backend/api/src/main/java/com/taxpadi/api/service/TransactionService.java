@@ -6,11 +6,10 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import java.io.InputStreamReader;
 
@@ -22,6 +21,21 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import com.taxpadi.api.dto.transaction.AmbiguousTransactionItem;
+import com.taxpadi.api.dto.transaction.CreateTransactionRequest;
+import com.taxpadi.api.dto.transaction.CreateTransactionResponse;
+import com.taxpadi.api.dto.transaction.ImportHistoryItem;
+import com.taxpadi.api.dto.transaction.ImportHistoryListResponse;
+import com.taxpadi.api.dto.transaction.ImportStatementResponse;
+import com.taxpadi.api.dto.transaction.PaginationInfo;
+import com.taxpadi.api.dto.transaction.TransactionDetailResponse;
+import com.taxpadi.api.dto.transaction.TransactionListResponse;
+import com.taxpadi.api.dto.transaction.TransactionSummaryResponse;
+import com.taxpadi.api.dto.transaction.UpdateTransactionRequest;
+import com.taxpadi.api.dto.transaction.UpdateTransactionResponse;
+import com.taxpadi.api.dto.transaction.ValidateImportResponse;
+import com.taxpadi.api.dto.transaction.VaultSuggestion;
+import com.taxpadi.api.dto.transaction.WithholdingInfo;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.ConflictException;
 import com.taxpadi.api.exception.ForbiddenException;
@@ -38,7 +52,6 @@ import com.taxpadi.api.model.User;
 @Service
 public class TransactionService {
 
-    private static final BigDecimal VAULT_SUGGESTION_RATE = new BigDecimal("0.25");
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
     private static final List<String> AMBIGUOUS_KEYWORDS = List.of(
         "transfer", "float", "commission", "adjustment");
@@ -62,7 +75,7 @@ public class TransactionService {
     }
 
 
-    public Map<String, Object> getTransactions(User user, String type, String category,
+    public TransactionListResponse getTransactions(User user, String type, String category,
             String entryMethod, Boolean taxDeductible, Boolean withholdingApplicable,
             LocalDate dateFrom, LocalDate dateTo, int page, int limit) {
         int safePage = Math.max(0, page - 1);
@@ -72,42 +85,59 @@ public class TransactionService {
             user, type, category, entryMethod, taxDeductible, withholdingApplicable,
             dateFrom, dateTo, PageRequest.of(safePage, safeLimit));
 
-        List<Map<String, Object>> transactions = results.getContent().stream()
-            .map(this::toSummary).toList();
+        PaginationInfo pagination = new PaginationInfo();
+        pagination.setTotal(results.getTotalElements());
+        pagination.setPage(page);
+        pagination.setLimit(safeLimit);
+        pagination.setTotalPages(results.getTotalPages());
 
-        return Map.of(
-            "transactions", transactions,
-            "pagination", Map.of(
-                "total", results.getTotalElements(),
-                "page", page,
-                "limit", safeLimit,
-                "total_pages", results.getTotalPages()
-            )
-        );
+        TransactionListResponse response = new TransactionListResponse();
+        response.setTransactions(results.getContent().stream().map(this::toSummary).collect(Collectors.toList()));
+        response.setPagination(pagination);
+        return response;
     }
 
 
     @Transactional
-    public Map<String, Object> createTransaction(User user, Map<String, Object> body) {
-        String type = requireString(body, "type");
-        
+    public CreateTransactionResponse createTransaction(User user, CreateTransactionRequest req) {
+        if (req.getType() == null || req.getType().isBlank()) {
+            throw new BadRequestException("type is required");
+        }
+        String type = req.getType();
         if (!type.equals("income") && !type.equals("expense")) {
             throw new BadRequestException("Type must be income or expense");
         }
 
-        BigDecimal amount = requirePositiveDecimal(body, "amount");
-        String category = requireString(body, "category");
-        LocalDate transactionDate = requireDate(body, "transaction_date");
+        if (req.getAmount() == null) {
+            throw new BadRequestException("amount is required");
+        }
+        BigDecimal amount = req.getAmount();
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new BadRequestException("amount must be greater than 0");
+        }
+
+        if (req.getCategory() == null || req.getCategory().isBlank()) {
+            throw new BadRequestException("category is required");
+        }
+        String category = req.getCategory();
+
+        if (req.getTransactionDate() == null || req.getTransactionDate().isBlank()) {
+            throw new BadRequestException("transaction_date is required");
+        }
+        LocalDate transactionDate;
+        try {
+            transactionDate = LocalDate.parse(req.getTransactionDate());
+        } catch (DateTimeParseException e) {
+            throw new BadRequestException("transaction_date must be a valid date (YYYY-MM-DD)");
+        }
 
         if (transactionDate.isAfter(LocalDate.now())) {
             throw new BadRequestException("Transaction date cannot be in the future");
         }
 
-        boolean taxDeductible = boolOrFalse(body, "tax_deductible");
-
-        boolean withholdingApplicable = boolOrFalse(body, "withholding_applicable");
-
-        String description = (String) body.get("description");
+        boolean taxDeductible = req.getTaxDeductible() != null && req.getTaxDeductible();
+        boolean withholdingApplicable = req.getWithholdingApplicable() != null && req.getWithholdingApplicable();
+        String description = req.getDescription();
 
         Transaction t = new Transaction();
         t.setUser(user);
@@ -140,34 +170,45 @@ public class TransactionService {
             "Transaction " + t.getTransactionId() + " created. Type: " + type
                 + ", Amount: " + amount + ", Category: " + category, null);
 
-        Map<String, Object> whtInfo = new LinkedHashMap<>();
-        whtInfo.put("applicable", withholdingApplicable);
-        whtInfo.put("rate", whtRateStr);
-        whtInfo.put("amount", whtAmount);
-        whtInfo.put("message", null);
+        WithholdingInfo whtInfo = new WithholdingInfo();
+        whtInfo.setApplicable(withholdingApplicable);
+        whtInfo.setRate(whtRateStr);
+        whtInfo.setAmount(whtAmount);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("transaction_id", t.getTransactionId());
-        result.put("type", t.getType());
-        result.put("amount", t.getAmount());
-        result.put("category", t.getCategory());
-        result.put("entry_method", t.getEntryMethod());
-        result.put("tax_deductible", t.getTaxDeductible());
-        result.put("withholding", whtInfo);
-        result.put("transaction_date", t.getTransactionDate());
-
-        result.put("tax_liability_updated", true);
+        CreateTransactionResponse response = new CreateTransactionResponse();
+        response.setTransactionId(t.getTransactionId());
+        response.setType(t.getType());
+        response.setAmount(t.getAmount());
+        response.setCategory(t.getCategory());
+        response.setEntryMethod(t.getEntryMethod());
+        response.setTaxDeductible(t.getTaxDeductible());
+        response.setWithholding(whtInfo);
+        response.setTransactionDate(t.getTransactionDate());
+        response.setTaxLiabilityUpdated(true);
 
         if (type.equals("income")) {
-            BigDecimal suggested = amount.multiply(VAULT_SUGGESTION_RATE).setScale(2, RoundingMode.HALF_UP);
-            Map<String, Object> vault = new LinkedHashMap<>();
-            vault.put("suggested", true);
-            vault.put("suggested_amount", suggested);
-            vault.put("message", "Consider saving GHS " + suggested + " for taxes on this income");
-            result.put("vault_suggestion", vault);
+            int year = LocalDate.now().getYear();
+            taxCalculationRepository
+                .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+                    user, "income_tax", LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
+                .filter(c -> c.getGrossIncome() != null
+                    && c.getGrossIncome().compareTo(BigDecimal.ZERO) > 0
+                    && c.getTaxLiability() != null
+                    && c.getTaxLiability().compareTo(BigDecimal.ZERO) > 0)
+                .ifPresent(c -> {
+                    BigDecimal effectiveRate = c.getTaxLiability()
+                        .divide(c.getGrossIncome(), 4, RoundingMode.HALF_UP);
+                    BigDecimal suggested = amount.multiply(effectiveRate).setScale(2, RoundingMode.HALF_UP);
+                    VaultSuggestion vault = new VaultSuggestion();
+                    vault.setSuggested(true);
+                    vault.setSuggestedAmount(suggested);
+                    vault.setMessage("Consider saving GHS " + suggested
+                        + " (" + toPercent(effectiveRate) + " effective rate) for taxes on this income");
+                    response.setVaultSuggestion(vault);
+                });
         }
 
-        return result;
+        return response;
     }
 
     // --- Internal: called by InvoiceService when an invoice is marked paid ---
@@ -191,14 +232,14 @@ public class TransactionService {
         return t;
     }
 
-    public Map<String, Object> getTransaction(User user, UUID id) {
+    public TransactionDetailResponse getTransaction(User user, UUID id) {
         Transaction t = findOwned(user, id);
         return toDetail(t);
     }
 
 
     @Transactional
-    public Map<String, Object> updateTransaction(User user, UUID id, Map<String, Object> body) {
+    public UpdateTransactionResponse updateTransaction(User user, UUID id, UpdateTransactionRequest req) {
         Transaction t = findOwned(user, id);
 
         if ("invoice".equals(t.getEntryMethod())) {
@@ -208,27 +249,34 @@ public class TransactionService {
         String oldValues = "Amount: " + t.getAmount() + ", Category: " + t.getCategory()
             + ", Date: " + t.getTransactionDate();
 
-        if (body.containsKey("amount")) {
-            t.setAmount(requirePositiveDecimal(body, "amount"));
+        if (req.getAmount() != null) {
+            if (req.getAmount().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new BadRequestException("amount must be greater than 0");
+            }
+            t.setAmount(req.getAmount());
         }
-        if (body.containsKey("category")) {
-            t.setCategory((String) body.get("category"));
+        if (req.getCategory() != null) {
+            t.setCategory(req.getCategory());
         }
-        if (body.containsKey("description")) {
-            t.setDescription((String) body.get("description"));
+        if (req.getDescription() != null) {
+            t.setDescription(req.getDescription());
         }
-        if (body.containsKey("tax_deductible")) {
-            t.setTaxDeductible(boolOrFalse(body, "tax_deductible"));
+        if (req.getTaxDeductible() != null) {
+            t.setTaxDeductible(req.getTaxDeductible());
         }
-        if (body.containsKey("withholding_applicable")) {
-            t.setWithholdingApplicable(boolOrFalse(body, "withholding_applicable"));
+        if (req.getWithholdingApplicable() != null) {
+            t.setWithholdingApplicable(req.getWithholdingApplicable());
         }
-        if (body.containsKey("transaction_date")) {
-            LocalDate d = requireDate(body, "transaction_date");
+        if (req.getTransactionDate() != null && !req.getTransactionDate().isBlank()) {
+            LocalDate d;
+            try {
+                d = LocalDate.parse(req.getTransactionDate());
+            } catch (DateTimeParseException e) {
+                throw new BadRequestException("transaction_date must be a valid date (YYYY-MM-DD)");
+            }
             if (d.isAfter(LocalDate.now())) {
                 throw new BadRequestException("Transaction date cannot be in the future");
             }
-
             t.setTransactionDate(d);
         }
 
@@ -251,21 +299,21 @@ public class TransactionService {
             "Transaction " + id + " updated. Before: [" + oldValues + "] After: [Amount: "
                 + t.getAmount() + ", Category: " + t.getCategory() + ", Date: " + t.getTransactionDate() + "]", null);
 
-        Map<String, Object> whtInfo = new LinkedHashMap<>();
-        whtInfo.put("applicable", t.getWithholdingApplicable());
-        whtInfo.put("rate", whtRateStr);
-        whtInfo.put("amount", whtAmount);
+        WithholdingInfo whtInfo = new WithholdingInfo();
+        whtInfo.setApplicable(t.getWithholdingApplicable());
+        whtInfo.setRate(whtRateStr);
+        whtInfo.setAmount(whtAmount);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("transaction_id", t.getTransactionId());
-        result.put("amount", t.getAmount());
-        result.put("category", t.getCategory());
-        result.put("tax_deductible", t.getTaxDeductible());
-        result.put("withholding", whtInfo);
-        result.put("transaction_date", t.getTransactionDate());
-        result.put("updated_at", t.getUpdatedAt());
-        result.put("tax_liability_updated", true);
-        return result;
+        UpdateTransactionResponse response = new UpdateTransactionResponse();
+        response.setTransactionId(t.getTransactionId());
+        response.setAmount(t.getAmount());
+        response.setCategory(t.getCategory());
+        response.setTaxDeductible(t.getTaxDeductible());
+        response.setWithholding(whtInfo);
+        response.setTransactionDate(t.getTransactionDate());
+        response.setUpdatedAt(t.getUpdatedAt());
+        response.setTaxLiabilityUpdated(true);
+        return response;
     }
 
 
@@ -287,7 +335,7 @@ public class TransactionService {
 
 
     @Transactional
-    public Map<String, Object> importStatement(User user, MultipartFile file,
+    public ImportStatementResponse importStatement(User user, MultipartFile file,
             String provider, LocalDate statementFrom, LocalDate statementTo) {
         validateFile(file);
 
@@ -300,9 +348,7 @@ public class TransactionService {
         List<ParsedRow> rows = parseCsv(file);
 
         List<Transaction> saved = new ArrayList<>();
-
-        List<Map<String, Object>> ambiguous = new ArrayList<>();
-
+        List<AmbiguousTransactionItem> ambiguous = new ArrayList<>();
         int skipped = 0;
 
         for (ParsedRow row : rows) {
@@ -329,13 +375,13 @@ public class TransactionService {
             saved.add(t);
 
             if (row.needsReview) {
-                Map<String, Object> a = new LinkedHashMap<>();
-                a.put("transaction_id", t.getTransactionId());
-                a.put("amount", t.getAmount());
-                a.put("description", t.getDescription());
-                a.put("suggested_category", t.getCategory());
-                a.put("transaction_date", t.getTransactionDate());
-                a.put("needs_review", true);
+                AmbiguousTransactionItem a = new AmbiguousTransactionItem();
+                a.setTransactionId(t.getTransactionId());
+                a.setAmount(t.getAmount());
+                a.setDescription(t.getDescription());
+                a.setSuggestedCategory(t.getCategory());
+                a.setTransactionDate(t.getTransactionDate());
+                a.setNeedsReview(true);
                 ambiguous.add(a);
             }
         }
@@ -354,42 +400,43 @@ public class TransactionService {
             "Statement imported from " + provider + " (" + statementFrom + " to " + statementTo
                 + "). Imported: " + saved.size() + ", Skipped: " + skipped, null);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("import_id", history.getImportId());
-        result.put("provider", provider);
-        result.put("statement_from", statementFrom);
-        result.put("statement_to", statementTo);
-        result.put("total_transactions_found", rows.size());
-        result.put("transactions_imported", saved.size());
-        result.put("transactions_skipped", skipped);
-        result.put("ambiguous_transactions", ambiguous);
-        result.put("tax_liability_updated", true);
-        return result;
+        ImportStatementResponse response = new ImportStatementResponse();
+        response.setImportId(history.getImportId());
+        response.setProvider(provider);
+        response.setStatementFrom(statementFrom);
+        response.setStatementTo(statementTo);
+        response.setTotalTransactionsFound(rows.size());
+        response.setTransactionsImported(saved.size());
+        response.setTransactionsSkipped(skipped);
+        response.setAmbiguousTransactions(ambiguous);
+        response.setTaxLiabilityUpdated(true);
+        return response;
     }
 
 
-    public Map<String, Object> getImportHistory(User user) {
-
+    public ImportHistoryListResponse getImportHistory(User user) {
         List<ImportHistory> imports = importHistoryRepository.findAllByUserOrderByImportedAtDesc(user);
 
-        List<Map<String, Object>> list = imports.stream().map(h -> {
-            Map<String, Object> m = new LinkedHashMap<>();
-            m.put("import_id", h.getImportId());
-            m.put("provider", h.getProvider());
-            m.put("statement_from", h.getStatementFrom());
-            m.put("statement_to", h.getStatementTo());
-            m.put("total_imported", h.getTotalImported());
-            m.put("imported_at", h.getImportedAt());
-            return m;
-        }).toList();
+        List<ImportHistoryItem> list = imports.stream().map(h -> {
+            ImportHistoryItem item = new ImportHistoryItem();
+            item.setImportId(h.getImportId());
+            item.setProvider(h.getProvider());
+            item.setStatementFrom(h.getStatementFrom());
+            item.setStatementTo(h.getStatementTo());
+            item.setTotalImported(h.getTotalImported());
+            item.setImportedAt(h.getImportedAt());
+            return item;
+        }).collect(Collectors.toList());
 
-        return Map.of("imports", list, "total", list.size());
+        ImportHistoryListResponse response = new ImportHistoryListResponse();
+        response.setImports(list);
+        response.setTotal(list.size());
+        return response;
     }
 
    
-    public Map<String, Object> validateImport(User user, MultipartFile file, String provider) {
+    public ValidateImportResponse validateImport(User user, MultipartFile file, String provider) {
         validateFile(file);
-
 
         List<ParsedRow> rows = parseCsv(file);
 
@@ -398,7 +445,6 @@ public class TransactionService {
             .toList();
 
         LocalDate detectedFrom = valid.stream().map(r -> r.date).min(LocalDate::compareTo).orElse(null);
-
         LocalDate detectedTo   = valid.stream().map(r -> r.date).max(LocalDate::compareTo).orElse(null);
 
         boolean overlap = detectedFrom != null && detectedTo != null
@@ -406,14 +452,14 @@ public class TransactionService {
                 .existsByUserAndProviderAndStatementFromLessThanEqualAndStatementToGreaterThanEqual(
                 user, provider, detectedTo, detectedFrom);
 
-        Map<String, Object> result = new LinkedHashMap<>();
-        result.put("detected_from", detectedFrom);
-        result.put("detected_to", detectedTo);
-        result.put("total_transactions_detected", valid.size());
-        result.put("overlap_detected", overlap);
-        result.put("overlapping_periods", List.of());
-        result.put("safe_to_import", !overlap);
-        return result;
+        ValidateImportResponse response = new ValidateImportResponse();
+        response.setDetectedFrom(detectedFrom);
+        response.setDetectedTo(detectedTo);
+        response.setTotalTransactionsDetected(valid.size());
+        response.setOverlapDetected(overlap);
+        response.setOverlappingPeriods(List.of());
+        response.setSafeToImport(!overlap);
+        return response;
     }
 
 
@@ -610,93 +656,44 @@ public class TransactionService {
         return rate.multiply(BigDecimal.valueOf(100)).stripTrailingZeros().toPlainString() + "%";
     }
 
-    private Map<String, Object> toSummary(Transaction t) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("transaction_id", t.getTransactionId());
-        m.put("type", t.getType());
-        m.put("amount", t.getAmount());
-        m.put("category", t.getCategory());
-        m.put("description", t.getDescription());
-        m.put("entry_method", t.getEntryMethod());
-        m.put("receipt_url", t.getReceiptUrl());
-        m.put("tax_deductible", t.getTaxDeductible());
-        m.put("withholding_applicable", t.getWithholdingApplicable());
-        m.put("withholding_amount", t.getWithholdingAmount());
-        m.put("withholding_remitted", t.getWithholdingRemitted());
-        m.put("transaction_date", t.getTransactionDate());
-        m.put("created_at", t.getCreatedAt());
-        return m;
+    private TransactionSummaryResponse toSummary(Transaction t) {
+        TransactionSummaryResponse r = new TransactionSummaryResponse();
+        r.setTransactionId(t.getTransactionId());
+        r.setType(t.getType());
+        r.setAmount(t.getAmount());
+        r.setCategory(t.getCategory());
+        r.setDescription(t.getDescription());
+        r.setEntryMethod(t.getEntryMethod());
+        r.setReceiptUrl(t.getReceiptUrl());
+        r.setTaxDeductible(t.getTaxDeductible());
+        r.setWithholdingApplicable(t.getWithholdingApplicable());
+        r.setWithholdingAmount(t.getWithholdingAmount());
+        r.setWithholdingRemitted(t.getWithholdingRemitted());
+        r.setTransactionDate(t.getTransactionDate());
+        r.setCreatedAt(t.getCreatedAt());
+        return r;
     }
 
-    private Map<String, Object> toDetail(Transaction t) {
-        Map<String, Object> m = new LinkedHashMap<>(toSummary(t));
-
-        m.put("withholding_remitted_at", t.getWithholdingRemittedAt());
-
-        m.put("updated_at", t.getUpdatedAt());
-
-        return m;
+    private TransactionDetailResponse toDetail(Transaction t) {
+        TransactionDetailResponse r = new TransactionDetailResponse();
+        r.setTransactionId(t.getTransactionId());
+        r.setType(t.getType());
+        r.setAmount(t.getAmount());
+        r.setCategory(t.getCategory());
+        r.setDescription(t.getDescription());
+        r.setEntryMethod(t.getEntryMethod());
+        r.setReceiptUrl(t.getReceiptUrl());
+        r.setTaxDeductible(t.getTaxDeductible());
+        r.setWithholdingApplicable(t.getWithholdingApplicable());
+        r.setWithholdingAmount(t.getWithholdingAmount());
+        r.setWithholdingRemitted(t.getWithholdingRemitted());
+        r.setWithholdingRemittedAt(t.getWithholdingRemittedAt());
+        r.setTransactionDate(t.getTransactionDate());
+        r.setCreatedAt(t.getCreatedAt());
+        r.setUpdatedAt(t.getUpdatedAt());
+        return r;
     }
 
-    private String requireString(Map<String, Object> body, String key) {
-        Object val = body.get(key);
-
-        if (val == null || val.toString().isBlank()) {
-            throw new BadRequestException(key + " is required");
-        }
-
-        return val.toString();
-    }
-
-    private BigDecimal requirePositiveDecimal(Map<String, Object> body, String key) {
-        Object val = body.get(key);
-
-        if (val == null){
-            throw new BadRequestException(key + " is required");
-        }
-
-        BigDecimal bd;
-
-        try{
-            bd = new BigDecimal(val.toString());
-        }
-        catch (NumberFormatException e){
-            throw new BadRequestException(key + " must be a valid number"); 
-        }
-        if (bd.compareTo(BigDecimal.ZERO) <= 0){
-            throw new BadRequestException(key + " must be greater than 0");
-        }
-
-        return bd;
-    }
-
-    private LocalDate requireDate(Map<String, Object> body, String key) {
-        Object val = body.get(key);
-        if (val == null){
-            throw new BadRequestException(key + " is required");
-        }
-
-
-        try{
-            return LocalDate.parse(val.toString()); 
-        }
-        catch (DateTimeParseException e){
-            throw new BadRequestException(key + " must be a valid date (YYYY-MM-DD)");
-        }
-    }
-
-    private boolean boolOrFalse(Map<String, Object> body, String key) {
-        Object val = body.get(key);
-        if (val == null){
-            return false;}
-        
-        if (val instanceof Boolean b){
-            return b;
-        }
-
-        return Boolean.parseBoolean(val.toString());
-    }
-    
     private static class ParsedRow {
         LocalDate date;
         String description;
