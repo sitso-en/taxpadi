@@ -1,11 +1,20 @@
 package com.taxpadi.api.service;
 
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.google.firebase.messaging.FirebaseMessaging;
 import com.taxpadi.api.dto.common.PaginationInfo;
 import com.taxpadi.api.dto.notification.NotificationItem;
 import com.taxpadi.api.dto.notification.NotificationListResponse;
 import com.taxpadi.api.dto.notification.NotificationPreferences;
 import com.taxpadi.api.dto.notification.NotificationPreferencesResponse;
-import com.taxpadi.api.dto.notification.UnreadCountResponse;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.DeviceToken;
 import com.taxpadi.api.model.Notification;
@@ -14,16 +23,6 @@ import com.taxpadi.api.model.User;
 import com.taxpadi.api.repository.DeviceTokenRepository;
 import com.taxpadi.api.repository.NotificationRepository;
 import com.taxpadi.api.repository.UserRepository;
-import com.google.firebase.messaging.FirebaseMessaging;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
 
 @Service
 public class NotificationService {
