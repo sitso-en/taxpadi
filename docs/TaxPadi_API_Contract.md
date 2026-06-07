@@ -75,7 +75,7 @@ All endpoints return responses in this format:
 | 14 | Tax Returns | 6 |
 | 15 | Tax Deadlines | 3 |
 | 16 | Penalties | 4 |
-| 17 | Payments | 6 |
+| 17 | Payments | 6 | 
 | 18 | Compliance Certificates | 3 |
 | 19 | Savings Vault | 5 |
 | 20 | Invoices | 8 |
