@@ -10,7 +10,6 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Map;
 import java.util.UUID;
 
 @RestController
@@ -24,7 +23,7 @@ public class PayeController {
     }
 
     @GetMapping("/employees")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getEmployees(
+    public ResponseEntity<ApiResponse<EmployeeListResponse>> getEmployees(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(defaultValue = "active") String status,
             @RequestParam(defaultValue = "1") int page,
@@ -36,7 +35,7 @@ public class PayeController {
     }
 
     @PostMapping("/employees")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> addEmployee(
+    public ResponseEntity<ApiResponse<AddEmployeeResponse>> addEmployee(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestBody CreateEmployeeRequest request) {
         User user = userDetails.getUser();
@@ -56,7 +55,7 @@ public class PayeController {
     }
 
     @PutMapping("/employees/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> updateEmployee(
+    public ResponseEntity<ApiResponse<UpdateEmployeeResponse>> updateEmployee(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
             @RequestBody UpdateEmployeeRequest request) {
@@ -67,7 +66,7 @@ public class PayeController {
     }
 
     @DeleteMapping("/employees/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> deactivateEmployee(
+    public ResponseEntity<ApiResponse<DeactivateEmployeeResponse>> deactivateEmployee(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
             @RequestBody DeactivateEmployeeRequest request) {
@@ -78,7 +77,7 @@ public class PayeController {
     }
 
     @GetMapping("/records")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getRecords(
+    public ResponseEntity<ApiResponse<PayeRecordListResponse>> getRecords(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(required = false) Integer month,
             @RequestParam(required = false) Integer year,
@@ -93,7 +92,7 @@ public class PayeController {
     }
 
     @GetMapping("/records/{month}/{year}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getMonthlySummary(
+    public ResponseEntity<ApiResponse<MonthlySummaryResponse>> getMonthlySummary(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable int month,
             @PathVariable int year) {
@@ -104,7 +103,7 @@ public class PayeController {
     }
 
     @PutMapping("/records/{id}/remit")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> remit(
+    public ResponseEntity<ApiResponse<PayeRemitResponse>> remit(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
             @RequestBody(required = false) RemitRequest request) {
@@ -115,7 +114,7 @@ public class PayeController {
     }
 
     @GetMapping("/annual-return/{year}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> getAnnualReturn(
+    public ResponseEntity<ApiResponse<AnnualReturnResponse>> getAnnualReturn(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable int year) {
         User user = userDetails.getUser();
