@@ -68,7 +68,7 @@ All endpoints return responses in this format:
 | 7 | Multi-Profile | 5 |
 | 8 | Transactions | 9 |
 | 9 | Tax Calculations | 4 |
-| 10 | Tax Brackets and Rates | 2 |
+| 10 | Tax Brackets and Rates | 2 |`
 | 11 | VAT | 4 |
 | 12 | PAYE | 9 |
 | 13 | Withholding Tax | 2 |
