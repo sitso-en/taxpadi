@@ -33,6 +33,12 @@ public class DeviceToken {
     @Column(name = "device_info", length = 255)
     private String deviceInfo;
 
+    @Column(name = "fcm_token", length = 500)
+    private String fcmToken;
+
+    @Column(name = "platform", length = 20)
+    private String platform;
+
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
@@ -45,7 +51,8 @@ public class DeviceToken {
     }
 
 
-    // --- Getters and Setters ---
+    
+
 
     public UUID getTokenId() { return tokenId; }
 
@@ -57,6 +64,12 @@ public class DeviceToken {
 
     public String getDeviceInfo() { return deviceInfo; }
     public void setDeviceInfo(String deviceInfo) { this.deviceInfo = deviceInfo; }
+
+    public String getFcmToken() { return fcmToken; }
+    public void setFcmToken(String fcmToken) { this.fcmToken = fcmToken; }
+
+    public String getPlatform() { return platform; }
+    public void setPlatform(String platform) { this.platform = platform; }
 
     public Boolean getIsActive() { return isActive; }
     public void setIsActive(Boolean isActive) { this.isActive = isActive; }

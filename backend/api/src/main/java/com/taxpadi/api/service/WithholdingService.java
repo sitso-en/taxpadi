@@ -1,0 +1,119 @@
+package com.taxpadi.api.service;
+
+import com.taxpadi.api.dto.common.PaginationInfo;
+import com.taxpadi.api.dto.withholding.*;
+import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.model.Transaction;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.repository.TransactionRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+@Service
+public class WithholdingService {
+
+    private final TransactionRepository transactionRepository;
+
+    public WithholdingService(TransactionRepository transactionRepository) {
+        this.transactionRepository = transactionRepository;
+    }
+
+    public WhtListResponse getTransactions(User user, Boolean remitted, String category,
+                                           LocalDate dateFrom, LocalDate dateTo,
+                                           int page, int limit) {
+        int safePage = Math.max(0, page - 1);
+        int safeLimit = Math.min(limit, 100);
+
+        Page<Transaction> results = transactionRepository.findWhtTransactions(
+            user, remitted, category, dateFrom, dateTo, PageRequest.of(safePage, safeLimit)
+        );
+
+        List<WhtTransactionDto> transactions = results.getContent().stream()
+            .map(this::toDto).toList();
+
+        BigDecimal totalWithheld = sum(results.getContent(), Transaction::getWithholdingAmount);
+        BigDecimal totalRemitted = results.getContent().stream()
+            .filter(Transaction::getWithholdingRemitted)
+            .map(Transaction::getWithholdingAmount)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        WhtSummary summary = new WhtSummary();
+        summary.setTotalWithheld(totalWithheld);
+        summary.setTotalRemitted(totalRemitted);
+        summary.setTotalOutstanding(totalWithheld.subtract(totalRemitted));
+
+        WhtListResponse response = new WhtListResponse();
+        response.setTransactions(transactions);
+        response.setSummary(summary);
+        response.setPagination(new PaginationInfo(results.getTotalElements(), page, safeLimit, results.getTotalPages()));
+        return response;
+    }
+
+    @Transactional
+    public WhtRemitResponse remit(User user, UUID transactionId, WhtRemitRequest request) {
+        Transaction tx = transactionRepository.findByTransactionIdAndUser(transactionId, user)
+            .orElseThrow(() -> new NotFoundException("No withholding transaction found with this ID."));
+
+        if (!tx.getWithholdingApplicable()) {
+            throw new BadRequestException("This transaction is not flagged as withholding-applicable.");
+        }
+        if (tx.getWithholdingRemitted()) {
+            throw new BadRequestException("This withholding transaction has already been marked as remitted.");
+        }
+
+        tx.setWithholdingRemitted(true);
+        tx.setWithholdingRemittedAt(
+            request != null && request.getRemittedAt() != null ? request.getRemittedAt() : LocalDateTime.now()
+        );
+        transactionRepository.save(tx);
+
+        WhtRemitResponse response = new WhtRemitResponse();
+        response.setTransactionId(tx.getTransactionId());
+        response.setDescription(tx.getDescription() != null ? tx.getDescription() : "");
+        response.setCategory(tx.getCategory());
+        response.setAmount(tx.getAmount());
+        response.setWithholdingAmount(tx.getWithholdingAmount());
+        response.setRemitted(true);
+        response.setRemittedAt(tx.getWithholdingRemittedAt());
+        return response;
+    }
+
+    private WhtTransactionDto toDto(Transaction tx) {
+        return new WhtTransactionDto(
+            tx.getTransactionId(),
+            tx.getDescription(),
+            tx.getCategory(),
+            tx.getTransactionDate(),
+            tx.getAmount(),
+            deriveRate(tx.getCategory()),
+            tx.getWithholdingAmount(),
+            tx.getWithholdingRemitted(),
+            tx.getWithholdingRemittedAt()
+        );
+    }
+
+    private String deriveRate(String category) {
+        return switch (category.toLowerCase()) {
+            case "dividend"                -> "8%";
+            case "interest"                -> "8%";
+            case "rent"                    -> "8%";
+            case "royalty"                 -> "15%";
+            case "contractor_payment"      -> "5%";
+            case "non_resident_contractor" -> "20%";
+            default                        -> "N/A";
+        };
+    }
+
+    private BigDecimal sum(List<Transaction> list, java.util.function.Function<Transaction, BigDecimal> fn) {
+        return list.stream().map(fn).reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+}

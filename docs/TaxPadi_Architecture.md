@@ -84,7 +84,7 @@ services:
       POSTGRES_USER: taxpadi_user
       POSTGRES_PASSWORD: taxpadi_password
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
@@ -111,7 +111,7 @@ docker compose down
 docker compose ps
 ```
 
-PostgreSQL runs on `localhost:5432`. Redis runs on `localhost:6379`.
+PostgreSQL runs on `localhost:5434`. Redis runs on `localhost:6379`.
 
 ---
 
@@ -750,7 +750,7 @@ spring:
     name: taxpadi-api
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/taxpadi_db
+    url: jdbc:postgresql://localhost:5434/taxpadi_db
     username: taxpadi_user
     password: taxpadi_password
     driver-class-name: org.postgresql.Driver

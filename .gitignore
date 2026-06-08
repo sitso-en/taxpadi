@@ -44,9 +44,15 @@ mobile/*.mobileprovision
 # Application properties (contains secrets)
 backend/api/src/main/resources/application.properties
 
+# IDE files
+.vscode/
+.idea/
+
 # OS files
 .DS_Store
 
 Thumbs.db.claude/
 CLAUDE.md
 .claude/
+
+google-services.json

@@ -37,8 +37,18 @@ public class TaxPadiUserDetails implements UserDetails {
     }
 
     @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
     public boolean isAccountNonLocked() {
         return user.isActive();
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
     }
 
     @Override

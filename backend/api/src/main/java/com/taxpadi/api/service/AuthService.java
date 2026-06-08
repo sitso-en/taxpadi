@@ -3,6 +3,7 @@ package com.taxpadi.api.service;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Optional;
@@ -38,11 +39,13 @@ import com.taxpadi.api.model.DeviceToken;
 import com.taxpadi.api.model.OtpPurpose;
 import com.taxpadi.api.model.OtpVerification;
 import com.taxpadi.api.model.RefreshToken;
+import com.taxpadi.api.model.TaxProfile;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.model.UserTaxProfile;
 import com.taxpadi.api.repository.DeviceTokenRepository;
 import com.taxpadi.api.repository.OtpVerificationRepository;
 import com.taxpadi.api.repository.RefreshTokenRepository;
+import com.taxpadi.api.repository.TaxProfileRepository;
 import com.taxpadi.api.repository.UserRepository;
 import com.taxpadi.api.repository.UserTaxProfileRepository;
 
@@ -51,8 +54,10 @@ import io.jsonwebtoken.Claims;
 @Service
 public class AuthService {
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
+    private static final SecureRandom secureRandom = new SecureRandom();
 
     private final UserTaxProfileRepository userTaxProfileRepository;
+    private final TaxProfileRepository taxProfileRepository;
     private final UserRepository userRepository;
     private final OtpVerificationRepository otpVerificationRepository;
     private final RefreshTokenRepository refreshTokenRepository;
@@ -60,23 +65,31 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final SmsService smsService;
     private final JwtService jwtService;
+    private final AuditLogService auditLogService;
+    private final EmailService emailService;
 
     public AuthService(UserRepository userRepository, OtpVerificationRepository otpVerificationRepository,
-        UserTaxProfileRepository userTaxProfileRepository, RefreshTokenRepository refreshTokenRepository,
+        UserTaxProfileRepository userTaxProfileRepository, TaxProfileRepository taxProfileRepository,
+        RefreshTokenRepository refreshTokenRepository,
         DeviceTokenRepository deviceTokenRepository,
-        BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService
+        BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService,
+        AuditLogService auditLogService, EmailService emailService
     ){
         this.userRepository = userRepository;
         this.userTaxProfileRepository = userTaxProfileRepository;
+        this.taxProfileRepository = taxProfileRepository;
         this.otpVerificationRepository = otpVerificationRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.deviceTokenRepository = deviceTokenRepository;
         this.passwordEncoder = bCryptPasswordEncoder;
         this.smsService = smsService;
         this.jwtService = jwtService;
+        this.auditLogService = auditLogService;
+        this.emailService = emailService;
     }
 
 
+    @Transactional
     public RegisterResponse register(RegisterRequest request){
         String phone = request.getPhone();
         String email = request.getEmail();
@@ -87,7 +100,7 @@ public class AuthService {
             throw new ConflictException("Phone number is already taken");
         }
 
-        if(userRepository.findByEmail(email).isPresent()){
+        if(email != null && userRepository.findByEmail(email).isPresent()){
             log.warn("Registration failed — email already taken: {}", email);
             throw new ConflictException("Email is already taken");
         }
@@ -105,12 +118,22 @@ public class AuthService {
         userRepository.save(user);
         log.info("User saved: userId={}, phone={}", user.getUserId(), phone);
 
+        TaxProfile primaryProfile = new TaxProfile();
+        primaryProfile.setUser(user);
+        primaryProfile.setLabel("Personal");
+        primaryProfile.setTaxpayerCategory(user.getTaxpayerCategory());
+        primaryProfile.setIsPrimary(true);
+        taxProfileRepository.save(primaryProfile);
+        user.setActiveProfileId(primaryProfile.getProfileId());
+        userRepository.save(user);
+        log.debug("Primary tax profile created for userId={}", user.getUserId());
+
         UserTaxProfile profile = new UserTaxProfile();
         profile.setUser(user);
         userTaxProfileRepository.save(profile);
         log.debug("Tax profile created for userId={}", user.getUserId());
 
-        String otpCode = String.valueOf((int)(Math.random()*900000) + 100000);
+        String otpCode = String.valueOf(100000 + secureRandom.nextInt(900000));
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
 
         OtpVerification otp = new OtpVerification();
@@ -139,7 +162,7 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
 
         OtpVerification otp = otpVerificationRepository
-                .findByPurposeAndUserAndUsed(purpose, user, false)
+                .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
                 .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -158,6 +181,9 @@ public class AuthService {
         if (purpose == OtpPurpose.REGISTER) {
             user.setVerified(true);
             userRepository.save(user);
+            if (user.getEmail() != null) {
+                emailService.sendWelcome(user.getEmail(), user.getFullName());
+            }
             log.info("Account verified for userId={}", user.getUserId());
         }
 
@@ -182,7 +208,7 @@ public class AuthService {
         otpVerificationRepository.invalidateActiveOtps(user, purpose);
         log.debug("Invalidated active OTPs for userId={}, purpose={}", user.getUserId(), purpose);
 
-        String otpCode = String.valueOf((int)(Math.random() * 900000) + 100000);
+        String otpCode = String.valueOf(100000 + secureRandom.nextInt(900000));
         LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
 
         OtpVerification otp = new OtpVerification();
@@ -199,7 +225,7 @@ public class AuthService {
         return new ResendOtpResponse(phone, 10);
     }
 
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse login(LoginRequest request, String ipAddress) {
         String phone = request.getPhone();
         log.info("Login attempt for phone={}", phone);
 
@@ -218,11 +244,11 @@ public class AuthService {
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             log.warn("Invalid password for userId={}", user.getUserId());
+            auditLogService.log(user, "LOGIN_FAILED", "Invalid password attempt", ipAddress);
             throw new IllegalArgumentException("Invalid phone number or password");
         }
 
-        String accessToken = jwtService.generateAccessToken(user);
-
+        
         String rawRefreshToken = UUID.randomUUID().toString();
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
@@ -231,6 +257,9 @@ public class AuthService {
         refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
         refreshTokenRepository.save(refreshToken);
 
+        String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
+        
+        auditLogService.log(user, "LOGIN", "Login from device: " + request.getDeviceInfo(), ipAddress);
         log.info("Login successful for userId={}", user.getUserId());
 
         UserSummary userSummary = new UserSummary(
@@ -261,13 +290,13 @@ public class AuthService {
             throw new IllegalArgumentException("Refresh token has expired. Please log in again");
         }
 
-        String newAccessToken = jwtService.generateAccessToken(token.getUser());
+        String newAccessToken = jwtService.generateAccessToken(token.getUser(), token.getTokenId());
         log.info("Access token refreshed for userId={}", token.getUser().getUserId());
 
         return new RefreshTokenResponse(newAccessToken, "Bearer", 900);
     }
 
-    public LogoutResponse logout(RefreshTokenRequest request) {
+    public LogoutResponse logout(RefreshTokenRequest request, String ipAddress) {
         String hash = hashToken(request.getRefreshToken());
         log.info("Logout attempt");
 
@@ -283,11 +312,12 @@ public class AuthService {
         token.setRevokedAt(LocalDateTime.now());
         refreshTokenRepository.save(token);
 
+        auditLogService.log(token.getUser(), "LOGOUT", "Session revoked", ipAddress);
         log.info("Logout successful for userId={}", token.getUser().getUserId());
         return new LogoutResponse("Logged out successfully");
     }
 
-    public RegisterBiometricResponse registerBiometric(RegisterBiometricRequest request, User user) {
+    public RegisterBiometricResponse registerBiometric(RegisterBiometricRequest request, User user, String ipAddress) {
         log.info("Biometric registration for userId={}, device={}", user.getUserId(), request.getDeviceInfo());
 
         String tokenHash = hashToken(request.getBiometricToken());
@@ -298,11 +328,12 @@ public class AuthService {
         deviceToken.setDeviceInfo(request.getDeviceInfo());
         deviceTokenRepository.save(deviceToken);
 
+        auditLogService.log(user, "BIOMETRIC_REGISTERED", "Device: " + request.getDeviceInfo(), ipAddress);
         log.info("Biometric registered for userId={}", user.getUserId());
         return new RegisterBiometricResponse(true, request.getDeviceInfo());
     }
 
-    public BiometricLoginResponse biometricLogin(BiometricLoginRequest request) {
+    public BiometricLoginResponse biometricLogin(BiometricLoginRequest request, String ipAddress) {
         log.info("Biometric login attempt from device={}", request.getDeviceInfo());
 
         String tokenHash = hashToken(request.getBiometricToken());
@@ -318,8 +349,7 @@ public class AuthService {
             throw new IllegalStateException("Account is deactivated. Please contact support");
         }
 
-        String accessToken = jwtService.generateAccessToken(user);
-
+        
         String rawRefreshToken = UUID.randomUUID().toString();
         RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
@@ -327,7 +357,10 @@ public class AuthService {
         refreshToken.setDeviceInfo(request.getDeviceInfo());
         refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
         refreshTokenRepository.save(refreshToken);
+        
+        String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
 
+        auditLogService.log(user, "BIOMETRIC_LOGIN", "Device: " + request.getDeviceInfo(), ipAddress);
         log.info("Biometric login successful for userId={}", user.getUserId());
 
         UserSummary userSummary = new UserSummary(
@@ -365,7 +398,7 @@ public class AuthService {
             otpVerificationRepository.invalidateActiveOtps(user, purpose);
             log.debug("Invalidated active OTPs for userId={}, purpose={}", user.getUserId(), purpose);
 
-            String otpCode = String.valueOf((int)(Math.random() * 900000) + 100000);
+            String otpCode = String.valueOf(100000 + secureRandom.nextInt(900000));
             LocalDateTime expiresAt = LocalDateTime.now().plusMinutes(10);
 
             OtpVerification otp = new OtpVerification();
@@ -392,7 +425,7 @@ public class AuthService {
                 .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
 
         OtpVerification otp = otpVerificationRepository
-                .findByPurposeAndUserAndUsed(purpose, user, false)
+                .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
                 .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
@@ -421,7 +454,7 @@ public class AuthService {
 
 
     @Transactional
-    public void resetPassword(String resetToken, String newPassword, String confirmPassword){
+    public void resetPassword(String resetToken, String newPassword, String confirmPassword, String ipAddress){
         if(!newPassword.equals(confirmPassword)){
             log.warn("New password is not equal to Confirm password");
             throw new IllegalStateException("Passwords do not match");
@@ -439,21 +472,15 @@ public class AuthService {
 
         User user = userOpt.get();
         
-        Optional <OtpVerification> otpOpt = otpVerificationRepository.findByUserAndPurposeAndRestTokenHash(user, OtpPurpose.PASSWORD_RESET);
-        
-        
-        if(otpOpt.isEmpty()){
-            throw new IllegalStateException("The token was already used");
-        }
-        
-        OtpVerification otp = otpOpt.get();
-        
-
         String hash = hashToken(resetToken);
 
-        if(!hash.equals(otp.getResetTokenHash())){
-            throw new IllegalStateException("Invalid or already used token");
+        Optional<OtpVerification> otpOpt = otpVerificationRepository.findByUserAndPurposeAndResetTokenHash(user, OtpPurpose.PASSWORD_RESET, hash);
+
+        if(otpOpt.isEmpty()){
+            throw new IllegalArgumentException("The reset token is invalid or has already been used");
         }
+
+        OtpVerification otp = otpOpt.get();
          
 
         otp.setResetTokenHash(null);
@@ -466,6 +493,10 @@ public class AuthService {
 
         refreshTokenRepository.revokeAllByUser(user);
 
+        auditLogService.log(user, "PASSWORD_RESET", "Password reset successfully", ipAddress);
+        if (user.getEmail() != null) {
+            emailService.sendPasswordReset(user.getEmail(), user.getFullName());
+        }
         log.info("Password has been reset for user={}", user);
     }
 }

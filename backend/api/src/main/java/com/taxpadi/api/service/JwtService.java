@@ -1,6 +1,7 @@
 package com.taxpadi.api.service;
 
 import java.util.Date;
+import java.util.UUID;
 
 import javax.crypto.SecretKey;
 
@@ -30,12 +31,13 @@ public class JwtService {
         return Keys.hmacShaKeyFor(Decoders.BASE64.decode(secret));
     }
 
-    public String generateAccessToken(User user) {
+    public String generateAccessToken(User user, UUID refreshTokenId) {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + ACCESS_TOKEN_EXPIRY_MS);
 
         String token = Jwts.builder()
                 .subject(user.getUserId().toString())
+                .id(refreshTokenId.toString())
                 .claim("phone", user.getPhone())
                 .claim("role", user.getRole().name())
                 .issuedAt(now)
