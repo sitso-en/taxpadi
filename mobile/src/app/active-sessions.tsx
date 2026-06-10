@@ -1,13 +1,17 @@
+import { router } from "expo-router";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 export default function ActiveSessionsScreen() {
   return (
     <ScrollView style={styles.container}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>⬅️ Back</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>Active Sessions</Text>
 
       <Text style={styles.subtitle}>
@@ -114,5 +118,15 @@ const styles = StyleSheet.create({
   currentSessionCard: {
     borderColor: "#B83729",
     borderWidth: 2,
+  },
+  backButton: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+
+  backText: {
+    color: "#B83729",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });

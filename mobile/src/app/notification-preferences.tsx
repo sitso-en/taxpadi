@@ -1,11 +1,12 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Switch,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 export default function NotificationPreferencesScreen() {
   const [deadlineReminders, setDeadlineReminders] = useState(true);
@@ -17,6 +18,9 @@ export default function NotificationPreferencesScreen() {
 
   return (
     <ScrollView style={styles.container}>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>⬅️ Back</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>Notification Preferences</Text>
 
       <Text style={styles.subtitle}>
@@ -175,5 +179,15 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  backButton: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+
+  backText: {
+    color: "#B83729",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });
