@@ -1,8 +1,14 @@
 import { router } from "expo-router";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
 export default function SettingsScreen() {
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 30 }}
+    >
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>⬅️ Back</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>Settings</Text>
 
       <TouchableOpacity
@@ -37,7 +43,7 @@ export default function SettingsScreen() {
       >
         <Text>Log Out</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -61,5 +67,15 @@ const styles = StyleSheet.create({
     padding: 18,
     borderRadius: 12,
     marginBottom: 12,
+  },
+  backButton: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+
+  backText: {
+    color: "#B83729",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });

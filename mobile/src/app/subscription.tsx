@@ -1,19 +1,25 @@
+import { router } from "expo-router";
+
 import {
+  ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-
 export default function SubscriptionScreen() {
   return (
-    <View style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 30 }}
+    >
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>⬅️ Back</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>Current Plan</Text>
 
       <View style={styles.planCard}>
-        <Text style={styles.planName}>
-          Free Plan
-        </Text>
+        <Text style={styles.planName}>Free Plan</Text>
 
         <Text style={styles.planDescription}>
           Basic tax management features
@@ -24,11 +30,9 @@ export default function SubscriptionScreen() {
         style={styles.upgradeButton}
         onPress={() => alert("Upgrade feature coming soon")}
       >
-        <Text style={styles.upgradeButtonText}>
-          Upgrade Plan
-        </Text>
+        <Text style={styles.upgradeButtonText}>Upgrade Plan</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -78,5 +82,15 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  backButton: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+
+  backText: {
+    color: "#B83729",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });
