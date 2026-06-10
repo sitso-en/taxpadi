@@ -9,7 +9,7 @@ export default function SettingsScreen() {
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Text style={styles.backText}>⬅️ Back</Text>
       </TouchableOpacity>
-      <Text style={styles.title}>Settings</Text>
+      <Text>⚙️ Settings</Text>
 
       <TouchableOpacity
         style={styles.item}

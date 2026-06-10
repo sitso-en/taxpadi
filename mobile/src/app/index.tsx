@@ -23,6 +23,28 @@ export default function HomeScreen() {
         <Text style={styles.cardTitle}>Current Plan</Text>
         <Text style={styles.highlightText}>Free Tier</Text>
       </View>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Profile Overview</Text>
+
+        <Text>TIN: Not Provided</Text>
+        <Text>VAT Registered: No</Text>
+        <Text>PAYE Registered: No</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Compliance Status</Text>
+
+        <Text
+          style={{
+            color: "#2E7D32",
+            fontWeight: "bold",
+            fontSize: 18,
+          }}
+        >
+          🟢 Good Standing
+        </Text>
+        <Text>No overdue filings detected.</Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Tax Summary</Text>
@@ -36,9 +58,47 @@ export default function HomeScreen() {
         <Text style={styles.cardTitle}>Upcoming Deadline</Text>
         <Text style={styles.highlightText}>VAT Filing - 15 June 2026</Text>
       </View>
+      <View style={styles.card}>
+        <Text style={styles.cardTitle}>Recent Activity</Text>
+
+        <Text>• VAT Filing deadline generated</Text>
+        <Text>• Profile updated</Text>
+        <Text>• Subscription status checked</Text>
+      </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Quick Actions</Text>
+        <Text style={styles.cardTitle}>Account Center</Text>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/deadlines")}
+        >
+          <Text style={styles.actionText}>📅 View Deadlines</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/transactions")}
+        >
+          <Text style={styles.actionText}>💰 Transactions</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/returns")}
+        >
+          <Text style={styles.actionText}>📄 Tax Returns</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/payments")}
+        >
+          <Text style={styles.actionText}>💳 Payments</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/reports")}
+        >
+          <Text style={styles.actionText}>📊 Reports & Export</Text>
+        </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.actionButton}
