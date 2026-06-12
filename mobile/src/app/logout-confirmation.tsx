@@ -1,16 +1,12 @@
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { router } from "expo-router";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function LogoutConfirmationScreen() {
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        Log Out
-      </Text>
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Text style={styles.backText}>⬅️ Back</Text>
+      </TouchableOpacity>
 
       <Text style={styles.message}>
         Are you sure you want to log out of your account?
@@ -20,17 +16,11 @@ export default function LogoutConfirmationScreen() {
         style={styles.logoutButton}
         onPress={() => alert("Logged out successfully")}
       >
-        <Text style={styles.logoutButtonText}>
-          Log Out
-        </Text>
+        <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.cancelButton}
-      >
-        <Text style={styles.cancelButtonText}>
-          Cancel
-        </Text>
+      <TouchableOpacity style={styles.cancelButton}>
+        <Text style={styles.cancelButtonText}>Cancel</Text>
       </TouchableOpacity>
     </View>
   );
@@ -86,5 +76,15 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     color: "#110503",
     fontWeight: "600",
+  },
+  backButton: {
+    marginTop: 20,
+    marginBottom: 10,
+  },
+
+  backText: {
+    color: "#B83729",
+    fontSize: 24,
+    fontWeight: "bold",
   },
 });

@@ -1,6 +1,7 @@
 import { router } from "expo-router";
 import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
-export default function SettingsScreen() {
+
+export default function MoreScreen() {
   return (
     <ScrollView
       style={styles.container}
@@ -10,38 +11,41 @@ export default function SettingsScreen() {
         <Text style={styles.backText}>⬅️ Back</Text>
       </TouchableOpacity>
 
-      <Text style={styles.title}>⚙️ Settings</Text>
+      <Text style={styles.title}>More</Text>
+
       <TouchableOpacity
         style={styles.item}
-        onPress={() => router.push("/edit-profile")}
+        onPress={() => router.push("/settings")}
       >
-        <Text>Edit Profile</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/notification-preferences")}
-      >
-        <Text>Notification Preferences</Text>
+        <Text>⚙️ Settings</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.item}
-        onPress={() => router.push("/active-sessions")}
+        onPress={() => router.push("/notification-preferences")}
       >
-        <Text>Active Sessions</Text>
+        <Text>🔔 Notifications</Text>
       </TouchableOpacity>
+
       <TouchableOpacity
         style={styles.item}
         onPress={() => router.push("/subscription")}
       >
-        <Text>Current Plan</Text>
+        <Text>💳 Subscription</Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => router.push("/tax-profile")}
+      >
+        <Text>📄 Tax Profile</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.item}
         onPress={() => router.push("/logout-confirmation")}
       >
-        <Text>Log Out</Text>
+        <Text>🚪 Logout</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -55,11 +59,10 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 36,
+    fontSize: 28,
     fontWeight: "bold",
-    color: "#000000",
-    marginTop: 10,
-    marginBottom: 25,
+    marginTop: 50,
+    marginBottom: 20,
   },
 
   item: {
@@ -68,6 +71,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 12,
   },
+
   backButton: {
     marginTop: 20,
     marginBottom: 10,

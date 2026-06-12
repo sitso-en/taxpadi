@@ -14,7 +14,7 @@ export default function HomeScreen() {
       contentContainerStyle={{ paddingBottom: 30 }}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>Dashboard</Text>
+        <Text style={styles.title}>🏠 TaxPadi Dashboard</Text>
         <Text style={styles.cardTitle}>Welcome Back, TaxPayer 👋</Text>
         <Text>Manage your taxes with confidence.</Text>
       </View>
@@ -99,33 +99,11 @@ export default function HomeScreen() {
         >
           <Text style={styles.actionText}>📊 Reports & Export</Text>
         </TouchableOpacity>
-
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={() => router.push("/settings")}
+          onPress={() => router.push("/more")}
         >
-          <Text style={styles.actionText}>Settings</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/subscription")}
-        >
-          <Text style={styles.actionText}>Subscription</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/notification-preferences")}
-        >
-          <Text style={styles.actionText}>Notifications</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/tax-profile")}
-        >
-          <Text style={styles.actionText}>Tax Profile</Text>
+          <Text style={styles.actionText}>⋯ More</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

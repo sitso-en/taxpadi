@@ -18,6 +18,12 @@ export default function TransactionsScreen() {
       </TouchableOpacity>
 
       <Text style={styles.title}>Transactions</Text>
+      <View style={styles.card}>
+        <Text style={styles.transactionTitle}>Transaction Summary</Text>
+        <Text>Total Income: GHS 2,500</Text>
+        <Text>Total Expenses: GHS 520</Text>
+        <Text>Net Position: GHS 1,980</Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.transactionTitle}>Sales Revenue</Text>

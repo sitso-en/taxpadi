@@ -18,6 +18,12 @@ export default function TaxReturnsScreen() {
       </TouchableOpacity>
 
       <Text style={styles.title}>Tax Returns</Text>
+      <View style={styles.card}>
+        <Text style={styles.returnTitle}>Returns Summary</Text>
+        <Text>Filed: 0</Text>
+        <Text>Pending: 3</Text>
+        <Text>Compliance Status: Good Standing</Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.returnTitle}>VAT Return</Text>

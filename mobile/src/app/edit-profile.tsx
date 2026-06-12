@@ -1,3 +1,4 @@
+import { router } from "expo-router";
 import { useState } from "react";
 import {
     StyleSheet,
@@ -12,7 +13,12 @@ export default function EditProfileScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{fullName || "Edit Profile"}</Text>
+      <TouchableOpacity
+  onPress={() => router.back()}
+  style={styles.backButton}
+>
+  <Text style={styles.backText}>⬅️ Back</Text>
+</TouchableOpacity>
 
       <Text style={styles.subtitle}>Update your personal information</Text>
       <TextInput
@@ -75,4 +81,14 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
+  backButton: {
+  marginTop: 20,
+  marginBottom: 10,
+},
+
+backText: {
+  color: "#B83729",
+  fontSize: 24,
+  fontWeight: "bold",
+},
 });

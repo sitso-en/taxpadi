@@ -18,6 +18,12 @@ export default function PaymentsScreen() {
       </TouchableOpacity>
 
       <Text style={styles.title}>Payments</Text>
+      <View style={styles.card}>
+        <Text style={styles.paymentTitle}>Payment Summary</Text>
+        <Text>Total Due: GHS 0.00</Text>
+        <Text>Payments Made: GHS 0.00</Text>
+        <Text>Outstanding Balance: GHS 0.00</Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.paymentTitle}>VAT Payment</Text>

@@ -18,6 +18,12 @@ export default function DeadlinesScreen() {
       </TouchableOpacity>
 
       <Text style={styles.title}>Upcoming Deadlines</Text>
+      <View style={styles.card}>
+        <Text style={styles.deadlineTitle}>Deadline Summary</Text>
+        <Text>Upcoming Deadlines: 3</Text>
+        <Text>Overdue Deadlines: 0</Text>
+        <Text>Next Due: VAT Filing (15 June 2026)</Text>
+      </View>
 
       <View style={styles.card}>
         <Text style={styles.deadlineTitle}>VAT Filing</Text>
