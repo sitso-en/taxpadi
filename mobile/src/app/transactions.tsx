@@ -6,8 +6,19 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { transactions } from "../data/transactions";
 
 export default function TransactionsScreen() {
+  const totalIncome = transactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpenses = transactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const netPosition = totalIncome - totalExpenses;
+
   return (
     <ScrollView
       style={styles.container}
@@ -18,30 +29,29 @@ export default function TransactionsScreen() {
       </TouchableOpacity>
       <Text style={styles.title}>Transactions</Text>
       <TouchableOpacity
-  style={styles.addButton}
-  onPress={() => router.push("/add-transaction")}
->
-  <Text style={styles.addButtonText}>➕ Add Transaction</Text>
-</TouchableOpacity>
+        style={styles.addButton}
+        onPress={() => router.push("/add-transaction")}
+      >
+        <Text style={styles.addButtonText}>➕ Add Transaction</Text>
+      </TouchableOpacity>
 
       <View style={styles.card}>
         <Text style={styles.transactionTitle}>Transaction Summary</Text>
-        <Text>Total Income: GHS 2,500</Text>
-        <Text>Total Expenses: GHS 520</Text>
-        <Text>Net Position: GHS 1,980</Text>
+        <Text>Total Income: GHS {totalIncome.toLocaleString()}</Text>
+
+        <Text>Total Expenses: GHS {totalExpenses.toLocaleString()}</Text>
+
+        <Text>Net Position: GHS {netPosition.toLocaleString()}</Text>
       </View>
-      <View style={styles.card}>
-        <Text style={styles.transactionTitle}>🟢 Sales Revenue</Text>
-        <Text>GHS 2,500</Text>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.transactionTitle}>🔴 Office Supplies</Text>
-        <Text>GHS 400</Text>
-      </View>
-      <View style={styles.card}>
-        <Text style={styles.transactionTitle}>🔴 Internet Bill</Text>
-        <Text>GHS 120</Text>
-      </View>
+      {transactions.map((transaction) => (
+        <View key={transaction.id} style={styles.card}>
+          <Text style={styles.transactionTitle}>
+            {transaction.type === "income" ? "🟢" : "🔴"} {transaction.title}
+          </Text>
+
+          <Text>GHS {transaction.amount.toLocaleString()}</Text>
+        </View>
+      ))}
     </ScrollView>
   );
 }
@@ -95,7 +105,4 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     fontSize: 16,
   },
-  
-
-
 });

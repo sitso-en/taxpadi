@@ -1,4 +1,5 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import {
     ScrollView,
     StyleSheet,
@@ -7,8 +8,11 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-
 export default function AddTransactionScreen() {
+  const [title, setTitle] = useState("");
+  const [amount, setAmount] = useState("");
+  const [type, setType] = useState<"income" | "expense">("income");
+
   return (
     <ScrollView
       style={styles.container}
@@ -22,24 +26,52 @@ export default function AddTransactionScreen() {
 
       <View style={styles.card}>
         <Text style={styles.label}>Transaction Name</Text>
-        <TextInput style={styles.input} placeholder="e.g. Sales Revenue" />
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Sales Revenue"
+          value={title}
+          onChangeText={setTitle}
+        />
 
         <Text style={styles.label}>Amount (GHS)</Text>
         <TextInput
           style={styles.input}
           placeholder="e.g. 2500"
           keyboardType="numeric"
+          value={amount}
+          onChangeText={setAmount}
         />
 
         <Text style={styles.label}>Type</Text>
 
-        <TouchableOpacity style={styles.typeButton}>
+        <TouchableOpacity
+          style={[
+            styles.typeButton,
+            type === "income" && styles.selectedTypeButton,
+          ]}
+          onPress={() => setType("income")}
+        >
           <Text>🟢 Income</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.typeButton}>
+        <TouchableOpacity
+          style={[
+            styles.typeButton,
+            type === "expense" && styles.selectedTypeButton,
+          ]}
+          onPress={() => setType("expense")}
+        >
           <Text>🔴 Expense</Text>
         </TouchableOpacity>
+        <Text style={styles.selectedTypeText}>
+          Selected Type: {type === "income" ? "🟢 Income" : "🔴 Expense"}
+        </Text>
+        <View style={{ marginTop: 10 }}>
+          <Text>Preview</Text>
+          <Text>Name: {title || "Not entered"}</Text>
+          <Text>Amount: {amount || "0"}</Text>
+          <Text>Type: {type === "income" ? "🟢 Income" : "🔴 Expense"}</Text>
+        </View>
 
         <TouchableOpacity style={styles.saveButton}>
           <Text style={styles.saveButtonText}>Save Transaction</Text>
@@ -112,6 +144,15 @@ const styles = StyleSheet.create({
   backText: {
     color: "#B83729",
     fontSize: 24,
+    fontWeight: "bold",
+  },
+  selectedTypeButton: {
+    borderWidth: 2,
+    borderColor: "#B83729",
+  },
+  selectedTypeText: {
+    marginTop: 8,
+    marginBottom: 12,
     fontWeight: "bold",
   },
 });
