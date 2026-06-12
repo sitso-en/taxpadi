@@ -16,27 +16,30 @@ export default function TransactionsScreen() {
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Text style={styles.backText}>⬅️ Back</Text>
       </TouchableOpacity>
-
       <Text style={styles.title}>Transactions</Text>
+      <TouchableOpacity
+  style={styles.addButton}
+  onPress={() => router.push("/add-transaction")}
+>
+  <Text style={styles.addButtonText}>➕ Add Transaction</Text>
+</TouchableOpacity>
+
       <View style={styles.card}>
         <Text style={styles.transactionTitle}>Transaction Summary</Text>
         <Text>Total Income: GHS 2,500</Text>
         <Text>Total Expenses: GHS 520</Text>
         <Text>Net Position: GHS 1,980</Text>
       </View>
-
       <View style={styles.card}>
-        <Text style={styles.transactionTitle}>Sales Revenue</Text>
+        <Text style={styles.transactionTitle}>🟢 Sales Revenue</Text>
         <Text>GHS 2,500</Text>
       </View>
-
       <View style={styles.card}>
-        <Text style={styles.transactionTitle}>Office Supplies</Text>
+        <Text style={styles.transactionTitle}>🔴 Office Supplies</Text>
         <Text>GHS 400</Text>
       </View>
-
       <View style={styles.card}>
-        <Text style={styles.transactionTitle}>Internet Bill</Text>
+        <Text style={styles.transactionTitle}>🔴 Internet Bill</Text>
         <Text>GHS 120</Text>
       </View>
     </ScrollView>
@@ -79,4 +82,20 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
   },
+  addButton: {
+    backgroundColor: "#B83729",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 16,
+    alignItems: "center",
+  },
+
+  addButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+    fontSize: 16,
+  },
+  
+
+
 });
