@@ -5,7 +5,7 @@ export type Transaction = {
   type: "income" | "expense";
 };
 
-export const transactions: Transaction[] = [
+export let transactions: Transaction[] = [
   {
     id: 1,
     title: "Sales Revenue",
@@ -31,3 +31,6 @@ export const transactions: Transaction[] = [
     type: "income",
   },
 ];
+export function addTransaction(transaction: Transaction) {
+  transactions.push(transaction);
+}

@@ -6,9 +6,11 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
-import { transactions } from "../data/transactions";
+import { useTransactions } from "../context/TransactionContext";
 
 export default function TransactionsScreen() {
+  const { transactions } = useTransactions();
+  console.log("Transactions count:", transactions.length);
   const totalIncome = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
@@ -28,6 +30,7 @@ export default function TransactionsScreen() {
         <Text style={styles.backText}>⬅️ Back</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Transactions</Text>
+      <Text>Transactions Count: {transactions.length}</Text>
       <TouchableOpacity
         style={styles.addButton}
         onPress={() => router.push("/add-transaction")}

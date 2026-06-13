@@ -8,10 +8,27 @@ import {
     TouchableOpacity,
     View,
 } from "react-native";
+import { useTransactions } from "../context/TransactionContext";
 export default function AddTransactionScreen() {
   const [title, setTitle] = useState("");
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<"income" | "expense">("income");
+  const { transactions, addTransaction } = useTransactions();
+
+  const handleSave = () => {
+    if (!title.trim() || !amount.trim()) {
+      return;
+    }
+
+    addTransaction({
+      id: transactions.length + 1,
+      title,
+      amount: Number(amount),
+      type,
+    });
+
+    router.push("/transactions");
+  };
 
   return (
     <ScrollView
@@ -73,7 +90,7 @@ export default function AddTransactionScreen() {
           <Text>Type: {type === "income" ? "🟢 Income" : "🔴 Expense"}</Text>
         </View>
 
-        <TouchableOpacity style={styles.saveButton}>
+        <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
           <Text style={styles.saveButtonText}>Save Transaction</Text>
         </TouchableOpacity>
       </View>
