@@ -5,6 +5,7 @@ import { Transaction } from "../data/transactions";
 type TransactionContextType = {
   transactions: Transaction[];
   addTransaction: (transaction: Transaction) => void;
+  deleteTransaction: (id: number) => void;
 };
 
 const TransactionContext = createContext<TransactionContextType | undefined>(
@@ -70,15 +71,22 @@ export function TransactionProvider({
   }, [transactions, loaded]);
 
   const addTransaction = (transaction: Transaction) => {
-    setTransactions((prev) => [...prev, transaction]);
-  };
+  setTransactions((prev) => [...prev, transaction]);
+};
 
-  return (
+const deleteTransaction = (id: number) => {
+  setTransactions((prev) =>
+    prev.filter((transaction) => transaction.id !== id)
+  );
+};
+
+return (
     <TransactionContext.Provider
       value={{
-        transactions,
-        addTransaction,
-      }}
+  transactions,
+  addTransaction,
+  deleteTransaction,
+}}
     >
       {children}
     </TransactionContext.Provider>

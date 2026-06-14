@@ -1,15 +1,15 @@
 import { router } from "expo-router";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useTransactions } from "../context/TransactionContext";
 
 export default function TransactionsScreen() {
-  const { transactions } = useTransactions();
+  const { transactions, deleteTransaction } = useTransactions();
   console.log("Transactions count:", transactions.length);
   const totalIncome = transactions
     .filter((t) => t.type === "income")
@@ -53,6 +53,13 @@ export default function TransactionsScreen() {
           </Text>
 
           <Text>GHS {transaction.amount.toLocaleString()}</Text>
+
+          <TouchableOpacity
+            style={styles.deleteButton}
+            onPress={() => deleteTransaction(transaction.id)}
+          >
+            <Text style={styles.deleteButtonText}>🗑 Delete</Text>
+          </TouchableOpacity>
         </View>
       ))}
     </ScrollView>
@@ -107,5 +114,17 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontWeight: "bold",
     fontSize: 16,
+  },
+  deleteButton: {
+    backgroundColor: "#D9534F",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: "center",
+  },
+
+  deleteButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
   },
 });
