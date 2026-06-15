@@ -20,6 +20,7 @@ export default function EditTransactionScreen() {
   const [type, setType] = useState<"income" | "expense">(
     transaction?.type ?? "income",
   );
+  const [category, setCategory] = useState(transaction?.category ?? "Other");
   const handleSave = () => {
     if (!transaction) return;
 
@@ -28,6 +29,7 @@ export default function EditTransactionScreen() {
       title,
       amount: Number(amount),
       type,
+      category,
     });
 
     router.push("/transactions");
@@ -51,7 +53,13 @@ export default function EditTransactionScreen() {
         onChangeText={setAmount}
         keyboardType="numeric"
       />
-
+      <Text style={styles.label}>Category</Text>
+      <TextInput
+        style={styles.input}
+        value={category}
+        onChangeText={setCategory}
+        placeholder="e.g. Sales, Utilities"
+      />
       <Text style={styles.label}>Type</Text>
 
       <TouchableOpacity

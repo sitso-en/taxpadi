@@ -10,6 +10,7 @@ import { useTransactions } from "../context/TransactionContext";
 
 export default function TransactionsScreen() {
   const { transactions, deleteTransaction } = useTransactions();
+  console.log("Transactions:", transactions);
   console.log("Transactions count:", transactions.length);
   const totalIncome = transactions
     .filter((t) => t.type === "income")
@@ -51,6 +52,7 @@ export default function TransactionsScreen() {
           <Text style={styles.transactionTitle}>
             {transaction.type === "income" ? "🟢" : "🔴"} {transaction.title}
           </Text>
+          <Text>Category: {transaction.category}</Text>
 
           <Text>GHS {transaction.amount.toLocaleString()}</Text>
 

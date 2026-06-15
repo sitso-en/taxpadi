@@ -1,12 +1,12 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 import { useTransactions } from "../context/TransactionContext";
 export default function AddTransactionScreen() {
@@ -14,6 +14,7 @@ export default function AddTransactionScreen() {
   const [amount, setAmount] = useState("");
   const [type, setType] = useState<"income" | "expense">("income");
   const { transactions, addTransaction } = useTransactions();
+  const [category, setCategory] = useState("Other");
 
   const handleSave = () => {
     if (!title.trim() || !amount.trim()) {
@@ -21,10 +22,11 @@ export default function AddTransactionScreen() {
     }
 
     addTransaction({
-      id: transactions.length + 1,
+      id: Date.now(),
       title,
       amount: Number(amount),
       type,
+      category,
     });
 
     router.push("/transactions");
@@ -58,7 +60,13 @@ export default function AddTransactionScreen() {
           value={amount}
           onChangeText={setAmount}
         />
-
+        <Text style={styles.label}>Category</Text>
+        <TextInput
+          style={styles.input}
+          value={category}
+          onChangeText={setCategory}
+          placeholder="e.g. Sales, Utilities"
+        />
         <Text style={styles.label}>Type</Text>
 
         <TouchableOpacity
