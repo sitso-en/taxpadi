@@ -6,8 +6,8 @@ type TransactionContextType = {
   transactions: Transaction[];
   addTransaction: (transaction: Transaction) => void;
   deleteTransaction: (id: number) => void;
+  editTransaction: (transaction: Transaction) => void;
 };
-
 const TransactionContext = createContext<TransactionContextType | undefined>(
   undefined,
 );
@@ -71,22 +71,32 @@ export function TransactionProvider({
   }, [transactions, loaded]);
 
   const addTransaction = (transaction: Transaction) => {
-  setTransactions((prev) => [...prev, transaction]);
-};
+    setTransactions((prev) => [...prev, transaction]);
+  };
 
-const deleteTransaction = (id: number) => {
-  setTransactions((prev) =>
-    prev.filter((transaction) => transaction.id !== id)
-  );
-};
+  const deleteTransaction = (id: number) => {
+    setTransactions((prev) =>
+      prev.filter((transaction) => transaction.id !== id),
+    );
+  };
 
-return (
+  const editTransaction = (updatedTransaction: Transaction) => {
+    setTransactions((prev) =>
+      prev.map((transaction) =>
+        transaction.id === updatedTransaction.id
+          ? updatedTransaction
+          : transaction,
+      ),
+    );
+  };
+  return (
     <TransactionContext.Provider
       value={{
-  transactions,
-  addTransaction,
-  deleteTransaction,
-}}
+        transactions,
+        addTransaction,
+        deleteTransaction,
+        editTransaction,
+      }}
     >
       {children}
     </TransactionContext.Provider>

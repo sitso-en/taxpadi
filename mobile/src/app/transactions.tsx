@@ -55,6 +55,15 @@ export default function TransactionsScreen() {
           <Text>GHS {transaction.amount.toLocaleString()}</Text>
 
           <TouchableOpacity
+            style={styles.editButton}
+            onPress={() =>
+              router.push(`/edit-transaction?id=${transaction.id}`)
+            }
+          >
+            <Text style={styles.editButtonText}>✏️ Edit</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
             style={styles.deleteButton}
             onPress={() => deleteTransaction(transaction.id)}
           >
@@ -124,6 +133,18 @@ const styles = StyleSheet.create({
   },
 
   deleteButtonText: {
+    color: "#FFFFFF",
+    fontWeight: "bold",
+  },
+  editButton: {
+    backgroundColor: "#F0AD4E",
+    padding: 10,
+    borderRadius: 8,
+    marginTop: 10,
+    alignItems: "center",
+  },
+
+  editButtonText: {
     color: "#FFFFFF",
     fontWeight: "bold",
   },
