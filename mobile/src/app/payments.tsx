@@ -1,13 +1,42 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { usePayments } from "../context/PaymentContext";
 
 export default function PaymentsScreen() {
+  const { payments, addPayment } = usePayments();
+  const paymentsMade = payments.reduce(
+    (sum, payment) => sum + payment.amount,
+    0,
+  );
+
+  const totalDue = 5000;
+
+  const outstandingBalance = totalDue - paymentsMade;
+
+  const [description, setDescription] = useState("");
+  const [amount, setAmount] = useState("");
+  const handleAddPayment = () => {
+    if (!description || !amount) return;
+
+    addPayment({
+      id: Date.now(),
+      description,
+      amount: Number(amount),
+      date: new Date().toLocaleDateString(),
+      status: "Pending",
+    });
+
+    setDescription("");
+    setAmount("");
+  };
   return (
     <ScrollView
       style={styles.container}
@@ -16,28 +45,62 @@ export default function PaymentsScreen() {
       <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
         <Text style={styles.backText}>⬅️ Back</Text>
       </TouchableOpacity>
-
       <Text style={styles.title}>Payments</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Payment Description"
+        value={description}
+        onChangeText={setDescription}
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="Amount"
+        keyboardType="numeric"
+        value={amount}
+        onChangeText={setAmount}
+      />
+      <TouchableOpacity style={styles.addButton} onPress={handleAddPayment}>
+        <Text style={styles.addButtonText}>Add Payment</Text>
+      </TouchableOpacity>
       <View style={styles.card}>
         <Text style={styles.paymentTitle}>Payment Summary</Text>
-        <Text>Total Due: GHS 0.00</Text>
-        <Text>Payments Made: GHS 0.00</Text>
-        <Text>Outstanding Balance: GHS 0.00</Text>
-      </View>
+        <Text>Total Due: GHS {totalDue.toFixed(2)}</Text>
 
+        <Text>Payments Made: GHS {paymentsMade.toFixed(2)}</Text>
+
+        <Text>Outstanding Balance: GHS {outstandingBalance.toFixed(2)}</Text>
+      </View>
       <View style={styles.card}>
         <Text style={styles.paymentTitle}>VAT Payment</Text>
         <Text>Amount Due: GHS 0.00</Text>
       </View>
-
       <View style={styles.card}>
         <Text style={styles.paymentTitle}>PAYE Payment</Text>
         <Text>Amount Due: GHS 0.00</Text>
       </View>
-
       <View style={styles.card}>
         <Text style={styles.paymentTitle}>Payment History</Text>
-        <Text>No payments recorded</Text>
+
+        {payments.length === 0 ? (
+          <Text>No payments recorded</Text>
+        ) : (
+          payments.map((payment) => (
+            <View
+              key={payment.id}
+              style={{
+                marginTop: 8,
+                paddingTop: 8,
+                borderTopWidth: 1,
+                borderColor: "#EEE",
+              }}
+            >
+              <Text>{payment.description}</Text>
+              <Text>GHS {payment.amount}</Text>
+              <Text>{payment.date}</Text>
+              <Text>{payment.status}</Text>
+            </View>
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -77,6 +140,25 @@ const styles = StyleSheet.create({
   backText: {
     color: "#B83729",
     fontSize: 24,
+    fontWeight: "bold",
+  },
+  input: {
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+
+  addButton: {
+    backgroundColor: "#B83729",
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+
+  addButtonText: {
+    color: "#FFFFFF",
+    textAlign: "center",
     fontWeight: "bold",
   },
 });

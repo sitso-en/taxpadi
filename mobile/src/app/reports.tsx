@@ -1,13 +1,60 @@
 import { router } from "expo-router";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { useTransactions } from "../context/TransactionContext";
 
 export default function ReportsScreen() {
+  const handleExport = () => {
+    const report = `
+TAXPADI REPORT
+
+Total Transactions: ${transactions.length}
+
+Total Income: GHS ${totalIncome.toFixed(2)}
+
+Total Expenses: GHS ${totalExpenses.toFixed(2)}
+
+Net Position: GHS ${netPosition.toFixed(2)}
+`;
+
+    alert(report);
+  };
+  const { transactions } = useTransactions();
+
+  const totalIncome = transactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpenses = transactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const netPosition = totalIncome - totalExpenses;
+  const incomeByCategory: Record<string, number> = {};
+  const expenseByCategory: Record<string, number> = {};
+
+  transactions.forEach((transaction) => {
+    if (transaction.type === "income") {
+      incomeByCategory[transaction.category] =
+        (incomeByCategory[transaction.category] || 0) + transaction.amount;
+    } else {
+      expenseByCategory[transaction.category] =
+        (expenseByCategory[transaction.category] || 0) + transaction.amount;
+    }
+  });
+
+  const topIncomeCategory = Object.entries(incomeByCategory).sort(
+    (a, b) => b[1] - a[1],
+  )[0];
+
+  const topExpenseCategory = Object.entries(expenseByCategory).sort(
+    (a, b) => b[1] - a[1],
+  )[0];
   return (
     <ScrollView
       style={styles.container}
@@ -21,7 +68,28 @@ export default function ReportsScreen() {
 
       <View style={styles.card}>
         <Text style={styles.reportTitle}>Total Transactions</Text>
-        <Text>3</Text>
+        <Text>{transactions.length}</Text>
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.reportTitle}>Total Income</Text>
+        <Text>GHS {totalIncome.toFixed(2)}</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.reportTitle}>Total Expenses</Text>
+        <Text>GHS {totalExpenses.toFixed(2)}</Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.reportTitle}>Net Position</Text>
+        <Text
+          style={{
+            color: netPosition >= 0 ? "green" : "red",
+            fontWeight: "bold",
+          }}
+        >
+          GHS {netPosition.toFixed(2)}
+        </Text>
       </View>
 
       <View style={styles.card}>
@@ -38,6 +106,50 @@ export default function ReportsScreen() {
         <Text style={styles.reportTitle}>Compliance Status</Text>
         <Text>🟢 Good Standing</Text>
       </View>
+      <View style={styles.card}>
+        <Text style={styles.reportTitle}>Income by Category</Text>
+
+        {Object.entries(incomeByCategory).map(([category, amount]) => (
+          <Text key={category}>
+            {category}: GHS {amount.toFixed(2)}
+          </Text>
+        ))}
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.reportTitle}>Expenses by Category</Text>
+
+        {Object.entries(expenseByCategory).map(([category, amount]) => (
+          <Text key={category}>
+            {category}: GHS {amount.toFixed(2)}
+          </Text>
+        ))}
+      </View>
+      <View style={styles.card}>
+        <Text style={styles.reportTitle}>Highest Income Category</Text>
+
+        <Text>
+          {topIncomeCategory
+            ? `${topIncomeCategory[0]} - GHS ${topIncomeCategory[1].toFixed(2)}`
+            : "No income recorded"}
+        </Text>
+      </View>
+
+      <View style={styles.card}>
+        <Text style={styles.reportTitle}>Highest Expense Category</Text>
+
+        <Text>
+          {topExpenseCategory
+            ? `${topExpenseCategory[0]} - GHS ${topExpenseCategory[1].toFixed(2)}`
+            : "No expenses recorded"}
+        </Text>
+      </View>
+      <TouchableOpacity
+        style={[styles.exportButton, { marginBottom: 40 }]}
+        onPress={handleExport}
+      >
+        <Text style={styles.exportButtonText}>Export Summary</Text>
+      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -76,6 +188,18 @@ const styles = StyleSheet.create({
   backText: {
     color: "#B83729",
     fontSize: 24,
+    fontWeight: "bold",
+  },
+  exportButton: {
+    backgroundColor: "#B83729",
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 20,
+  },
+
+  exportButtonText: {
+    color: "#FFFFFF",
+    textAlign: "center",
     fontWeight: "bold",
   },
 });

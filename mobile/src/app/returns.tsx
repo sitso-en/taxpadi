@@ -1,13 +1,38 @@
 import { router } from "expo-router";
+import { useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
+import { useReturns } from "../context/ReturnContext";
 
 export default function TaxReturnsScreen() {
+  const { returns, addReturn } = useReturns();
+
+  const [taxType, setTaxType] = useState("");
+  const [dueDate, setDueDate] = useState("");
+
+  const filedReturns = returns.filter((r) => r.status === "Filed").length;
+
+  const pendingReturns = returns.filter((r) => r.status === "Pending").length;
+  const handleAddReturn = () => {
+    if (!taxType || !dueDate) return;
+
+    addReturn({
+      id: Date.now(),
+      taxType,
+      dueDate,
+      status: "Pending",
+    });
+
+    setTaxType("");
+    setDueDate("");
+  };
+
   return (
     <ScrollView
       style={styles.container}
@@ -18,26 +43,58 @@ export default function TaxReturnsScreen() {
       </TouchableOpacity>
 
       <Text style={styles.title}>Tax Returns</Text>
+      <TextInput
+        style={styles.input}
+        placeholder="Tax Type"
+        value={taxType}
+        onChangeText={setTaxType}
+      />
+
+      <TextInput
+        style={styles.input}
+        placeholder="Due Date"
+        value={dueDate}
+        onChangeText={setDueDate}
+      />
+
+      <TouchableOpacity style={styles.addButton} onPress={handleAddReturn}>
+        <Text style={styles.addButtonText}>Add Return</Text>
+      </TouchableOpacity>
       <View style={styles.card}>
         <Text style={styles.returnTitle}>Returns Summary</Text>
-        <Text>Filed: 0</Text>
-        <Text>Pending: 3</Text>
-        <Text>Compliance Status: Good Standing</Text>
+
+        <Text>Filed: {filedReturns}</Text>
+
+        <Text>Pending: {pendingReturns}</Text>
+
+        <Text>
+          Compliance Status:
+          {pendingReturns === 0 ? " Good Standing" : " Action Required"}
+        </Text>
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.returnTitle}>VAT Return</Text>
-        <Text>Status: Not Filed</Text>
-      </View>
+        <Text style={styles.returnTitle}>Return History</Text>
 
-      <View style={styles.card}>
-        <Text style={styles.returnTitle}>PAYE Return</Text>
-        <Text>Status: Not Filed</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.returnTitle}>Annual Return</Text>
-        <Text>Status: Not Filed</Text>
+        {returns.length === 0 ? (
+          <Text>No returns recorded</Text>
+        ) : (
+          returns.map((taxReturn) => (
+            <View
+              key={taxReturn.id}
+              style={{
+                marginTop: 8,
+                paddingTop: 8,
+                borderTopWidth: 1,
+                borderColor: "#EEE",
+              }}
+            >
+              <Text>{taxReturn.taxType}</Text>
+              <Text>Due Date: {taxReturn.dueDate}</Text>
+              <Text>Status: {taxReturn.status}</Text>
+            </View>
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -77,6 +134,25 @@ const styles = StyleSheet.create({
   backText: {
     color: "#B83729",
     fontSize: 24,
+    fontWeight: "bold",
+  },
+  input: {
+    backgroundColor: "#FFFFFF",
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 10,
+  },
+
+  addButton: {
+    backgroundColor: "#B83729",
+    padding: 14,
+    borderRadius: 10,
+    marginBottom: 20,
+  },
+
+  addButtonText: {
+    color: "#FFFFFF",
+    textAlign: "center",
     fontWeight: "bold",
   },
 });
