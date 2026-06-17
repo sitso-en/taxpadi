@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { useState } from "react";
 import {
   ScrollView,
@@ -11,7 +10,7 @@ import {
 import { useReturns } from "../context/ReturnContext";
 
 export default function TaxReturnsScreen() {
-  const { returns, addReturn } = useReturns();
+  const { returns, addReturn, deleteReturn, editReturn } = useReturns();
 
   const [taxType, setTaxType] = useState("");
   const [dueDate, setDueDate] = useState("");
@@ -38,10 +37,6 @@ export default function TaxReturnsScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 30 }}
     >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
-
       <Text style={styles.title}>Tax Returns</Text>
       <TextInput
         style={styles.input}
@@ -91,7 +86,57 @@ export default function TaxReturnsScreen() {
             >
               <Text>{taxReturn.taxType}</Text>
               <Text>Due Date: {taxReturn.dueDate}</Text>
-              <Text>Status: {taxReturn.status}</Text>
+              <Text
+                style={{
+                  color: taxReturn.status === "Filed" ? "green" : "orange",
+                  fontWeight: "bold",
+                }}
+              >
+                Status: {taxReturn.status}
+              </Text>
+              <TouchableOpacity
+                onPress={() =>
+                  editReturn({
+                    ...taxReturn,
+                    status: "Filed",
+                  })
+                }
+                style={{
+                  backgroundColor: "green",
+                  padding: 8,
+                  borderRadius: 6,
+                  marginTop: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Mark as Filed
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => deleteReturn(taxReturn.id)}
+                style={{
+                  backgroundColor: "#B83729",
+                  padding: 8,
+                  borderRadius: 6,
+                  marginTop: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Delete
+                </Text>
+              </TouchableOpacity>
             </View>
           ))
         )}

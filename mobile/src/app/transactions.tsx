@@ -27,9 +27,6 @@ export default function TransactionsScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 30 }}
     >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
       <Text style={styles.title}>Transactions</Text>
       <Text>Transactions Count: {transactions.length}</Text>
       <TouchableOpacity

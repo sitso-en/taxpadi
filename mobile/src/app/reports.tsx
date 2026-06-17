@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -6,6 +5,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { usePayments } from "../context/PaymentContext";
+import { useReturns } from "../context/ReturnContext";
 import { useTransactions } from "../context/TransactionContext";
 
 export default function ReportsScreen() {
@@ -25,6 +26,8 @@ Net Position: GHS ${netPosition.toFixed(2)}
     alert(report);
   };
   const { transactions } = useTransactions();
+  const { payments } = usePayments();
+  const { returns } = useReturns();
 
   const totalIncome = transactions
     .filter((t) => t.type === "income")
@@ -60,10 +63,6 @@ Net Position: GHS ${netPosition.toFixed(2)}
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 30 }}
     >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
-
       <Text style={styles.title}>Reports & Export</Text>
 
       <View style={styles.card}>
@@ -94,17 +93,26 @@ Net Position: GHS ${netPosition.toFixed(2)}
 
       <View style={styles.card}>
         <Text style={styles.reportTitle}>Tax Returns Filed</Text>
-        <Text>0</Text>
+        <Text>{returns.filter((r) => r.status === "Filed").length}</Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.reportTitle}>Outstanding Payments</Text>
-        <Text>GHS 0.00</Text>
+        <Text>
+          GHS{" "}
+          {payments
+            .reduce((sum, payment) => sum + payment.amount, 0)
+            .toFixed(2)}
+        </Text>
       </View>
 
       <View style={styles.card}>
         <Text style={styles.reportTitle}>Compliance Status</Text>
-        <Text>🟢 Good Standing</Text>
+        <Text>
+          {returns.some((r) => r.status === "Pending")
+            ? "🟡 Action Required"
+            : "🟢 Good Standing"}
+        </Text>
       </View>
       <View style={styles.card}>
         <Text style={styles.reportTitle}>Income by Category</Text>

@@ -13,9 +13,7 @@ export default function DeadlinesScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 30 }}
     >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
+      
 
       <Text style={styles.title}>Upcoming Deadlines</Text>
       <View style={styles.card}>

@@ -1,10 +1,10 @@
 import { router } from "expo-router";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function TaxProfileScreen() {
@@ -13,7 +13,10 @@ export default function TaxProfileScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 30 }}
     >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+      <TouchableOpacity
+        onPress={() => router.replace("/more")}
+        style={styles.backButton}
+      >
         <Text style={styles.backText}>⬅️ Back</Text>
       </TouchableOpacity>
       <Text style={styles.title}>Tax Profile</Text>

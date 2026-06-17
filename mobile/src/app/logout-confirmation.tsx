@@ -4,10 +4,6 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 export default function LogoutConfirmationScreen() {
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
-
       <Text style={styles.message}>
         Are you sure you want to log out of your account?
       </Text>
@@ -19,7 +15,13 @@ export default function LogoutConfirmationScreen() {
         <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.cancelButton}>
+      <TouchableOpacity
+        style={styles.cancelButton}
+        onPress={() => {
+          console.log("CANCEL PRESSED");
+          router.push("/more");
+        }}
+      >
         <Text style={styles.cancelButtonText}>Cancel</Text>
       </TouchableOpacity>
     </View>

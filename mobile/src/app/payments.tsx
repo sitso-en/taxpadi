@@ -1,4 +1,3 @@
-import { router } from "expo-router";
 import { useState } from "react";
 import {
   ScrollView,
@@ -11,7 +10,7 @@ import {
 import { usePayments } from "../context/PaymentContext";
 
 export default function PaymentsScreen() {
-  const { payments, addPayment } = usePayments();
+  const { payments, addPayment, deletePayment } = usePayments();
   const paymentsMade = payments.reduce(
     (sum, payment) => sum + payment.amount,
     0,
@@ -42,9 +41,6 @@ export default function PaymentsScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 30 }}
     >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
       <Text style={styles.title}>Payments</Text>
       <TextInput
         style={styles.input}
@@ -98,6 +94,25 @@ export default function PaymentsScreen() {
               <Text>GHS {payment.amount}</Text>
               <Text>{payment.date}</Text>
               <Text>{payment.status}</Text>
+              <TouchableOpacity
+                onPress={() => deletePayment(payment.id)}
+                style={{
+                  backgroundColor: "#B83729",
+                  padding: 8,
+                  borderRadius: 6,
+                  marginTop: 8,
+                }}
+              >
+                <Text
+                  style={{
+                    color: "#FFFFFF",
+                    textAlign: "center",
+                    fontWeight: "bold",
+                  }}
+                >
+                  Delete
+                </Text>
+              </TouchableOpacity>
             </View>
           ))
         )}

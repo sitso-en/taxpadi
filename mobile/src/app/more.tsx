@@ -7,10 +7,6 @@ export default function MoreScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 30 }}
     >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
-
       <Text style={styles.title}>More</Text>
 
       <TouchableOpacity

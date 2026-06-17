@@ -6,8 +6,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useReturns } from "../context/ReturnContext";
 
 export default function HomeScreen() {
+  const { returns } = useReturns();
+  const filedReturns = returns.filter((r) => r.status === "Filed").length;
+
+  const pendingReturns = returns.filter((r) => r.status === "Pending").length;
   return (
     <ScrollView
       style={styles.container}
@@ -49,9 +54,14 @@ export default function HomeScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Tax Summary</Text>
 
-        <Text>Total Returns Filed: 0</Text>
-        <Text>Pending Returns: 0</Text>
-        <Text>Compliance Status: Good Standing ✅</Text>
+        <Text>Total Returns Filed: {filedReturns}</Text>
+
+        <Text>Pending Returns: {pendingReturns}</Text>
+
+        <Text>
+          Compliance Status:{" "}
+          {pendingReturns === 0 ? "Good Standing ✅" : "Action Required ⚠️"}
+        </Text>
       </View>
 
       <View style={styles.card}>
@@ -67,43 +77,34 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Account Center</Text>
+        <Text style={styles.cardTitle}>Quick Actions</Text>
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/deadlines")}
-        >
-          <Text style={styles.actionText}>📅 View Deadlines</Text>
-        </TouchableOpacity>
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/transactions")}
         >
-          <Text style={styles.actionText}>💰 Transactions</Text>
+          <Text style={styles.actionText}>➕ Add Transaction</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/returns")}
-        >
-          <Text style={styles.actionText}>📄 Tax Returns</Text>
-        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/payments")}
         >
-          <Text style={styles.actionText}>💳 Payments</Text>
+          <Text style={styles.actionText}>💳 Add Payment</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={() => router.push("/returns")}
+        >
+          <Text style={styles.actionText}>📄 Add Tax Return</Text>
+        </TouchableOpacity>
+
         <TouchableOpacity
           style={styles.actionButton}
           onPress={() => router.push("/reports")}
         >
-          <Text style={styles.actionText}>📊 Reports & Export</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/more")}
-        >
-          <Text style={styles.actionText}>⋯ More</Text>
+          <Text style={styles.actionText}>📊 View Reports</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>

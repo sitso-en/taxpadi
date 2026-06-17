@@ -78,6 +78,76 @@ export default function Layout() {
                 title: "More",
               }}
             />
+
+            <Drawer.Screen
+              name="explore"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="settings"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="tax-profile"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="edit-profile"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="subscription"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="active-sessions"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="add-transaction"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="edit-transaction"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="logout-confirmation"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
+
+            <Drawer.Screen
+              name="notification-preferences"
+              options={{
+                drawerItemStyle: { display: "none" },
+              }}
+            />
           </Drawer>
         </ReturnProvider>
       </PaymentProvider>
