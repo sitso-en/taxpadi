@@ -11,7 +11,11 @@ export const createProfile = async (data: {
   taxpayerCategory: string;
   tin?: string;
 }) => {
-  const response = await client.post(ENDPOINTS.PROFILE.CREATE, data);
+  const response = await client.post(ENDPOINTS.PROFILE.CREATE, {
+    label: data.label,
+    taxpayer_category: data.taxpayerCategory,
+    tin: data.tin,
+  });
   return response.data;
 };
 
@@ -25,7 +29,11 @@ export const updateProfile = async (id: string, data: {
   taxpayerCategory?: string;
   tin?: string;
 }) => {
-  const response = await client.put(ENDPOINTS.PROFILE.UPDATE(id), data);
+  const response = await client.put(ENDPOINTS.PROFILE.UPDATE(id), {
+    label: data.label,
+    taxpayer_category: data.taxpayerCategory,
+    tin: data.tin,
+  });
   return response.data;
 };
 
