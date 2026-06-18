@@ -439,7 +439,6 @@ All endpoints return responses in this format:
 ---
 
 ## Group 2 — Password
-
 ### POST /api/v1/auth/forgot-password
 **Description:** Initiate a password reset by sending an OTP to the user's phone number.
 **Auth:** Public
