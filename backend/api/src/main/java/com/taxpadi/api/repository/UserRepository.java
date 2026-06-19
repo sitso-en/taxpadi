@@ -18,6 +18,11 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     Optional<User> findByPhone(String phone);
     Optional<User> findByEmail(String email);
 
+    long countByIsActive(Boolean isActive);
+    long countByIsVerified(Boolean isVerified);
+    long countBySubscriptionTier(SubscriptionTier tier);
+    long countByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
+
     @Query("""
             SELECT u FROM User u
             WHERE (:subscriptionTier IS NULL OR u.subscriptionTier = :subscriptionTier)
