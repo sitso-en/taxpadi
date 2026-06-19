@@ -1,34 +1,43 @@
-package com.taxpadi.controller;
-import com.taxpadi.entity.TaxDeadline;
-import com.taxpadi.service.TaxDeadlineService;
+package com.taxpadi.api.controller;
+
+import com.taxpadi.api.common.ApiResponse;
+import com.taxpadi.api.dto.deadline.CompleteDeadlineResponse;
+import com.taxpadi.api.dto.deadline.DeadlineListResponse;
+import com.taxpadi.api.dto.deadline.UpcomingDeadlinesResponse;
+import com.taxpadi.api.service.TaxDeadlineService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.util.*;
+
+import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/tax-deadlines")
+@RequestMapping("/api/v1/tax/deadlines")
 public class TaxDeadlineController {
+
     private final TaxDeadlineService service;
-    public TaxDeadlineController(TaxDeadlineService service) { this.service = service; }
+
+    public TaxDeadlineController(TaxDeadlineService service) {
+        this.service = service;
+    }
 
     @GetMapping
-    public ResponseEntity<Map<String,Object>> getAll() {
-        return ok("Tax deadlines retrieved", service.getAll());
+    public ResponseEntity<ApiResponse<DeadlineListResponse>> getAll(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        DeadlineListResponse data = service.getAll(page, Math.min(limit, 100));
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Tax deadlines retrieved successfully."));
     }
 
     @GetMapping("/upcoming")
-    public ResponseEntity<Map<String,Object>> getUpcoming(@RequestParam(defaultValue="30") int days) {
-        return ok("Upcoming deadlines retrieved", service.getUpcoming(days));
+    public ResponseEntity<ApiResponse<UpcomingDeadlinesResponse>> getUpcoming(
+            @RequestParam(defaultValue = "90") int days) {
+        UpcomingDeadlinesResponse data = service.getUpcoming(days);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Upcoming deadlines retrieved successfully."));
     }
 
-    @GetMapping("/overdue")
-    public ResponseEntity<Map<String,Object>> getOverdue() {
-        return ok("Overdue deadlines retrieved", service.getOverdue());
-    }
-
-    private ResponseEntity<Map<String,Object>> ok(String msg, Object data) {
-        Map<String,Object> r = new HashMap<>();
-        r.put("success",true); r.put("message",msg); r.put("data",data);
-        return ResponseEntity.ok(r);
+    @PutMapping("/{id}/complete")
+    public ResponseEntity<ApiResponse<CompleteDeadlineResponse>> complete(@PathVariable UUID id) {
+        CompleteDeadlineResponse data = service.complete(id);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Deadline marked as complete."));
     }
 }
