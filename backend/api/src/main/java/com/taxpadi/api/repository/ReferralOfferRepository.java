@@ -19,4 +19,6 @@ public interface ReferralOfferRepository extends JpaRepository<ReferralOffer, UU
     Page<ReferralOffer> findAllByUserAndOfferTypeAndStatusNotOrderByCreatedAtDesc(User user, OfferType offerType, ReferralStatus status, Pageable pageable);
 
     Optional<ReferralOffer> findByOfferIdAndUser(UUID offerId, User user);
+
+    long countByStatus(ReferralStatus status);
 }
