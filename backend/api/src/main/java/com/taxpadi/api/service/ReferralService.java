@@ -2,14 +2,17 @@ package com.taxpadi.api.service;
 
 import com.taxpadi.api.dto.referral.*;
 import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.exception.ForbiddenException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.OfferType;
 import com.taxpadi.api.model.ReferralOffer;
 import com.taxpadi.api.model.ReferralStatus;
 import com.taxpadi.api.model.User;
+import com.taxpadi.api.repository.PartnerRepository;
 import com.taxpadi.api.repository.ReferralOfferRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,9 +24,15 @@ import java.util.UUID;
 public class ReferralService {
 
     private final ReferralOfferRepository referralOfferRepository;
+    private final PartnerRepository partnerRepository;
+    private final BCryptPasswordEncoder passwordEncoder;
 
-    public ReferralService(ReferralOfferRepository referralOfferRepository) {
+    public ReferralService(ReferralOfferRepository referralOfferRepository,
+                           PartnerRepository partnerRepository,
+                           BCryptPasswordEncoder passwordEncoder) {
         this.referralOfferRepository = referralOfferRepository;
+        this.partnerRepository = partnerRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public ReferralListResponse getOffers(User user, String offerType, int page, int limit) {
@@ -111,9 +120,14 @@ public class ReferralService {
     }
 
     @Transactional
-    public ConvertedOfferResponse markConverted(UUID id, MarkConvertedRequest request) {
+    public ConvertedOfferResponse markConverted(UUID id, MarkConvertedRequest request, String apiKey) {
         ReferralOffer offer = referralOfferRepository.findById(id)
             .orElseThrow(() -> new NotFoundException("Offer not found"));
+
+        partnerRepository.findByNameIgnoreCase(offer.getPartnerName())
+            .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
+            .filter(p -> apiKey != null && passwordEncoder.matches(apiKey, p.getApiKeyHash()))
+            .orElseThrow(() -> new ForbiddenException("Invalid or missing partner API key."));
         offer.setStatus(ReferralStatus.CONVERTED);
         offer.setPartnerReference(request.getPartnerReference());
         offer.setConvertedAt(request.getConvertedAt() != null
