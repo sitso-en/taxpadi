@@ -1,49 +1,62 @@
-package com.taxpadi.controller;
-import com.taxpadi.entity.Penalty;
-import com.taxpadi.service.PenaltyService;
+package com.taxpadi.api.controller;
+
+import com.taxpadi.api.common.ApiResponse;
+import com.taxpadi.api.dto.penalty.*;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.security.TaxPadiUserDetails;
+import com.taxpadi.api.service.PenaltyService;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import java.util.*;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/penalties")
 public class PenaltyController {
+
     private final PenaltyService service;
-    public PenaltyController(PenaltyService service) { this.service = service; }
+
+    public PenaltyController(PenaltyService service) {
+        this.service = service;
+    }
 
     @GetMapping
-    public ResponseEntity<Map<String,Object>> getMyPenalties(
-            @RequestParam Long userId,
-            @RequestParam(required=false) String status) {
-        List<Penalty> penalties = status != null
-                ? service.getUserPenaltiesByStatus(userId, status)
-                : service.getUserPenalties(userId);
-        return ok("Penalties retrieved", penalties);
+    public ResponseEntity<ApiResponse<PenaltyListResponse>> getPenalties(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        User user = userDetails.getUser();
+        PenaltyListResponse data = service.getPenalties(user, page, Math.min(limit, 100));
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Penalties retrieved successfully."));
     }
 
-    @PostMapping("/calculate")
-    public ResponseEntity<Map<String,Object>> calculate(@RequestBody Map<String,Object> req) {
-        return ok("Penalty calculated", service.calculate(req));
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<PenaltyDetailDto>> getPenalty(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @PathVariable UUID id) {
+        User user = userDetails.getUser();
+        PenaltyDetailDto data = service.getPenalty(id, user);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Penalty retrieved successfully."));
     }
 
-    @PostMapping
-    public ResponseEntity<Map<String,Object>> record(
-            @RequestParam Long userId,
-            @RequestBody Map<String,Object> req) {
-        Penalty p = service.record(userId, req);
-        return ResponseEntity.status(201).body(build(true,"Penalty recorded",p));
+    @GetMapping("/preview/{taxType}")
+    public ResponseEntity<ApiResponse<PenaltyPreviewDto>> preview(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @PathVariable String taxType) {
+        User user = userDetails.getUser();
+        PenaltyPreviewDto data = service.preview(taxType, user);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Penalty preview calculated successfully."));
     }
 
-    @GetMapping("/summary")
-    public ResponseEntity<Map<String,Object>> getSummary(@RequestParam Long userId) {
-        return ok("Penalty summary retrieved", service.getSummary(userId));
-    }
-
-    private ResponseEntity<Map<String,Object>> ok(String msg, Object data) {
-        return ResponseEntity.ok(build(true,msg,data));
-    }
-    private Map<String,Object> build(boolean success, String msg, Object data) {
-        Map<String,Object> r = new HashMap<>();
-        r.put("success",success); r.put("message",msg); r.put("data",data); return r;
+    @PutMapping("/{id}/resolve")
+    public ResponseEntity<ApiResponse<ResolvePenaltyResponse>> resolve(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @PathVariable UUID id,
+            @RequestBody(required = false) ResolvePenaltyRequest request) {
+        User user = userDetails.getUser();
+        if (request == null) request = new ResolvePenaltyRequest();
+        ResolvePenaltyResponse data = service.resolve(id, user, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Penalty marked as resolved."));
     }
 }
