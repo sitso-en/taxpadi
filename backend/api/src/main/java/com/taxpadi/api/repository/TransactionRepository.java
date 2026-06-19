@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -98,4 +99,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         @Param("from") LocalDate from,
         @Param("to") LocalDate to
     );
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.createdAt >= :from AND t.createdAt <= :to")
+    long countByCreatedAtBetween(
+        @Param("from") LocalDateTime from,
+        @Param("to") LocalDateTime to
+    );
+
+    Optional<Transaction> findTopByUserAndTypeOrderByTransactionDateDesc(User user, String type);
 }
