@@ -10,6 +10,12 @@
 @transactionId = paste-transaction-id-here
 @refreshToken = paste-refresh-token-here
 @returnId = paste-return-id-here
+@userId = paste-user-id-here
+@partnerId = paste-partner-id-here
+@partnerApiKey = paste-partner-api-key-here
+@deadlineId = paste-deadline-id-here
+@penaltyId = paste-penalty-id-here
+@certificateId = paste-certificate-id-here
 
 
 
@@ -852,6 +858,7 @@ Authorization: Bearer {{accessToken}}
 ### 7. Mark Offer as Converted (partner webhook)
 POST {{baseUrl}}/api/v1/referrals/{{referralId}}/converted
 Content-Type: application/json
+X-Partner-Api-Key: {{partnerApiKey}}
 
 {
   "partner_reference": "FIDO-REF-2026-001",
@@ -1098,7 +1105,7 @@ Authorization: Bearer {{accessToken}}
 ### 7. Mark offer as converted (partner webhook)
 POST {{baseUrl}}/api/v1/referrals/{{referralId}}/converted
 Content-Type: application/json
-Authorization: Bearer {{accessToken}}
+X-Partner-Api-Key: {{partnerApiKey}}
 
 {
   "partner_reference": "PARTNER-REF-001",
@@ -1222,4 +1229,220 @@ Authorization: Bearer {{accessToken}}
 
 ### 3. Get audit logs (filtered by date range)
 GET {{baseUrl}}/api/v1/audit-log?date_from=2026-01-01&date_to=2026-06-05&page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+
+
+
+
+
+
+
+
+### GROUP 26: ADMIN
+
+### 1. Get all users (no filters)
+GET {{baseUrl}}/api/v1/admin/users?page=1
+Authorization: Bearer {{accessToken}}
+
+### 2. Get users (filtered)
+GET {{baseUrl}}/api/v1/admin/users?subscription_tier=FREE&is_active=true&date_from=2026-01-01&date_to=2026-06-30&page=1
+Authorization: Bearer {{accessToken}}
+
+### 3. Get single user detail
+GET {{baseUrl}}/api/v1/admin/users/{{userId}}
+Authorization: Bearer {{accessToken}}
+
+### 4. Deactivate user
+PUT {{baseUrl}}/api/v1/admin/users/{{userId}}/deactivate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "Suspected fraudulent activity"
+}
+
+### 5. Activate user
+PUT {{baseUrl}}/api/v1/admin/users/{{userId}}/activate
+Authorization: Bearer {{accessToken}}
+
+### 6. Change user role to admin
+PUT {{baseUrl}}/api/v1/admin/users/{{userId}}/role
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "role": "admin"
+}
+
+### 7. Change user role back to user
+PUT {{baseUrl}}/api/v1/admin/users/{{userId}}/role
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "role": "user"
+}
+
+### 8. Get platform stats
+GET {{baseUrl}}/api/v1/admin/stats
+Authorization: Bearer {{accessToken}}
+
+### 9. Get admin audit log (all)
+GET {{baseUrl}}/api/v1/admin/audit-log?page=1
+Authorization: Bearer {{accessToken}}
+
+### 10. Get admin audit log (filtered by user and action)
+GET {{baseUrl}}/api/v1/admin/audit-log?user_id={{userId}}&action=LOGIN&page=1
+Authorization: Bearer {{accessToken}}
+
+### 11. Get admin audit log (filtered by date range)
+GET {{baseUrl}}/api/v1/admin/audit-log?date_from=2026-01-01&date_to=2026-06-30&page=1
+Authorization: Bearer {{accessToken}}
+
+### 12. Get all partners
+GET {{baseUrl}}/api/v1/admin/partners
+Authorization: Bearer {{accessToken}}
+
+### 13. Create partner
+POST {{baseUrl}}/api/v1/admin/partners
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "name": "Fido Finance",
+  "offer_type": "loan",
+  "eligibility_threshold": {
+    "min_months_data": 3,
+    "min_average_income": 1500.00,
+    "min_consistency_score": 70,
+    "requires_tax_compliance": true
+  }
+}
+
+### 14. Update partner
+PUT {{baseUrl}}/api/v1/admin/partners/{{partnerId}}
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "eligibility_threshold": {
+    "min_months_data": 6,
+    "min_average_income": 2000.00,
+    "min_consistency_score": 75,
+    "requires_tax_compliance": true
+  },
+  "is_active": true
+}
+
+### 15. Deactivate partner (delete)
+DELETE {{baseUrl}}/api/v1/admin/partners/{{partnerId}}
+Authorization: Bearer {{accessToken}}
+
+### 16. Get tax rates (admin view)
+GET {{baseUrl}}/api/v1/admin/tax-rates
+Authorization: Bearer {{accessToken}}
+
+### 17. Update tax rates
+PUT {{baseUrl}}/api/v1/admin/tax-rates
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tax_year": 2026,
+  "vat_standard_rate": 15.0,
+  "vat_nhil_levy": 2.5,
+  "vat_getfund_levy": 2.5,
+  "vat_registration_threshold": 750000.00
+}
+
+###############################################
+### Group 15 — Tax Deadlines
+###############################################
+
+### 1. Get all tax deadlines (paginated)
+GET {{baseUrl}}/api/v1/tax/deadlines?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 2. Get upcoming deadlines (within 90 days)
+GET {{baseUrl}}/api/v1/tax/deadlines/upcoming?days=90
+Authorization: Bearer {{accessToken}}
+
+### 3. Mark a deadline as complete
+PUT {{baseUrl}}/api/v1/tax/deadlines/{{deadlineId}}/complete
+Authorization: Bearer {{accessToken}}
+
+###############################################
+### Group 16 — Penalties
+###############################################
+
+### 1. Get all my penalties
+GET {{baseUrl}}/api/v1/penalties?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 2. Get a single penalty by ID
+GET {{baseUrl}}/api/v1/penalties/{{penaltyId}}
+Authorization: Bearer {{accessToken}}
+
+### 3. Preview penalty for a tax type (income_tax | vat | paye | withholding)
+GET {{baseUrl}}/api/v1/penalties/preview/income_tax
+Authorization: Bearer {{accessToken}}
+
+### 4. Resolve (mark as paid) a penalty
+PUT {{baseUrl}}/api/v1/penalties/{{penaltyId}}/resolve
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{}
+
+###############################################
+### Group 18 — Compliance Certificates
+###############################################
+
+### 1. Get all my compliance certificates
+GET {{baseUrl}}/api/v1/certificates?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 2. Get a single certificate by ID
+GET {{baseUrl}}/api/v1/certificates/{{certificateId}}
+Authorization: Bearer {{accessToken}}
+
+### 3. Get certificate download URL (pre-signed)
+GET {{baseUrl}}/api/v1/certificates/{{certificateId}}/download
+Authorization: Bearer {{accessToken}}
+
+###############################################
+### Group 19 — Savings Vault
+###############################################
+
+### 1. Get vault balance and details
+GET {{baseUrl}}/api/v1/vault
+Authorization: Bearer {{accessToken}}
+
+### 2. Link MoMo number to vault
+PUT {{baseUrl}}/api/v1/vault/link
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "momoNumber": "+233501234567",
+  "momoProvider": "mtn"
+}
+
+### 3. Initiate a vault contribution
+POST {{baseUrl}}/api/v1/vault/contribute
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "amount": 75.00,
+  "trigger": "manual"
+}
+
+### 4. Get vault transaction history
+GET {{baseUrl}}/api/v1/vault/transactions?page=1&limit=20
+Authorization: Bearer {{accessToken}}
+
+### 5. Get savings suggestion
+GET {{baseUrl}}/api/v1/vault/suggestion
 Authorization: Bearer {{accessToken}}
