@@ -1,94 +1,188 @@
-package com.taxpadi.service;
-import com.taxpadi.entity.SavingsVault;
-import com.taxpadi.entity.VaultTransaction;
-import com.taxpadi.repository.SavingsVaultRepository;
-import com.taxpadi.repository.VaultTransactionRepository;
+package com.taxpadi.api.service;
+
+import com.taxpadi.api.dto.common.PaginationInfo;
+import com.taxpadi.api.dto.vault.*;
+import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.model.SavingsVault;
+import com.taxpadi.api.model.Transaction;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.model.VaultTransaction;
+import com.taxpadi.api.repository.SavingsVaultRepository;
+import com.taxpadi.api.repository.TransactionRepository;
+import com.taxpadi.api.repository.VaultTransactionRepository;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDateTime;
-import java.util.*;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class SavingsVaultService {
+
     private final SavingsVaultRepository vaultRepo;
     private final VaultTransactionRepository txnRepo;
+    private final TransactionRepository transactionRepo;
 
-    public SavingsVaultService(SavingsVaultRepository vaultRepo, VaultTransactionRepository txnRepo) {
-        this.vaultRepo = vaultRepo; this.txnRepo = txnRepo;
+    public SavingsVaultService(SavingsVaultRepository vaultRepo,
+                                VaultTransactionRepository txnRepo,
+                                TransactionRepository transactionRepo) {
+        this.vaultRepo = vaultRepo;
+        this.txnRepo = txnRepo;
+        this.transactionRepo = transactionRepo;
     }
 
-    public SavingsVault getVault(Long userId) {
-        return vaultRepo.findByUserId(userId).orElseThrow(() -> new RuntimeException("Vault not found"));
-    }
-
-    @Transactional
-    public SavingsVault create(Long userId, Map<String,Object> req) {
-        if (vaultRepo.existsByUserId(userId)) throw new RuntimeException("You already have a savings vault");
-        SavingsVault v = new SavingsVault();
-        v.setUserId(userId);
-        v.setVaultName((String) req.getOrDefault("vaultName","My Tax Savings Vault"));
-        v.setPurpose((String) req.getOrDefault("purpose","GENERAL_TAX"));
-        if (req.containsKey("targetAmount")) v.setTargetAmount(new BigDecimal(req.get("targetAmount").toString()));
-        if (req.containsKey("autoSaveAmount")) { v.setAutoSaveAmount(new BigDecimal(req.get("autoSaveAmount").toString())); v.setAutoSaveEnabled(true); }
-        return vaultRepo.save(v);
+    public VaultDto getVault(User user) {
+        SavingsVault vault = requireVault(user);
+        return toVaultDto(vault);
     }
 
     @Transactional
-    public Map<String,Object> deposit(Long userId, BigDecimal amount, String description) {
-        SavingsVault v = getVault(userId);
-        if (!"ACTIVE".equals(v.getStatus())) throw new RuntimeException("Vault is " + v.getStatus());
-        v.setBalance(v.getBalance().add(amount));
-        v.setUpdatedAt(LocalDateTime.now());
-        vaultRepo.save(v);
-        VaultTransaction t = new VaultTransaction();
-        t.setVaultId(v.getId()); t.setUserId(userId); t.setType("DEPOSIT");
-        t.setAmount(amount); t.setBalanceAfter(v.getBalance());
-        t.setDescription(description != null ? description : "Deposit");
-        t.setReference("DEP-" + UUID.randomUUID().toString().substring(0,8).toUpperCase());
-        txnRepo.save(t);
-        Map<String,Object> r = new HashMap<>();
-        r.put("newBalance", v.getBalance()); r.put("amountDeposited", amount); r.put("reference", t.getReference());
-        r.put("progressToTarget", v.getTargetAmount().compareTo(BigDecimal.ZERO) > 0
-            ? v.getBalance().divide(v.getTargetAmount(),4,RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
-            : BigDecimal.ZERO);
-        return r;
+    public LinkMomoResponse linkMomo(User user, LinkMomoRequest request) {
+        SavingsVault vault = requireVault(user);
+        vault.setLinkedMomoNumber(request.getMomoNumber());
+        vault.setLinkedMomoProvider(request.getMomoProvider());
+        vaultRepo.save(vault);
+
+        LinkMomoResponse resp = new LinkMomoResponse();
+        resp.setVaultId(vault.getVaultId());
+        resp.setLinkedMomoNumber(vault.getLinkedMomoNumber());
+        resp.setLinkedMomoProvider(vault.getLinkedMomoProvider());
+        resp.setMomoLinked(true);
+        resp.setUpdatedAt(vault.getUpdatedAt());
+        return resp;
     }
 
     @Transactional
-    public Map<String,Object> withdraw(Long userId, BigDecimal amount, String description) {
-        SavingsVault v = getVault(userId);
-        if (v.getBalance().compareTo(amount) < 0) throw new RuntimeException("Insufficient balance");
-        v.setBalance(v.getBalance().subtract(amount));
-        v.setUpdatedAt(LocalDateTime.now());
-        vaultRepo.save(v);
-        VaultTransaction t = new VaultTransaction();
-        t.setVaultId(v.getId()); t.setUserId(userId); t.setType("WITHDRAWAL");
-        t.setAmount(amount); t.setBalanceAfter(v.getBalance());
-        t.setDescription(description != null ? description : "Withdrawal");
-        t.setReference("WTH-" + UUID.randomUUID().toString().substring(0,8).toUpperCase());
-        txnRepo.save(t);
-        Map<String,Object> r = new HashMap<>();
-        r.put("newBalance", v.getBalance()); r.put("amountWithdrawn", amount); r.put("reference", t.getReference());
-        return r;
+    public ContributeResponse contribute(User user, ContributeRequest request) {
+        SavingsVault vault = requireVault(user);
+        if (vault.getLinkedMomoNumber() == null) {
+            throw new BadRequestException("Please link a MoMo number to your vault before contributing.");
+        }
+
+        VaultTransaction txn = new VaultTransaction();
+        txn.setVault(vault);
+        txn.setType("DEPOSIT");
+        txn.setAmount(request.getAmount());
+        txn.setBalanceAfter(vault.getBalance().add(request.getAmount()));
+        txn.setTrigger(request.getTrigger().toUpperCase());
+        txn.setStatus("PENDING");
+        txn.setDescription("Vault contribution via MoMo");
+        txn.setReference("VLT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+        txnRepo.save(txn);
+
+        ContributeResponse resp = new ContributeResponse();
+        resp.setVaultTransactionId(txn.getTransactionId());
+        resp.setAmount(request.getAmount());
+        resp.setTrigger(txn.getTrigger());
+        resp.setStatus("PENDING");
+        resp.setMomoPromptSent(true);
+        resp.setMessage("A payment prompt of GHS " + request.getAmount() + " has been sent. Please approve it.");
+        resp.setNewBalanceOnConfirmation(txn.getBalanceAfter());
+        return resp;
     }
 
-    public List<VaultTransaction> getHistory(Long userId, int page, int size) {
-        SavingsVault v = getVault(userId);
-        return txnRepo.findByVaultIdOrderByCreatedAtDesc(v.getId(), PageRequest.of(page,size)).getContent();
+    public VaultTransactionsResponse getTransactions(User user, int page, int limit) {
+        SavingsVault vault = requireVault(user);
+        Page<VaultTransaction> pageResult = txnRepo.findByVaultOrderByCreatedAtDesc(
+                vault, PageRequest.of(page - 1, limit));
+
+        List<VaultTransactionDto> dtos = pageResult.getContent().stream()
+                .map(this::toTxnDto)
+                .collect(Collectors.toList());
+
+        BigDecimal totalCredited = pageResult.getContent().stream()
+                .filter(t -> "DEPOSIT".equals(t.getType()) && "SUCCESSFUL".equals(t.getStatus()))
+                .map(VaultTransaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalDebited = pageResult.getContent().stream()
+                .filter(t -> "WITHDRAWAL".equals(t.getType()) && "SUCCESSFUL".equals(t.getStatus()))
+                .map(VaultTransaction::getAmount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        VaultTxnSummary summary = new VaultTxnSummary(totalCredited, totalDebited, vault.getBalance());
+        PaginationInfo pagination = new PaginationInfo(
+                pageResult.getTotalElements(), page, limit, pageResult.getTotalPages());
+        return new VaultTransactionsResponse(dtos, summary, pagination);
     }
 
-    @Transactional
-    public SavingsVault updateSettings(Long userId, Map<String,Object> req) {
-        SavingsVault v = getVault(userId);
-        if (req.containsKey("vaultName")) v.setVaultName((String) req.get("vaultName"));
-        if (req.containsKey("targetAmount")) v.setTargetAmount(new BigDecimal(req.get("targetAmount").toString()));
-        if (req.containsKey("autoSaveAmount")) v.setAutoSaveAmount(new BigDecimal(req.get("autoSaveAmount").toString()));
-        if (req.containsKey("autoSaveFrequency")) v.setAutoSaveFrequency((String) req.get("autoSaveFrequency"));
-        if (req.containsKey("autoSaveEnabled")) v.setAutoSaveEnabled((Boolean) req.get("autoSaveEnabled"));
-        v.setUpdatedAt(LocalDateTime.now());
-        return vaultRepo.save(v);
+    public VaultSuggestionDto getSuggestion(User user) {
+        SavingsVault vault = requireVault(user);
+        Transaction latest = transactionRepo
+                .findTopByUserAndTypeOrderByTransactionDateDesc(user, "income")
+                .orElseThrow(() -> new NotFoundException("No income transactions found to base a suggestion on."));
+
+        BigDecimal latestIncome = latest.getAmount();
+        // Apply marginal rate of 17.5% as a representative rate
+        BigDecimal marginalRate = new BigDecimal("0.175");
+        BigDecimal suggested = latestIncome.multiply(marginalRate).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal currentLiability = vault.getTargetAmount();
+        BigDecimal alreadySaved = vault.getBalance();
+        BigDecimal remaining = currentLiability.subtract(alreadySaved).max(BigDecimal.ZERO);
+
+        if (alreadySaved.compareTo(currentLiability) >= 0) {
+            suggested = BigDecimal.ZERO;
+        }
+
+        VaultSuggestionBasedOn basedOn = new VaultSuggestionBasedOn(
+                latestIncome, "17.5%", currentLiability, alreadySaved, remaining);
+
+        VaultSuggestionDto dto = new VaultSuggestionDto();
+        dto.setSuggestedAmount(suggested);
+        dto.setBasedOn(basedOn);
+        dto.setMessage("Based on your latest income of GHS " + latestIncome +
+                " we suggest saving GHS " + suggested + " toward your tax bill.");
+        return dto;
+    }
+
+    private SavingsVault requireVault(User user) {
+        return vaultRepo.findByUser(user)
+                .orElseThrow(() -> new NotFoundException("Vault not found for this user."));
+    }
+
+    private VaultDto toVaultDto(SavingsVault v) {
+        VaultDto dto = new VaultDto();
+        dto.setVaultId(v.getVaultId());
+        dto.setBalance(v.getBalance());
+        dto.setLinkedMomoNumber(v.getLinkedMomoNumber());
+        dto.setLinkedMomoProvider(v.getLinkedMomoProvider());
+        dto.setMomoLinked(v.getLinkedMomoNumber() != null);
+
+        // Compute totals from transaction history (confirmed only)
+        List<VaultTransaction> allTxns = txnRepo.findByVault(v);
+        BigDecimal totalIn = allTxns.stream()
+                .filter(t -> "DEPOSIT".equals(t.getType()) && "SUCCESSFUL".equals(t.getStatus()))
+                .map(VaultTransaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalOut = allTxns.stream()
+                .filter(t -> "WITHDRAWAL".equals(t.getType()) && "SUCCESSFUL".equals(t.getStatus()))
+                .map(VaultTransaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        dto.setTotalContributed(totalIn);
+        dto.setTotalWithdrawn(totalOut);
+
+        if (v.getTargetAmount().compareTo(BigDecimal.ZERO) > 0) {
+            double pct = v.getBalance().divide(v.getTargetAmount(), 4, RoundingMode.HALF_UP)
+                    .multiply(BigDecimal.valueOf(100)).doubleValue();
+            BigDecimal remaining = v.getTargetAmount().subtract(v.getBalance()).max(BigDecimal.ZERO);
+            dto.setTarget(new VaultTarget(v.getTargetAmount(), pct, remaining));
+        }
+        return dto;
+    }
+
+    private VaultTransactionDto toTxnDto(VaultTransaction t) {
+        VaultTransactionDto dto = new VaultTransactionDto();
+        dto.setVaultTransactionId(t.getTransactionId());
+        dto.setType(t.getType());
+        dto.setAmount(t.getAmount());
+        dto.setTrigger(t.getTrigger());
+        dto.setMomoReference(t.getMomoReference());
+        dto.setStatus(t.getStatus());
+        dto.setCreatedAt(t.getCreatedAt());
+        dto.setConfirmedAt(t.getConfirmedAt());
+        return dto;
     }
 }
