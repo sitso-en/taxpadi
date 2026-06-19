@@ -1,6 +1,7 @@
 package com.taxpadi.api.repository;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,8 @@ public interface TaxReturnRepository extends JpaRepository<TaxReturn, UUID> {
     Optional<TaxReturn> findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
         User user, String taxType, LocalDate periodStart, LocalDate periodEnd
     );
+
+    long countByCreatedAtBetween(LocalDateTime from, LocalDateTime to);
 
     @Query("SELECT r FROM TaxReturn r WHERE r.user = :user AND r.taxYear >= :yearFrom AND r.taxYear <= :yearTo ORDER BY r.taxYear DESC, r.taxType ASC")
     List<TaxReturn> findAllByUserAndYearRange(
