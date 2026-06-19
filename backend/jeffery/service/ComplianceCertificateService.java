@@ -1,50 +1,84 @@
-package com.taxpadi.service;
-import com.taxpadi.entity.ComplianceCertificate;
-import com.taxpadi.repository.ComplianceCertificateRepository;
+package com.taxpadi.api.service;
+
+import com.taxpadi.api.dto.certificate.*;
+import com.taxpadi.api.dto.common.PaginationInfo;
+import com.taxpadi.api.exception.ForbiddenException;
+import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.model.ComplianceCertificate;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.repository.ComplianceCertificateRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDate;
+
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class ComplianceCertificateService {
+
     private final ComplianceCertificateRepository repo;
-    public ComplianceCertificateService(ComplianceCertificateRepository repo) { this.repo = repo; }
 
-    public List<ComplianceCertificate> getUserCertificates(Long userId) { return repo.findByUserId(userId); }
-
-    public ComplianceCertificate getById(Long id) {
-        return repo.findById(id).orElseThrow(() -> new RuntimeException("Certificate not found"));
+    public ComplianceCertificateService(ComplianceCertificateRepository repo) {
+        this.repo = repo;
     }
 
-    @Transactional
-    public ComplianceCertificate request(Long userId, Map<String,Object> req) {
-        String type = (String) req.get("certificateType");
-        if (repo.existsByUserIdAndCertificateTypeAndStatus(userId, type, "PENDING"))
-            throw new RuntimeException("Pending request already exists for this certificate type");
-        ComplianceCertificate c = new ComplianceCertificate();
-        c.setUserId(userId);
-        c.setCertificateNumber("CERT-" + UUID.randomUUID().toString().substring(0,10).toUpperCase());
-        c.setCertificateType(type);
-        c.setStatus("PENDING");
-        c.setTinNumber((String) req.get("tinNumber"));
-        c.setBusinessName((String) req.getOrDefault("businessName",""));
-        c.setIssuedBy((String) req.getOrDefault("issuedBy","FIRS"));
-        c.setRemarks((String) req.getOrDefault("remarks",""));
-        return repo.save(c);
+    public CertificateListResponse getCertificates(User user, int page, int limit) {
+        List<ComplianceCertificate> all = repo.findByUser(user);
+        long total = all.size();
+        int fromIdx = Math.min((page - 1) * limit, (int) total);
+        int toIdx = Math.min(fromIdx + limit, (int) total);
+        List<CertificateListItem> items = all.subList(fromIdx, toIdx).stream()
+                .map(this::toListItem)
+                .collect(Collectors.toList());
+        int totalPages = (int) Math.ceil((double) total / limit);
+        return new CertificateListResponse(items, new PaginationInfo(total, page, limit, totalPages));
     }
 
-    @Transactional
-    public ComplianceCertificate issue(Long id) {
-        ComplianceCertificate c = getById(id);
-        c.setStatus("ISSUED");
-        c.setIssueDate(LocalDate.now());
-        c.setExpiryDate(LocalDate.now().plusYears(1));
-        c.setIssuedAt(LocalDateTime.now());
-        c.setDownloadUrl("/api/v1/certificates/" + id + "/download");
-        return repo.save(c);
+    public CertificateDetailDto getCertificate(UUID certificateId, User user) {
+        ComplianceCertificate c = repo.findById(certificateId)
+                .orElseThrow(() -> new NotFoundException("No certificate found with this ID."));
+        if (!c.getUser().getUserId().equals(user.getUserId())) {
+            throw new ForbiddenException("You do not have access to this certificate.");
+        }
+        return toDetailDto(c, user);
+    }
+
+    public CertificateDownloadDto getDownloadUrl(UUID certificateId, User user) {
+        ComplianceCertificate c = repo.findById(certificateId)
+                .orElseThrow(() -> new NotFoundException("No certificate found with this ID."));
+        if (!c.getUser().getUserId().equals(user.getUserId())) {
+            throw new ForbiddenException("You do not have access to this certificate.");
+        }
+        // In production, generate a pre-signed S3 URL here
+        String pdfUrl = c.getDownloadUrl() != null ? c.getDownloadUrl()
+                : "/api/v1/certificates/" + certificateId + "/file";
+
+        CertificateDownloadDto dto = new CertificateDownloadDto();
+        dto.setCertificateId(c.getCertificateId());
+        dto.setDocumentRef(c.getCertificateNumber());
+        dto.setPdfUrl(pdfUrl);
+        dto.setExpiresAt(LocalDateTime.now().plusMinutes(15));
+        return dto;
+    }
+
+    private CertificateListItem toListItem(ComplianceCertificate c) {
+        CertificateListItem item = new CertificateListItem();
+        item.setCertificateId(c.getCertificateId());
+        item.setDocumentRef(c.getCertificateNumber());
+        item.setTaxType(c.getCertificateType());
+        item.setIssuedAt(c.getIssuedAt());
+        return item;
+    }
+
+    private CertificateDetailDto toDetailDto(ComplianceCertificate c, User user) {
+        CertificateDetailDto dto = new CertificateDetailDto();
+        dto.setCertificateId(c.getCertificateId());
+        dto.setDocumentRef(c.getCertificateNumber());
+        dto.setTaxType(c.getCertificateType());
+        dto.setPaymentReference(c.getRemarks());
+        dto.setIssuedAt(c.getIssuedAt());
+        dto.setTaxpayer(new TaxpayerInfo(user.getFullName(), c.getTinNumber(), user.getPhone()));
+        return dto;
     }
 }
