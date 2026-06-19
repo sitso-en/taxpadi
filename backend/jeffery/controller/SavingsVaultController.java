@@ -1,61 +1,66 @@
-package com.taxpadi.controller;
-import com.taxpadi.entity.SavingsVault;
-import com.taxpadi.entity.VaultTransaction;
-import com.taxpadi.service.SavingsVaultService;
+package com.taxpadi.api.controller;
+
+import com.taxpadi.api.common.ApiResponse;
+import com.taxpadi.api.dto.vault.*;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.security.TaxPadiUserDetails;
+import com.taxpadi.api.service.SavingsVaultService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import java.math.BigDecimal;
-import java.util.*;
 
 @RestController
-@RequestMapping("/api/v1/savings-vault")
+@RequestMapping("/api/v1/vault")
 public class SavingsVaultController {
+
     private final SavingsVaultService service;
-    public SavingsVaultController(SavingsVaultService service) { this.service = service; }
+
+    public SavingsVaultController(SavingsVaultService service) {
+        this.service = service;
+    }
 
     @GetMapping
-    public ResponseEntity<Map<String,Object>> getVault(@RequestParam Long userId) {
-        return ok("Vault retrieved", service.getVault(userId));
+    public ResponseEntity<ApiResponse<VaultDto>> getVault(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
+        User user = userDetails.getUser();
+        VaultDto data = service.getVault(user);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Vault retrieved successfully."));
     }
 
-    @PostMapping
-    public ResponseEntity<Map<String,Object>> create(
-            @RequestParam Long userId,
-            @RequestBody Map<String,Object> req) {
-        SavingsVault v = service.create(userId, req);
-        return ResponseEntity.status(201).body(build(true,"Vault created",v));
+    @PutMapping("/link")
+    public ResponseEntity<ApiResponse<LinkMomoResponse>> linkMomo(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @Valid @RequestBody LinkMomoRequest request) {
+        User user = userDetails.getUser();
+        LinkMomoResponse data = service.linkMomo(user, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "MoMo number linked to your vault successfully."));
     }
 
-    @PostMapping("/deposit")
-    public ResponseEntity<Map<String,Object>> deposit(
-            @RequestParam Long userId,
-            @RequestBody Map<String,Object> req) {
-        BigDecimal amount = new BigDecimal(req.get("amount").toString());
-        return ok("Deposit successful", service.deposit(userId, amount, (String) req.get("description")));
-    }
-
-    @PostMapping("/withdraw")
-    public ResponseEntity<Map<String,Object>> withdraw(
-            @RequestParam Long userId,
-            @RequestBody Map<String,Object> req) {
-        BigDecimal amount = new BigDecimal(req.get("amount").toString());
-        return ok("Withdrawal successful", service.withdraw(userId, amount, (String) req.get("description")));
+    @PostMapping("/contribute")
+    public ResponseEntity<ApiResponse<ContributeResponse>> contribute(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @Valid @RequestBody ContributeRequest request) {
+        User user = userDetails.getUser();
+        ContributeResponse data = service.contribute(user, request);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Vault contribution initiated."));
     }
 
     @GetMapping("/transactions")
-    public ResponseEntity<Map<String,Object>> getHistory(
-            @RequestParam Long userId,
-            @RequestParam(defaultValue="0") int page,
-            @RequestParam(defaultValue="20") int size) {
-        List<VaultTransaction> txns = service.getHistory(userId, page, size);
-        return ok("Transactions retrieved", txns);
+    public ResponseEntity<ApiResponse<VaultTransactionsResponse>> getTransactions(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit) {
+        User user = userDetails.getUser();
+        VaultTransactionsResponse data = service.getTransactions(user, page, Math.min(limit, 100));
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Vault transactions retrieved successfully."));
     }
 
-    private ResponseEntity<Map<String,Object>> ok(String msg, Object data) {
-        return ResponseEntity.ok(build(true,msg,data));
-    }
-    private Map<String,Object> build(boolean s, String msg, Object data) {
-        Map<String,Object> r = new HashMap<>();
-        r.put("success",s); r.put("message",msg); r.put("data",data); return r;
+    @GetMapping("/suggestion")
+    public ResponseEntity<ApiResponse<VaultSuggestionDto>> getSuggestion(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
+        User user = userDetails.getUser();
+        VaultSuggestionDto data = service.getSuggestion(user);
+        return ResponseEntity.ok(new ApiResponse<>(true, data, "Vault suggestion retrieved successfully."));
     }
 }
