@@ -1,154 +1,197 @@
-import { Drawer } from "expo-router/drawer";
+import {
+  Inter_400Regular,
+  Inter_600SemiBold,
+  Inter_700Bold,
+  useFonts,
+} from "@expo-google-fonts/inter";
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
+
 import { PaymentProvider } from "../context/PaymentContext";
 import { ReturnProvider } from "../context/ReturnContext";
 import { TransactionProvider } from "../context/TransactionContext";
-
 export default function Layout() {
+  const [fontsLoaded] = useFonts({
+    Inter_400Regular,
+    Inter_600SemiBold,
+    Inter_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return null;
+  }
+
   return (
     <TransactionProvider>
       <PaymentProvider>
         <ReturnProvider>
-          <Drawer
+          <Tabs
             screenOptions={{
-              headerStyle: {
-                backgroundColor: "#B83729",
-              },
-              headerTintColor: "#FFFFFF",
-              headerTitleStyle: {
-                fontWeight: "bold",
-              },
-              drawerActiveTintColor: "#B83729",
-              drawerLabelStyle: {
-                fontSize: 16,
+              headerShown: false,
+              tabBarActiveTintColor: "#C44736",
+              tabBarInactiveTintColor: "#8E8E93",
+              tabBarStyle: {
+                height: 70,
+                paddingBottom: 10,
+                paddingTop: 10,
               },
             }}
           >
-            <Drawer.Screen
+            <Tabs.Screen
               name="index"
               options={{
-                drawerLabel: "Dashboard",
-                title: "TaxPadi",
+                title: "Home",
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name="home-outline" size={size} color={color} />
+                ),
               }}
             />
 
-            <Drawer.Screen
-              name="deadlines"
-              options={{
-                drawerLabel: "Deadlines",
-                title: "Deadlines",
-              }}
-            />
-
-            <Drawer.Screen
+            <Tabs.Screen
               name="transactions"
               options={{
-                drawerLabel: "Transactions",
                 title: "Transactions",
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons
+                    name="swap-horizontal-outline"
+                    size={size}
+                    color={color}
+                  />
+                ),
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="returns"
               options={{
-                drawerLabel: "Tax Returns",
-                title: "Tax Returns",
+                title: "Tax",
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons
+                    name="document-text-outline"
+                    size={size}
+                    color={color}
+                  />
+                ),
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="payments"
               options={{
-                drawerLabel: "Payments",
                 title: "Payments",
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons name="card-outline" size={size} color={color} />
+                ),
               }}
             />
 
-            <Drawer.Screen
-              name="reports"
-              options={{
-                drawerLabel: "Reports & Export",
-                title: "Reports",
-              }}
-            />
-
-            <Drawer.Screen
+            <Tabs.Screen
               name="more"
               options={{
-                drawerLabel: "More",
                 title: "More",
+                tabBarIcon: ({ color, size }) => (
+                  <Ionicons
+                    name="ellipsis-horizontal-circle-outline"
+                    size={size}
+                    color={color}
+                  />
+                ),
               }}
             />
 
-            <Drawer.Screen
+            {/* Hidden Screens */}
+
+            <Tabs.Screen
+              name="invoices"
+              options={{
+                href: null,
+              }}
+            />
+
+            <Tabs.Screen
+              name="reports"
+              options={{
+                href: null,
+              }}
+            />
+
+            <Tabs.Screen
+              name="deadlines"
+              options={{
+                href: null,
+              }}
+            />
+
+            <Tabs.Screen
               name="explore"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="settings"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="tax-profile"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="edit-profile"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="subscription"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="active-sessions"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="add-transaction"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="edit-transaction"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="logout-confirmation"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
 
-            <Drawer.Screen
+            <Tabs.Screen
               name="notification-preferences"
               options={{
-                drawerItemStyle: { display: "none" },
+                href: null,
               }}
             />
-          </Drawer>
+          </Tabs>
         </ReturnProvider>
       </PaymentProvider>
     </TransactionProvider>

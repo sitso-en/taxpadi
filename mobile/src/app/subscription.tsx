@@ -1,5 +1,4 @@
-import { router } from "expo-router";
-
+import { Ionicons } from "@expo/vector-icons";
 import {
   ScrollView,
   StyleSheet,
@@ -7,32 +6,46 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 export default function SubscriptionScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 30 }}
+      contentContainerStyle={{ paddingBottom: 40 }}
     >
-      <TouchableOpacity
-        onPress={() => router.replace("/more")}
-        style={styles.backButton}
-      >
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Current Plan</Text>
+      <Text style={styles.title}>Subscription</Text>
 
       <View style={styles.planCard}>
+        <Ionicons name="card-outline" size={32} color="#C44736" />
+
         <Text style={styles.planName}>Free Plan</Text>
 
         <Text style={styles.planDescription}>
-          Basic tax management features
+          Basic tax management features with transactions, tax returns,
+          payments, invoices and reports.
         </Text>
+      </View>
+
+      <View style={styles.featuresCard}>
+        <Text style={styles.sectionTitle}>Included Features</Text>
+
+        <Text style={styles.feature}>• Transaction Tracking</Text>
+
+        <Text style={styles.feature}>• Tax Return Management</Text>
+
+        <Text style={styles.feature}>• Payment Tracking</Text>
+
+        <Text style={styles.feature}>• Reports & Analytics</Text>
+
+        <Text style={styles.feature}>• Invoice Management</Text>
       </View>
 
       <TouchableOpacity
         style={styles.upgradeButton}
         onPress={() => alert("Upgrade feature coming soon")}
       >
+        <Ionicons name="rocket-outline" size={20} color="#FFFFFF" />
+
         <Text style={styles.upgradeButtonText}>Upgrade Plan</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -43,57 +56,69 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    padding: 24,
+    padding: 20,
+    paddingTop: 50,
   },
 
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "bold",
-    color: "#110503",
-    marginTop: 50,
     marginBottom: 20,
   },
 
   planCard: {
     backgroundColor: "#FFFFFF",
+    borderRadius: 16,
     padding: 20,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#EBEBEB",
+    alignItems: "center",
+    marginBottom: 16,
   },
 
   planName: {
-    fontSize: 22,
+    fontSize: 24,
     fontWeight: "bold",
-    color: "#B83729",
+    color: "#C44736",
+    marginTop: 12,
   },
 
   planDescription: {
-    marginTop: 8,
     color: "#666",
+    textAlign: "center",
+    marginTop: 10,
+    lineHeight: 22,
+  },
+
+  featuresCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12,
+  },
+
+  feature: {
+    marginBottom: 10,
+    color: "#333",
   },
 
   upgradeButton: {
-    backgroundColor: "#B83729",
-    padding: 15,
-    borderRadius: 10,
+    backgroundColor: "#C44736",
+    borderRadius: 12,
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "center",
     alignItems: "center",
-    marginTop: 30,
   },
 
   upgradeButtonText: {
     color: "#FFFFFF",
     fontWeight: "bold",
+    marginLeft: 8,
     fontSize: 16,
-  },
-  backButton: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-
-  backText: {
-    color: "#B83729",
-    fontSize: 24,
-    fontWeight: "bold",
   },
 });

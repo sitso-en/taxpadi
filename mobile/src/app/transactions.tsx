@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
   ScrollView,
@@ -10,8 +11,7 @@ import { useTransactions } from "../context/TransactionContext";
 
 export default function TransactionsScreen() {
   const { transactions, deleteTransaction } = useTransactions();
-  console.log("Transactions:", transactions);
-  console.log("Transactions count:", transactions.length);
+
   const totalIncome = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
@@ -20,57 +20,111 @@ export default function TransactionsScreen() {
     .filter((t) => t.type === "expense")
     .reduce((sum, t) => sum + t.amount, 0);
 
-  const netPosition = totalIncome - totalExpenses;
-
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 30 }}
-    >
-      <Text style={styles.title}>Transactions</Text>
-      <Text>Transactions Count: {transactions.length}</Text>
+    <View style={styles.container}>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+        <Text style={styles.title}>Transactions</Text>
+
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Ionicons
+              name="arrow-down-circle-outline"
+              size={24}
+              color="#2E7D32"
+            />
+            <Text style={styles.summaryAmount}>
+              GHS {totalIncome.toLocaleString()}
+            </Text>
+            <Text style={styles.summaryLabel}>Income</Text>
+          </View>
+
+          <View style={styles.summaryCard}>
+            <Ionicons
+              name="arrow-up-circle-outline"
+              size={24}
+              color="#C44736"
+            />
+            <Text style={styles.summaryAmount}>
+              GHS {totalExpenses.toLocaleString()}
+            </Text>
+            <Text style={styles.summaryLabel}>Expenses</Text>
+          </View>
+        </View>
+
+        <Text style={styles.sectionTitle}>Recent Transactions</Text>
+
+        {transactions.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Text>No transactions yet</Text>
+          </View>
+        ) : (
+          transactions.map((transaction) => (
+            <View key={transaction.id} style={styles.transactionCard}>
+              <View style={styles.row}>
+                <Ionicons
+                  name={
+                    transaction.type === "income"
+                      ? "arrow-down-circle"
+                      : "arrow-up-circle"
+                  }
+                  size={26}
+                  color={transaction.type === "income" ? "#2E7D32" : "#C44736"}
+                />
+
+                <View style={styles.details}>
+                  <Text style={styles.transactionTitle}>
+                    {transaction.title}
+                  </Text>
+
+                  <Text style={styles.category}>{transaction.category}</Text>
+                </View>
+
+                <Text
+                  style={{
+                    fontWeight: "bold",
+                    color:
+                      transaction.type === "income" ? "#2E7D32" : "#C44736",
+                  }}
+                >
+                  GHS {transaction.amount}
+                </Text>
+              </View>
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity
+                  style={styles.editButton}
+                  onPress={() =>
+                    router.push(`/edit-transaction?id=${transaction.id}`)
+                  }
+                >
+                  <Ionicons name="create-outline" size={18} color="#333" />
+                  <Text style={[styles.buttonText, { color: "#333" }]}>
+                    Edit
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.deleteButton}
+                  onPress={() => deleteTransaction(transaction.id)}
+                >
+                  <Ionicons name="trash-outline" size={18} color="#C44736" />
+                  <Text style={[styles.buttonText, { color: "#C44736" }]}>
+                    Delete
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))
+        )}
+      </ScrollView>
+
       <TouchableOpacity
-        style={styles.addButton}
+        style={styles.fab}
         onPress={() => router.push("/add-transaction")}
       >
-        <Text style={styles.addButtonText}>➕ Add Transaction</Text>
+        <Ionicons name="add" size={32} color="#FFFFFF" />
       </TouchableOpacity>
-
-      <View style={styles.card}>
-        <Text style={styles.transactionTitle}>Transaction Summary</Text>
-        <Text>Total Income: GHS {totalIncome.toLocaleString()}</Text>
-
-        <Text>Total Expenses: GHS {totalExpenses.toLocaleString()}</Text>
-
-        <Text>Net Position: GHS {netPosition.toLocaleString()}</Text>
-      </View>
-      {transactions.map((transaction) => (
-        <View key={transaction.id} style={styles.card}>
-          <Text style={styles.transactionTitle}>
-            {transaction.type === "income" ? "🟢" : "🔴"} {transaction.title}
-          </Text>
-          <Text>Category: {transaction.category}</Text>
-
-          <Text>GHS {transaction.amount.toLocaleString()}</Text>
-
-          <TouchableOpacity
-            style={styles.editButton}
-            onPress={() =>
-              router.push(`/edit-transaction?id=${transaction.id}`)
-            }
-          >
-            <Text style={styles.editButtonText}>✏️ Edit</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => deleteTransaction(transaction.id)}
-          >
-            <Text style={styles.deleteButtonText}>🗑 Delete</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-    </ScrollView>
+    </View>
   );
 }
 
@@ -78,73 +132,121 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    padding: 24,
+    padding: 20,
+    paddingTop: 50,
   },
 
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "bold",
-    marginTop: 50,
     marginBottom: 20,
   },
 
-  card: {
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+
+  summaryCard: {
+    width: "48%",
     backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
+    padding: 18,
+    alignItems: "center",
+  },
+
+  summaryAmount: {
+    fontSize: 18,
+    fontWeight: "bold",
+    marginTop: 8,
+  },
+
+  summaryLabel: {
+    color: "#666",
+    marginTop: 4,
+  },
+
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
     marginBottom: 12,
+  },
+
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+  },
+
+  transactionCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+  },
+
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  details: {
+    flex: 1,
+    marginLeft: 12,
   },
 
   transactionTitle: {
     fontWeight: "bold",
-    marginBottom: 4,
-  },
-
-  backButton: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-
-  backText: {
-    color: "#B83729",
-    fontSize: 24,
-    fontWeight: "bold",
-  },
-  addButton: {
-    backgroundColor: "#B83729",
-    padding: 14,
-    borderRadius: 12,
-    marginBottom: 16,
-    alignItems: "center",
-  },
-
-  addButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
     fontSize: 16,
   },
-  deleteButton: {
-    backgroundColor: "#D9534F",
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 10,
-    alignItems: "center",
+
+  category: {
+    color: "#666",
+    marginTop: 2,
   },
 
-  deleteButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
+  buttonRow: {
+    flexDirection: "row",
+    marginTop: 12,
+    gap: 10,
   },
+
   editButton: {
-    backgroundColor: "#F0AD4E",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#F3F4F6",
     padding: 10,
     borderRadius: 8,
-    marginTop: 10,
-    alignItems: "center",
+    flex: 1,
   },
 
-  editButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
+  deleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FCE8E6",
+    padding: 10,
+    borderRadius: 8,
+    flex: 1,
+  },
+
+  buttonText: {
+    marginLeft: 6,
+    fontWeight: "600",
+  },
+
+  fab: {
+    position: "absolute",
+    right: 25,
+    bottom: 25,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#C44736",
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 6,
   },
 });

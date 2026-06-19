@@ -102,7 +102,7 @@ const styles = StyleSheet.create({
   },
 
   back: {
-    color: "#B83729",
+    color: "#C44736",
     fontSize: 20,
     marginTop: 20,
   },
@@ -129,10 +129,10 @@ const styles = StyleSheet.create({
 
   selectedTypeButton: {
     borderWidth: 2,
-    borderColor: "#B83729",
+    borderColor: "#C44736",
   },
   saveButton: {
-    backgroundColor: "#B83729",
+    backgroundColor: "#C44736",
     padding: 14,
     borderRadius: 12,
     alignItems: "center",

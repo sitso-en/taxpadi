@@ -53,7 +53,7 @@ const styles = StyleSheet.create({
 
   logoutButton: {
     width: "80%",
-    backgroundColor: "#B83729",
+    backgroundColor: "#C44736",
     padding: 15,
     borderRadius: 10,
     alignItems: "center",
@@ -85,7 +85,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: "#B83729",
+    color: "#C44736",
     fontSize: 24,
     fontWeight: "bold",
   },

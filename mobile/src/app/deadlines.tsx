@@ -1,10 +1,8 @@
-import { router } from "expo-router";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View
 } from "react-native";
 
 export default function DeadlinesScreen() {
@@ -13,8 +11,6 @@ export default function DeadlinesScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 30 }}
     >
-      
-
       <Text style={styles.title}>Upcoming Deadlines</Text>
       <View style={styles.card}>
         <Text style={styles.deadlineTitle}>Deadline Summary</Text>
@@ -73,7 +69,7 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: "#B83729",
+    color: "#C44736",
     fontSize: 24,
     fontWeight: "bold",
   },

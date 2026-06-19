@@ -1,5 +1,12 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function MoreScreen() {
   return (
@@ -13,35 +20,59 @@ export default function MoreScreen() {
         style={styles.item}
         onPress={() => router.push("/settings")}
       >
-        <Text>⚙️ Settings</Text>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/notification-preferences")}
-      >
-        <Text>🔔 Notifications</Text>
+        <View style={styles.row}>
+          <Ionicons name="settings-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>Settings</Text>
+        </View>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.item}
         onPress={() => router.push("/subscription")}
       >
-        <Text>💳 Subscription</Text>
+        <View style={styles.row}>
+          <Ionicons name="card-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>Subscription</Text>
+        </View>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.item}
         onPress={() => router.push("/tax-profile")}
       >
-        <Text>📄 Tax Profile</Text>
+        <View style={styles.row}>
+          <Ionicons name="document-text-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>Tax Profile</Text>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => router.push("/reports")}
+      >
+        <View style={styles.row}>
+          <Ionicons name="bar-chart-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>Reports</Text>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => router.push("/invoices")}
+      >
+        <View style={styles.row}>
+          <Ionicons name="receipt-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>Invoices</Text>
+        </View>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.item}
         onPress={() => router.push("/logout-confirmation")}
       >
-        <Text>🚪 Logout</Text>
+        <View style={styles.row}>
+          <Ionicons name="log-out-outline" size={24} color="#C44736" />
+          <Text style={[styles.itemText, { color: "#C44736" }]}>Logout</Text>
+        </View>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -59,23 +90,35 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginTop: 50,
     marginBottom: 20,
+    color: "#111",
   },
 
   item: {
     backgroundColor: "#FFFFFF",
     padding: 18,
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 12,
+
+    shadowColor: "#000",
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+
+    elevation: 2,
   },
 
-  backButton: {
-    marginTop: 20,
-    marginBottom: 10,
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
   },
 
-  backText: {
-    color: "#B83729",
-    fontSize: 24,
-    fontWeight: "bold",
+  itemText: {
+    marginLeft: 14,
+    fontSize: 16,
+    color: "#222",
+    fontWeight: "500",
   },
 });

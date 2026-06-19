@@ -1,3 +1,4 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
@@ -8,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+
 export default function NotificationPreferencesScreen() {
   const [deadlineReminders, setDeadlineReminders] = useState(true);
   const [penaltyAlerts, setPenaltyAlerts] = useState(true);
@@ -16,114 +18,95 @@ export default function NotificationPreferencesScreen() {
   const [paymentConfirmations, setPaymentConfirmations] = useState(true);
   const [systemUpdates, setSystemUpdates] = useState(true);
 
+  const PreferenceItem = ({
+    title,
+    description,
+    value,
+    onValueChange,
+  }: any) => (
+    <View style={styles.preferenceCard}>
+      <View style={styles.preferenceContent}>
+        <Text style={styles.preferenceTitle}>{title}</Text>
+
+        <Text style={styles.preferenceDescription}>{description}</Text>
+      </View>
+
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        trackColor={{
+          false: "#E5E7EB",
+          true: "#A7F3D0",
+        }}
+        thumbColor="#FFFFFF"
+      />
+    </View>
+  );
+
   return (
-    <ScrollView style={styles.container}>
-      <TouchableOpacity
-        onPress={() =>router.replace("/more")}
-        style={styles.backButton}
-      >
-        <Text style={styles.backText}>⬅️ Back</Text>
-      </TouchableOpacity>
-      <Text style={styles.title}>Notification Preferences</Text>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ paddingBottom: 40 }}
+    >
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.push("/settings")}>
+          <Ionicons name="chevron-back" size={28} color="#222" />
+        </TouchableOpacity>
+
+        <Text style={styles.title}>Notifications</Text>
+      </View>
 
       <Text style={styles.subtitle}>
-        Choose which notifications you want to receive
+        Choose which notifications you want to receive.
       </Text>
-      <View style={styles.preferenceRow}>
-        <View>
-          <Text style={styles.preferenceTitle}>Deadline Reminders</Text>
 
-          <Text style={styles.preferenceDescription}>
-            Get notified about upcoming tax deadlines
-          </Text>
-        </View>
+      <PreferenceItem
+        title="Deadline Reminders"
+        description="Get notified about upcoming tax deadlines."
+        value={deadlineReminders}
+        onValueChange={setDeadlineReminders}
+      />
 
-        <Switch
-          value={deadlineReminders}
-          onValueChange={setDeadlineReminders}
-          trackColor={{ false: "#EBEBEB", true: "#B83729" }}
-        />
-      </View>
-      <View style={styles.preferenceRow}>
-        <View>
-          <Text style={styles.preferenceTitle}>Penalty Alerts</Text>
+      <PreferenceItem
+        title="Penalty Alerts"
+        description="Receive alerts when penalties may apply."
+        value={penaltyAlerts}
+        onValueChange={setPenaltyAlerts}
+      />
 
-          <Text style={styles.preferenceDescription}>
-            Receive alerts when penalties may apply
-          </Text>
-        </View>
+      <PreferenceItem
+        title="Vault Suggestions"
+        description="Receive tax savings recommendations."
+        value={vaultSuggestions}
+        onValueChange={setVaultSuggestions}
+      />
 
-        <Switch
-          value={penaltyAlerts}
-          onValueChange={setPenaltyAlerts}
-          trackColor={{ false: "#EBEBEB", true: "#B83729" }}
-        />
-      </View>
-      <View style={styles.preferenceRow}>
-        <View>
-          <Text style={styles.preferenceTitle}>Vault Suggestions</Text>
+      <PreferenceItem
+        title="Referral Offers"
+        description="Receive referral rewards and offers."
+        value={referralOffers}
+        onValueChange={setReferralOffers}
+      />
 
-          <Text style={styles.preferenceDescription}>
-            Receive tax savings recommendations
-          </Text>
-        </View>
+      <PreferenceItem
+        title="Payment Confirmations"
+        description="Receive payment confirmations."
+        value={paymentConfirmations}
+        onValueChange={setPaymentConfirmations}
+      />
 
-        <Switch
-          value={vaultSuggestions}
-          onValueChange={setVaultSuggestions}
-          trackColor={{ false: "#EBEBEB", true: "#B83729" }}
-        />
-      </View>
-      <View style={styles.preferenceRow}>
-        <View>
-          <Text style={styles.preferenceTitle}>Referral Offers</Text>
+      <PreferenceItem
+        title="System Updates"
+        description="Receive important announcements."
+        value={systemUpdates}
+        onValueChange={setSystemUpdates}
+      />
 
-          <Text style={styles.preferenceDescription}>
-            Receive referral rewards and offers
-          </Text>
-        </View>
-
-        <Switch
-          value={referralOffers}
-          onValueChange={setReferralOffers}
-          trackColor={{ false: "#EBEBEB", true: "#B83729" }}
-        />
-      </View>
-      <View style={styles.preferenceRow}>
-        <View>
-          <Text style={styles.preferenceTitle}>Payment Confirmations</Text>
-
-          <Text style={styles.preferenceDescription}>
-            Receive confirmation for payments
-          </Text>
-        </View>
-
-        <Switch
-          value={paymentConfirmations}
-          onValueChange={setPaymentConfirmations}
-          trackColor={{ false: "#EBEBEB", true: "#B83729" }}
-        />
-      </View>
-      <View style={styles.preferenceRow}>
-        <View>
-          <Text style={styles.preferenceTitle}>System Updates</Text>
-
-          <Text style={styles.preferenceDescription}>
-            Receive important system announcements
-          </Text>
-        </View>
-
-        <Switch
-          value={systemUpdates}
-          onValueChange={setSystemUpdates}
-          trackColor={{ false: "#EBEBEB", true: "#B83729" }}
-        />
-      </View>
       <TouchableOpacity
-        style={styles.button}
+        style={styles.saveButton}
         onPress={() => alert("Preferences saved successfully!")}
       >
-        <Text style={styles.buttonText}>Save Preferences</Text>
+        <Text style={styles.saveButtonText}>Save Preferences</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -133,35 +116,45 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    padding: 24,
+    padding: 20,
+    paddingTop: 50,
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
   },
 
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: "bold",
-    color: "#110503",
-    marginTop: 50,
+    marginLeft: 10,
   },
 
   subtitle: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#1F1F1F",
+    color: "#666",
+    marginBottom: 20,
   },
-  preferenceRow: {
-    marginTop: 30,
+
+  preferenceCard: {
     backgroundColor: "#FFFFFF",
-    padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
 
+  preferenceContent: {
+    flex: 1,
+    marginRight: 10,
+  },
+
   preferenceTitle: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#110503",
   },
 
   preferenceDescription: {
@@ -169,28 +162,18 @@ const styles = StyleSheet.create({
     color: "#666",
     marginTop: 4,
   },
-  button: {
-    backgroundColor: "#B83729",
-    padding: 15,
-    borderRadius: 10,
+
+  saveButton: {
+    backgroundColor: "#C44736",
+    borderRadius: 12,
+    padding: 16,
     alignItems: "center",
-    marginTop: 30,
-    marginBottom: 30,
+    marginTop: 12,
   },
 
-  buttonText: {
+  saveButtonText: {
     color: "#FFFFFF",
     fontWeight: "bold",
     fontSize: 16,
-  },
-  backButton: {
-    marginTop: 20,
-    marginBottom: 10,
-  },
-
-  backText: {
-    color: "#B83729",
-    fontSize: 24,
-    fontWeight: "bold",
   },
 });

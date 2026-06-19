@@ -1,12 +1,12 @@
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from "react-native";
 import { useTransactions } from "../context/TransactionContext";
 export default function AddTransactionScreen() {
@@ -148,7 +148,7 @@ const styles = StyleSheet.create({
   },
 
   saveButton: {
-    backgroundColor: "#B83729",
+    backgroundColor: "#C44736",
     padding: 14,
     borderRadius: 12,
     alignItems: "center",
@@ -167,13 +167,13 @@ const styles = StyleSheet.create({
   },
 
   backText: {
-    color: "#B83729",
+    color: "#C44736",
     fontSize: 24,
     fontWeight: "bold",
   },
   selectedTypeButton: {
     borderWidth: 2,
-    borderColor: "#B83729",
+    borderColor: "#C44736",
   },
   selectedTypeText: {
     marginTop: 8,
