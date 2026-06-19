@@ -75,9 +75,10 @@ public class ReferralController {
     @PostMapping("/{id}/converted")
     public ResponseEntity<ApiResponse<ConvertedOfferResponse>> markConverted(
             @PathVariable UUID id,
-            @RequestBody MarkConvertedRequest request) {
+            @RequestBody MarkConvertedRequest request,
+            @RequestHeader(value = "X-Partner-Api-Key", required = false) String apiKey) {
         return ResponseEntity.ok(new ApiResponse<>(true,
-            referralService.markConverted(id, request),
+            referralService.markConverted(id, request, apiKey),
             "Conversion confirmed."));
     }
 }
