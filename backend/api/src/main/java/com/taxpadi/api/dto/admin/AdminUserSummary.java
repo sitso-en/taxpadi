@@ -39,13 +39,6 @@ public class AdminUserSummary {
     }
 
 
-
-    public void setUserId(UUID userId) {
-        this.userId = userId;
-    }
-
-
-
     public String getFullName() {
         return fullName;
     }
@@ -134,11 +127,6 @@ public class AdminUserSummary {
         return createdAt;
     }
 
-
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
 
     
 }
