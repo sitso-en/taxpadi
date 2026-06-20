@@ -35,6 +35,7 @@ export default function LogoutConfirmationScreen() {
         category: "",
         subscription_tier: "FREE",
         is_active: false,
+        is_verified: false,
         label: "",
         tin: "",
         taxpayer_category: "",
