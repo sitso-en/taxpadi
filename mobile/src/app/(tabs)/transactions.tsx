@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTransactions } from "../context/TransactionContext";
+import { useTransactions } from "../../context/TransactionContext";
 
 export default function TransactionsScreen() {
   const { transactions, deleteTransaction } = useTransactions();

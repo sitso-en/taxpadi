@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
 import {
   ScrollView,
   StyleSheet,
@@ -13,6 +14,9 @@ export default function SubscriptionScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
     >
+      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+        <Ionicons name="arrow-back" size={24} color="#C44736" />
+      </TouchableOpacity>
       <Text style={styles.title}>Subscription</Text>
 
       <View style={styles.planCard}>
@@ -120,5 +124,8 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 8,
     fontSize: 16,
+  },
+  backButton: {
+    marginBottom: 15,
   },
 });

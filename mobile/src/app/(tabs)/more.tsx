@@ -67,6 +67,46 @@ export default function MoreScreen() {
 
       <TouchableOpacity
         style={styles.item}
+        onPress={() => router.push("/taxbot")}
+      >
+        <View style={styles.row}>
+          <Ionicons name="chatbubble-ellipses-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>TaxBot</Text>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => router.push("/savings-vault")}
+      >
+        <View style={styles.row}>
+          <Ionicons name="wallet-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>Savings Vault</Text>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => router.push("/compliance-certificate")}
+      >
+        <View style={styles.row}>
+          <Ionicons name="shield-checkmark-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>Compliance Certificate</Text>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.item}
+        onPress={() => router.push("/referral-offers")}
+      >
+        <View style={styles.row}>
+          <Ionicons name="gift-outline" size={24} color="#222" />
+          <Text style={styles.itemText}>Referral Offers</Text>
+        </View>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.item}
         onPress={() => router.push("/logout-confirmation")}
       >
         <View style={styles.row}>

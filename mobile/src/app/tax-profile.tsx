@@ -1,5 +1,12 @@
 import { Ionicons } from "@expo/vector-icons";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { router } from "expo-router";
+import {
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 
 export default function TaxProfileScreen() {
   return (
@@ -7,6 +14,13 @@ export default function TaxProfileScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
     >
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={{ marginBottom: 15 }}
+      >
+        <Ionicons name="arrow-back" size={24} color="#C44736" />
+      </TouchableOpacity>
+
       <Text style={styles.title}>Tax Profile</Text>
 
       <View style={styles.profileCard}>

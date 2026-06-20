@@ -10,7 +10,7 @@ export default function LogoutConfirmationScreen() {
 
       <TouchableOpacity
         style={styles.logoutButton}
-        onPress={() => alert("Logged out successfully")}
+        onPress={() => router.replace("/login")}
       >
         <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>

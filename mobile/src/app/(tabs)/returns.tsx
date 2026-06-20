@@ -8,12 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useReturns } from "../context/ReturnContext";
+import { useReturns } from "../../context/ReturnContext";
 
 export default function TaxScreen() {
   const { returns, addReturn, deleteReturn, editReturn } = useReturns();
 
-  const [taxType, setTaxType] = useState("");
+  const [taxType, setTaxType] = useState("VAT");
   const [dueDate, setDueDate] = useState("");
 
   const filedReturns = returns.filter((r) => r.status === "Filed").length;
@@ -21,7 +21,7 @@ export default function TaxScreen() {
   const pendingReturns = returns.filter((r) => r.status === "Pending").length;
 
   const handleAddReturn = () => {
-    if (!taxType || !dueDate) return;
+    if (!dueDate) return;
 
     addReturn({
       id: Date.now(),
@@ -30,7 +30,6 @@ export default function TaxScreen() {
       status: "Pending",
     });
 
-    setTaxType("");
     setDueDate("");
   };
 
@@ -42,25 +41,29 @@ export default function TaxScreen() {
       <Text style={styles.title}>My Taxes</Text>
 
       <View style={styles.taxCard}>
-        <Text style={styles.taxLabel}>Tax Due</Text>
+        <Text style={styles.taxLabel}>Outstanding Tax Due</Text>
 
         <Text style={styles.taxAmount}>
           GHS {(pendingReturns * 500).toFixed(2)}
         </Text>
 
-        <Text style={styles.taxSubText}>Outstanding tax obligations</Text>
+        <Text style={styles.taxSubText}>Based on pending tax returns</Text>
       </View>
 
       <View style={styles.summaryRow}>
         <View style={styles.summaryCard}>
-          <Ionicons name="checkmark-circle-outline" size={24} color="#2E7D32" />
+          <Ionicons name="checkmark-circle-outline" size={24} color="#34A853" />
+
           <Text style={styles.summaryNumber}>{filedReturns}</Text>
+
           <Text style={styles.summaryLabel}>Filed</Text>
         </View>
 
         <View style={styles.summaryCard}>
           <Ionicons name="time-outline" size={24} color="#E65100" />
+
           <Text style={styles.summaryNumber}>{pendingReturns}</Text>
+
           <Text style={styles.summaryLabel}>Pending</Text>
         </View>
       </View>
@@ -70,7 +73,7 @@ export default function TaxScreen() {
 
         <Text
           style={{
-            color: pendingReturns === 0 ? "#2E7D32" : "#E65100",
+            color: pendingReturns === 0 ? "#34A853" : "#E65100",
             fontWeight: "bold",
             fontSize: 18,
           }}
@@ -82,16 +85,31 @@ export default function TaxScreen() {
       <View style={styles.card}>
         <Text style={styles.sectionTitle}>Add Tax Return</Text>
 
-        <TextInput
-          style={styles.input}
-          placeholder="Tax Type"
-          value={taxType}
-          onChangeText={setTaxType}
-        />
+        <Text style={styles.fieldLabel}>Tax Type</Text>
+
+        <TouchableOpacity
+          style={[
+            styles.taxButton,
+            taxType === "VAT" && styles.selectedTaxButton,
+          ]}
+          onPress={() => setTaxType("VAT")}
+        >
+          <Text style={styles.taxButtonText}>VAT Return</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.taxButton,
+            taxType === "PAYE" && styles.selectedTaxButton,
+          ]}
+          onPress={() => setTaxType("PAYE")}
+        >
+          <Text style={styles.taxButtonText}>PAYE Return</Text>
+        </TouchableOpacity>
 
         <TextInput
           style={styles.input}
-          placeholder="Due Date"
+          placeholder="Due Date (e.g. 30 Jun 2026)"
           value={dueDate}
           onChangeText={setDueDate}
         />
@@ -115,8 +133,9 @@ export default function TaxScreen() {
 
               <Text
                 style={{
-                  color: taxReturn.status === "Filed" ? "#2E7D32" : "#E65100",
+                  color: taxReturn.status === "Filed" ? "#34A853" : "#E65100",
                   fontWeight: "bold",
+                  marginTop: 6,
                 }}
               >
                 {taxReturn.status}
@@ -132,9 +151,13 @@ export default function TaxScreen() {
                     })
                   }
                 >
-                  <Text style={[styles.buttonText, { color: "#2E7D32" }]}>
-                    Mark as Filed
-                  </Text>
+                  <Ionicons
+                    name="checkmark-circle-outline"
+                    size={18}
+                    color="#34A853"
+                  />
+
+                  <Text style={styles.filedText}>Mark as Filed</Text>
                 </TouchableOpacity>
               )}
 
@@ -142,9 +165,9 @@ export default function TaxScreen() {
                 style={styles.deleteButton}
                 onPress={() => deleteReturn(taxReturn.id)}
               >
-                <Text style={[styles.buttonText, { color: "#C44736" }]}>
-                  Delete
-                </Text>
+                <Ionicons name="trash-outline" size={18} color="#C44736" />
+
+                <Text style={styles.deleteText}>Delete</Text>
               </TouchableOpacity>
             </View>
           ))
@@ -169,25 +192,25 @@ const styles = StyleSheet.create({
   },
 
   taxCard: {
-    backgroundColor: "#C44736",
+    backgroundColor: "#FFFFFF",
     borderRadius: 18,
-    padding: 18,
+    padding: 20,
     marginBottom: 20,
   },
 
   taxLabel: {
-    color: "#FFFFFF",
+    color: "#666",
   },
 
   taxAmount: {
-    color: "#FFFFFF",
     fontSize: 30,
     fontWeight: "bold",
+    color: "#111",
     marginTop: 8,
   },
 
   taxSubText: {
-    color: "#FFFFFF",
+    color: "#888",
     marginTop: 6,
   },
 
@@ -228,17 +251,40 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
+  fieldLabel: {
+    fontWeight: "600",
+    marginBottom: 10,
+  },
+
+  taxButton: {
+    backgroundColor: "#F5F5F5",
+    padding: 14,
+    borderRadius: 14,
+    marginBottom: 10,
+  },
+
+  selectedTaxButton: {
+    borderWidth: 2,
+    borderColor: "#C44736",
+  },
+
+  taxButtonText: {
+    fontWeight: "600",
+  },
+
   input: {
     backgroundColor: "#F5F5F5",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
+    borderRadius: 999,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    marginTop: 10,
+    marginBottom: 12,
   },
 
   addButton: {
     backgroundColor: "#C44736",
     padding: 14,
-    borderRadius: 10,
+    borderRadius: 12,
   },
 
   addButtonText: {
@@ -256,24 +302,38 @@ const styles = StyleSheet.create({
 
   returnType: {
     fontWeight: "bold",
+    fontSize: 16,
   },
 
   filedButton: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: "#E8F5E9",
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     marginTop: 10,
   },
 
+  filedText: {
+    marginLeft: 6,
+    color: "#34A853",
+    fontWeight: "600",
+  },
+
   deleteButton: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
     backgroundColor: "#FCE8E6",
     padding: 10,
-    borderRadius: 8,
+    borderRadius: 10,
     marginTop: 8,
   },
 
-  buttonText: {
-    textAlign: "center",
+  deleteText: {
+    marginLeft: 6,
+    color: "#C44736",
     fontWeight: "600",
   },
 });

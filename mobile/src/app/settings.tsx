@@ -14,6 +14,12 @@ export default function SettingsScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
     >
+      <TouchableOpacity
+        onPress={() => router.push("/more")}
+        style={styles.backButton}
+      >
+        <Ionicons name="arrow-back" size={24} color="#C44736" />
+      </TouchableOpacity>
       <Text style={styles.title}>Settings</Text>
 
       <View style={styles.section}>
@@ -139,5 +145,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "#C44736",
     fontWeight: "600",
+  },
+  backButton: {
+    marginBottom: 15,
   },
 });
