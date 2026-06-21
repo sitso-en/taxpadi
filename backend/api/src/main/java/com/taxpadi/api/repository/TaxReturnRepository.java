@@ -33,6 +33,8 @@ public interface TaxReturnRepository extends JpaRepository<TaxReturn, UUID> {
         Pageable pageable
     );
 
+    boolean existsByUserAndStatus(User user, String status);
+
     Optional<TaxReturn> findByReturnIdAndUser(UUID returnId, User user);
 
     Optional<TaxReturn> findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
