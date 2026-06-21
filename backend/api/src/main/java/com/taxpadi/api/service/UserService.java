@@ -40,15 +40,18 @@ public class UserService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
+    private final DataExportService dataExportService;
 
     public UserService(UserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository,
                        BCryptPasswordEncoder passwordEncoder,
-                       AuditLogService auditLogService) {
+                       AuditLogService auditLogService,
+                       DataExportService dataExportService) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditLogService = auditLogService;
+        this.dataExportService = dataExportService;
     }
 
     public UserProfileResponse getProfile(User user) {
@@ -83,8 +86,8 @@ public class UserService {
         }
 
         if (request.getTin() != null) {
-            if (!request.getTin().matches("\\d{11}")) {
-                throw new IllegalArgumentException("TIN must be exactly 11 digits");
+            if (!request.getTin().matches("[A-Za-z]\\d{10}")) {
+                throw new IllegalArgumentException("TIN must be a letter followed by 10 digits (e.g. P0012345678)");
             }
             user.setTin(request.getTin());
         }
@@ -131,7 +134,8 @@ public class UserService {
 
     public DataRequestResponse requestData(User user) {
         log.info("Data export requested for userId={}", user.getUserId());
-        return new DataRequestResponse(UUID.randomUUID(), "processing", 5);
+        dataExportService.exportAndSend(user);
+        return new DataRequestResponse(UUID.randomUUID(), "sent", 0);
     }
 
     public SessionsResponse getSessions(User user, UUID currentTokenId) {
