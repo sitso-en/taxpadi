@@ -34,6 +34,7 @@ import com.taxpadi.api.dto.auth.VerifyOtpRequest;
 import com.taxpadi.api.dto.auth.VerifyOtpResponse;
 import com.taxpadi.api.dto.auth.VerifyResetOtpResponse;
 import com.taxpadi.api.exception.ConflictException;
+import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.DeviceToken;
 import com.taxpadi.api.model.OtpPurpose;
@@ -144,7 +145,11 @@ public class AuthService {
         otpVerificationRepository.save(otp);
         log.debug("OTP saved for userId={}, expiresAt={}", user.getUserId(), expiresAt);
 
-        smsService.sendOtp(phone, otpCode);
+        try {
+            smsService.sendOtp(phone, otpCode);
+        } catch (RuntimeException ex) {
+            log.warn("SMS delivery failed for phone={} — OTP={} (use for manual verification)", phone, otpCode);
+        }
         log.info("Registration complete for userId={}, OTP dispatched to phone={}", user.getUserId(), phone);
 
         return new RegisterResponse(user.getUserId(),
@@ -163,7 +168,7 @@ public class AuthService {
 
         OtpVerification otp = otpVerificationRepository
                 .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
-                .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
+                .orElseThrow(() -> new BadRequestException("No active OTP found. Please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
             log.warn("OTP expired for userId={}", user.getUserId());
@@ -219,7 +224,11 @@ public class AuthService {
         otpVerificationRepository.save(otp);
         log.debug("New OTP saved for userId={}, expiresAt={}", user.getUserId(), expiresAt);
 
-        smsService.sendOtp(phone, otpCode);
+        try {
+            smsService.sendOtp(phone, otpCode);
+        } catch (RuntimeException ex) {
+            log.warn("SMS delivery failed for phone={} — OTP={} (use for manual verification)", phone, otpCode);
+        }
         log.info("OTP resent to phone={} for purpose={}", phone, purpose);
 
         return new ResendOtpResponse(phone, 10);
@@ -409,7 +418,11 @@ public class AuthService {
             otpVerificationRepository.save(otp);
             log.debug("New OTP saved for userId={}, expiresAt={}", user.getUserId(), expiresAt);
 
-            smsService.sendOtp(phone, otpCode);
+            try {
+                smsService.sendOtp(phone, otpCode);
+            } catch (RuntimeException ex) {
+                log.warn("SMS delivery failed for phone={} — OTP={} (use for manual verification)", phone, otpCode);
+            }
             log.info("OTP sent to phone={} for purpose={}", phone, purpose);
 
             return;
@@ -426,7 +439,7 @@ public class AuthService {
 
         OtpVerification otp = otpVerificationRepository
                 .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
-                .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
+                .orElseThrow(() -> new BadRequestException("No active OTP found. Please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
             log.warn("OTP expired for userId={}", user.getUserId());

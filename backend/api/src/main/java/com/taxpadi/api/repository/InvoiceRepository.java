@@ -2,6 +2,7 @@ package com.taxpadi.api.repository;
                 
 import java.math.BigDecimal;                                                                  
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -15,6 +16,8 @@ import com.taxpadi.api.model.Invoice;
 import com.taxpadi.api.model.User;
 
 public interface InvoiceRepository extends JpaRepository<Invoice, UUID> {
+
+    List<Invoice> findAllByUserOrderByCreatedAtDesc(User user);
 
     Page<Invoice> findAllByUserOrderByCreatedAtDesc(User user, Pageable pageable);
 

@@ -60,6 +60,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         Pageable pageable
     );
 
+    List<Transaction> findAllByUserOrderByTransactionDateDesc(User user);
+
     Optional<Transaction> findByTransactionIdAndUser(UUID transactionId, User user);
 
     @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.user = :user AND t.type = :type AND t.transactionDate >= :from AND t.transactionDate <= :to")

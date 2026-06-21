@@ -11,12 +11,53 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-taxpadi_user} -d ${POSTGRES_DB:-taxpadi_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7-alpine
     container_name: taxpadi_redis
     ports:
       - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: backend/api
+      dockerfile: Dockerfile
+    container_name: taxpadi_api
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/taxpadi_db
+      SPRING_DATASOURCE_USERNAME: taxpadi_user
+      SPRING_DATASOURCE_PASSWORD: taxpadi_password
+      SPRING_REDIS_HOST: redis
+      SPRING_REDIS_PORT: 6379
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:8080}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_RESET_SECRET: ${JWT_RESET_SECRET}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ASSEMBLYAI_API_KEY: ${ASSEMBLYAI_API_KEY:-}
+      PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-}
+      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-}
+      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET:-}
+      SENDGRID_API_KEY: ${SENDGRID_API_KEY:-}
+      TERMII_API_KEY: ${TERMII_API_KEY:-}
     restart: unless-stopped
 
 volumes:

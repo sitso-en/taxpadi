@@ -39,4 +39,20 @@ public class CloudinaryService {
             throw new RuntimeException("Failed to upload PDF to Cloudinary: " + e.getMessage());
         }
     }
+
+    public String uploadFile(byte[] fileBytes, String folder, String publicId) {
+        try {
+            Map<?, ?> result = cloudinary.uploader().upload(
+                fileBytes,
+                Map.of(
+                    "public_id", folder + "/" + publicId,
+                    "resource_type", "auto",
+                    "overwrite", true
+                )
+            );
+            return (String) result.get("secure_url");
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to upload file to Cloudinary: " + e.getMessage());
+        }
+    }
 }
