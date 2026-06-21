@@ -1,4 +1,4 @@
-package com.taxpadi.entity;
+package com.taxpadi.api.model;
 
 import jakarta.persistence.*;
 import java.math.BigDecimal;
@@ -10,20 +10,25 @@ import java.util.UUID;
 public class Payment {
 
     @Id
-    @Column(nullable = false, unique = true)
-    private String paymentId = UUID.randomUUID().toString();
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(name = "payment_id")
+    private UUID paymentId;
 
-    @Column(name = "user_id", nullable = false)
-    private String userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
-    @Column(name = "return_id")
-    private String returnId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "return_id")
+    private TaxReturn taxReturn;
 
-    @Column(name = "penalty_id")
-    private String penaltyId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "penalty_id")
+    private Penalty penalty;
 
-    @Column(name = "certificate_id")
-    private String certificateId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "certificate_id")
+    private ComplianceCertificate certificate;
 
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
@@ -49,41 +54,61 @@ public class Payment {
     @Column(name = "expires_at")
     private LocalDateTime expiresAt;
 
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt = LocalDateTime.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
 
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt = LocalDateTime.now();
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
 
-    public Payment() {}
+    @PrePersist
+    protected void onCreate() {
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
+    }
 
-    public String getPaymentId() { return paymentId; }
-    public String getUserId() { return userId; }
-    public String getReturnId() { return returnId; }
-    public String getPenaltyId() { return penaltyId; }
-    public String getCertificateId() { return certificateId; }
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    public UUID getPaymentId() { return paymentId; }
+
+    public User getUser() { return user; }
+    public void setUser(User v) { this.user = v; }
+
+    public TaxReturn getTaxReturn() { return taxReturn; }
+    public void setTaxReturn(TaxReturn v) { this.taxReturn = v; }
+
+    public Penalty getPenalty() { return penalty; }
+    public void setPenalty(Penalty v) { this.penalty = v; }
+
+    public ComplianceCertificate getCertificate() { return certificate; }
+    public void setCertificate(ComplianceCertificate v) { this.certificate = v; }
+
     public BigDecimal getAmount() { return amount; }
+    public void setAmount(BigDecimal v) { this.amount = v; }
+
     public String getPaymentMethod() { return paymentMethod; }
+    public void setPaymentMethod(String v) { this.paymentMethod = v; }
+
     public String getPaymentReference() { return paymentReference; }
+    public void setPaymentReference(String v) { this.paymentReference = v; }
+
     public String getMomoNumber() { return momoNumber; }
+    public void setMomoNumber(String v) { this.momoNumber = v; }
+
     public String getMomoProvider() { return momoProvider; }
+    public void setMomoProvider(String v) { this.momoProvider = v; }
+
     public String getStatus() { return status; }
+    public void setStatus(String v) { this.status = v; }
+
     public LocalDateTime getPaidAt() { return paidAt; }
+    public void setPaidAt(LocalDateTime v) { this.paidAt = v; }
+
     public LocalDateTime getExpiresAt() { return expiresAt; }
+    public void setExpiresAt(LocalDateTime v) { this.expiresAt = v; }
+
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
-
-    public void setUserId(String v) { this.userId = v; }
-    public void setReturnId(String v) { this.returnId = v; }
-    public void setPenaltyId(String v) { this.penaltyId = v; }
-    public void setCertificateId(String v) { this.certificateId = v; }
-    public void setAmount(BigDecimal v) { this.amount = v; }
-    public void setPaymentMethod(String v) { this.paymentMethod = v; }
-    public void setPaymentReference(String v) { this.paymentReference = v; }
-    public void setMomoNumber(String v) { this.momoNumber = v; }
-    public void setMomoProvider(String v) { this.momoProvider = v; }
-    public void setStatus(String v) { this.status = v; }
-    public void setPaidAt(LocalDateTime v) { this.paidAt = v; }
-    public void setExpiresAt(LocalDateTime v) { this.expiresAt = v; }
-    public void setUpdatedAt(LocalDateTime v) { this.updatedAt = v; }
 }
