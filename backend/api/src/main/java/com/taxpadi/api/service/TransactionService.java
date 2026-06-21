@@ -28,6 +28,7 @@ import com.taxpadi.api.dto.transaction.ImportHistoryItem;
 import com.taxpadi.api.dto.transaction.ImportHistoryListResponse;
 import com.taxpadi.api.dto.transaction.ImportStatementResponse;
 import com.taxpadi.api.dto.transaction.PaginationInfo;
+import com.taxpadi.api.dto.transaction.ScanTransactionResponse;
 import com.taxpadi.api.dto.transaction.TransactionDetailResponse;
 import com.taxpadi.api.dto.transaction.TransactionListResponse;
 import com.taxpadi.api.dto.transaction.TransactionSummaryResponse;
@@ -35,6 +36,7 @@ import com.taxpadi.api.dto.transaction.UpdateTransactionRequest;
 import com.taxpadi.api.dto.transaction.UpdateTransactionResponse;
 import com.taxpadi.api.dto.transaction.ValidateImportResponse;
 import com.taxpadi.api.dto.transaction.VaultSuggestion;
+import com.taxpadi.api.dto.transaction.VoiceTransactionResponse;
 import com.taxpadi.api.dto.transaction.WithholdingInfo;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.ConflictException;
@@ -53,6 +55,8 @@ import com.taxpadi.api.model.User;
 public class TransactionService {
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+    private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+    private static final long MAX_AUDIO_SIZE = 2 * 1024 * 1024;
     private static final List<String> AMBIGUOUS_KEYWORDS = List.of(
         "transfer", "float", "commission", "adjustment");
 
@@ -61,17 +65,26 @@ public class TransactionService {
     private final TaxCalculationRepository taxCalculationRepository;
     private final GhanaTaxEngine taxEngine;
     private final AuditLogService auditLogService;
+    private final CloudinaryService cloudinaryService;
+    private final OcrService ocrService;
+    private final SpeechService speechService;
 
     public TransactionService(TransactionRepository transactionRepository,
             ImportHistoryRepository importHistoryRepository,
             TaxCalculationRepository taxCalculationRepository,
             GhanaTaxEngine taxEngine,
-            AuditLogService auditLogService) {
+            AuditLogService auditLogService,
+            CloudinaryService cloudinaryService,
+            OcrService ocrService,
+            SpeechService speechService) {
         this.transactionRepository = transactionRepository;
         this.importHistoryRepository = importHistoryRepository;
         this.taxCalculationRepository = taxCalculationRepository;
         this.taxEngine = taxEngine;
         this.auditLogService = auditLogService;
+        this.cloudinaryService = cloudinaryService;
+        this.ocrService = ocrService;
+        this.speechService = speechService;
     }
 
 
@@ -208,6 +221,107 @@ public class TransactionService {
                 });
         }
 
+        return response;
+    }
+
+    @Transactional
+    public ScanTransactionResponse scan(User user, MultipartFile image, String transactionType) {
+        String filename = image.getOriginalFilename() != null ? image.getOriginalFilename().toLowerCase() : "";
+        if (!filename.endsWith(".jpg") && !filename.endsWith(".jpeg") && !filename.endsWith(".png"))
+            throw new BadRequestException("Only JPG and PNG images are supported");
+        if (image.getSize() > MAX_IMAGE_SIZE)
+            throw new BadRequestException("Image size exceeds the 5MB limit");
+        if (!transactionType.equals("income") && !transactionType.equals("expense"))
+            throw new BadRequestException("transaction_type must be income or expense");
+
+        byte[] imageBytes;
+        try { imageBytes = image.getBytes(); } catch (Exception e) {
+            throw new BadRequestException("Could not read image file");
+        }
+
+        String mediaType = filename.endsWith(".png") ? "image/png" : "image/jpeg";
+        String receiptUrl = cloudinaryService.uploadFile(imageBytes, "receipts",
+            "receipt-" + user.getUserId() + "-" + System.currentTimeMillis());
+
+        OcrService.OcrResult ocr = ocrService.extractFromImage(imageBytes, mediaType);
+
+        Transaction t = new Transaction();
+        t.setUser(user);
+        t.setType(transactionType);
+        t.setAmount(ocr.amount);
+        t.setCategory(ocr.category);
+        t.setDescription(ocr.description);
+        t.setEntryMethod("scan");
+        t.setReceiptUrl(receiptUrl);
+        t.setTaxDeductible(false);
+        t.setWithholdingApplicable(false);
+        t.setWithholdingAmount(BigDecimal.ZERO);
+        t.setTransactionDate(ocr.transactionDate);
+        transactionRepository.save(t);
+        updateIncomeTaxCalculation(user);
+        auditLogService.log(user, "TRANSACTION_CREATED",
+            "Scan transaction " + t.getTransactionId() + " created via OCR. Amount: " + ocr.amount, null);
+
+        ScanTransactionResponse response = new ScanTransactionResponse();
+        response.setTransactionId(t.getTransactionId());
+        response.setType(t.getType());
+        response.setAmount(t.getAmount());
+        response.setCategory(t.getCategory());
+        response.setDescription(t.getDescription());
+        response.setEntryMethod("scan");
+        response.setReceiptUrl(receiptUrl);
+        response.setTaxDeductible(false);
+        response.setTransactionDate(t.getTransactionDate());
+        response.setOcrConfidence(ocr.confidence);
+        response.setNeedsReview(ocr.needsReview);
+        response.setTaxLiabilityUpdated(true);
+        return response;
+    }
+
+    @Transactional
+    public VoiceTransactionResponse voice(User user, MultipartFile audio, String language) {
+        String filename = audio.getOriginalFilename() != null ? audio.getOriginalFilename().toLowerCase() : "";
+        if (!filename.endsWith(".mp3") && !filename.endsWith(".wav") && !filename.endsWith(".m4a"))
+            throw new BadRequestException("Only MP3, WAV, and M4A formats are supported");
+        if (audio.getSize() > MAX_AUDIO_SIZE)
+            throw new BadRequestException("Audio file exceeds the 2MB limit");
+
+        byte[] audioBytes;
+        try { audioBytes = audio.getBytes(); } catch (Exception e) {
+            throw new BadRequestException("Could not read audio file");
+        }
+
+        SpeechService.SpeechResult speech = speechService.transcribe(audioBytes, language);
+
+        Transaction t = new Transaction();
+        t.setUser(user);
+        t.setType(speech.type);
+        t.setAmount(speech.amount);
+        t.setCategory(speech.category);
+        t.setDescription(speech.description);
+        t.setEntryMethod("voice");
+        t.setTaxDeductible(false);
+        t.setWithholdingApplicable(false);
+        t.setWithholdingAmount(BigDecimal.ZERO);
+        t.setTransactionDate(LocalDate.now());
+        transactionRepository.save(t);
+        updateIncomeTaxCalculation(user);
+        auditLogService.log(user, "TRANSACTION_CREATED",
+            "Voice transaction " + t.getTransactionId() + " created. Transcription: " + speech.transcription, null);
+
+        VoiceTransactionResponse response = new VoiceTransactionResponse();
+        response.setTransactionId(t.getTransactionId());
+        response.setType(t.getType());
+        response.setAmount(t.getAmount());
+        response.setCategory(t.getCategory());
+        response.setDescription(t.getDescription());
+        response.setEntryMethod("voice");
+        response.setTranscription(speech.transcription);
+        response.setTaxDeductible(false);
+        response.setTransactionDate(t.getTransactionDate());
+        response.setConfidence(speech.confidence);
+        response.setNeedsReview(speech.needsReview);
+        response.setTaxLiabilityUpdated(true);
         return response;
     }
 
