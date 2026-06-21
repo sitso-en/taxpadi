@@ -50,8 +50,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleUnreadable(HttpMessageNotReadableException ex) {
         log.warn("Malformed request body: {}", ex.getMessage());
+        String message = "Malformed or missing request body";
+        if (ex.getMessage() != null && ex.getMessage().contains("LocalDate")) {
+            message = "Invalid date format. Use YYYY-MM-DD (e.g. 2026-01-15)";
+        }
         return ResponseEntity.badRequest()
-                .body(new ApiResponse<>(false, null, "Malformed or missing request body"));
+                .body(new ApiResponse<>(false, null, message));
     }
 
     // Missing required query parameter — 400
