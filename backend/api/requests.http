@@ -16,6 +16,7 @@
 @deadlineId = paste-deadline-id-here
 @penaltyId = paste-penalty-id-here
 @certificateId = paste-certificate-id-here
+@paymentId = paste-payment-id-here
 
 
 
@@ -1446,3 +1447,175 @@ Authorization: Bearer {{accessToken}}
 ### 5. Get savings suggestion
 GET {{baseUrl}}/api/v1/vault/suggestion
 Authorization: Bearer {{accessToken}}
+
+###############################################
+### Group 5 — Subscriptions
+###############################################
+
+### 1. Get subscription status
+GET {{baseUrl}}/api/v1/subscriptions/status
+Authorization: Bearer {{accessToken}}
+
+### 2. Subscribe (MoMo monthly)
+POST {{baseUrl}}/api/v1/subscriptions/subscribe
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "plan": "monthly",
+  "payment_method": "momo",
+  "momo_number": "+233501234567"
+}
+
+### 3. Subscribe (annual, bank card)
+POST {{baseUrl}}/api/v1/subscriptions/subscribe
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "plan": "annual",
+  "payment_method": "bank_card"
+}
+
+### 4. Cancel subscription
+POST {{baseUrl}}/api/v1/subscriptions/cancel
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "reason": "No longer needed"
+}
+
+###############################################
+### Group 6 — Tax Profile
+###############################################
+
+### 1. Get tax profile
+GET {{baseUrl}}/api/v1/tax-profile
+Authorization: Bearer {{accessToken}}
+
+### 2. Update tax profile
+PUT {{baseUrl}}/api/v1/tax-profile
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "vat_registration_no": "VAT-0012345",
+  "nhil_registered": true
+}
+
+### 3. Complete onboarding
+POST {{baseUrl}}/api/v1/tax-profile/complete-onboarding
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "tax_year_start": "2026-01-01",
+  "tin": "P000123456789"
+}
+
+###############################################
+### Group 17 — Payments
+###############################################
+
+### 1. Get payment history
+GET {{baseUrl}}/api/v1/payments?page=1
+Authorization: Bearer {{accessToken}}
+
+### 2. Get payment history (filtered by status)
+GET {{baseUrl}}/api/v1/payments?status=successful&page=1
+Authorization: Bearer {{accessToken}}
+
+### 3. Initiate payment for a tax return (MoMo)
+POST {{baseUrl}}/api/v1/payments/initiate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "return_id": "{{returnId}}",
+  "amount": 250.00,
+  "payment_method": "momo",
+  "momo_number": "+233501234567",
+  "momo_provider": "mtn"
+}
+
+### 4. Initiate payment for a penalty (MoMo)
+POST {{baseUrl}}/api/v1/payments/initiate
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "penalty_id": "{{penaltyId}}",
+  "amount": 200.00,
+  "payment_method": "momo",
+  "momo_number": "+233501234567",
+  "momo_provider": "mtn"
+}
+
+### 5. Get payment by ID
+GET {{baseUrl}}/api/v1/payments/{{paymentId}}
+Authorization: Bearer {{accessToken}}
+
+### 6. Confirm payment (successful)
+POST {{baseUrl}}/api/v1/payments/{{paymentId}}/confirm
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "payment_reference": "MOMO-REF-ABC123456",
+  "status": "successful"
+}
+
+### 7. Confirm payment (failed)
+POST {{baseUrl}}/api/v1/payments/{{paymentId}}/confirm
+Authorization: Bearer {{accessToken}}
+Content-Type: application/json
+
+{
+  "payment_reference": "MOMO-REF-ABC123456",
+  "status": "failed"
+}
+
+### 8. Get payment status
+GET {{baseUrl}}/api/v1/payments/{{paymentId}}/status
+Authorization: Bearer {{accessToken}}
+
+### 9. Get payment certificate
+GET {{baseUrl}}/api/v1/payments/{{paymentId}}/certificate
+Authorization: Bearer {{accessToken}}
+
+######################################
+# Group 8 — Transactions (scan/voice)
+######################################
+
+### Scan receipt (POST /transactions/scan)
+POST {{baseUrl}}/api/v1/transactions/scan
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="image"; filename="receipt.jpg"
+Content-Type: image/jpeg
+
+< ./test-receipt.jpg
+--boundary
+Content-Disposition: form-data; name="transaction_type"
+
+expense
+--boundary--
+
+### Voice transaction (POST /transactions/voice)
+POST {{baseUrl}}/api/v1/transactions/voice
+Authorization: Bearer {{accessToken}}
+Content-Type: multipart/form-data; boundary=boundary
+
+--boundary
+Content-Disposition: form-data; name="audio"; filename="transaction.mp3"
+Content-Type: audio/mpeg
+
+< ./test-audio.mp3
+--boundary
+Content-Disposition: form-data; name="language"
+
+en
+--boundary--
