@@ -6,9 +6,12 @@ import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.TaxCalculationService;
 import com.taxpadi.api.service.TaxRateService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/v1/tax")
@@ -24,10 +27,12 @@ public class TaxCalculationController {
 
     @GetMapping("/liability")
     public ResponseEntity<ApiResponse<TaxLiabilityResponse>> getLiability(
-            @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
-            taxCalculationService.getLiability(user),
+            taxCalculationService.getLiability(user, from, to),
             "Tax liability retrieved successfully."));
     }
 
