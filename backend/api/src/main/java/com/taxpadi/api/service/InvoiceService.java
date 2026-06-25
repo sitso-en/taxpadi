@@ -3,7 +3,9 @@ package com.taxpadi.api.service;
 import com.taxpadi.api.dto.common.PaginationInfo;
 import com.taxpadi.api.dto.invoice.*;
 import com.taxpadi.api.dto.transaction.VaultSuggestion;
+import com.taxpadi.api.constant.InvoiceStatus;
 import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.constant.InvoiceStatus;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.Invoice;
 import com.taxpadi.api.model.NotificationType;
@@ -83,13 +85,13 @@ public class InvoiceService {
     public InvoiceStatsResponse getStats(User user) {
         LocalDate today = LocalDate.now();
         BigDecimal totalPaid = invoiceRepository.sumTotalAmountByUserAndStatus(user, "paid");
-        BigDecimal totalOutstanding = invoiceRepository.sumTotalAmountByUserAndStatus(user, "unpaid");
+        BigDecimal totalOutstanding = invoiceRepository.sumTotalAmountByUserAndStatus(user, InvoiceStatus.UNPAID);
         BigDecimal totalInvoiced = totalPaid.add(totalOutstanding);
         BigDecimal totalOverdue = invoiceRepository.sumOverdueByUser(user, today);
 
         long countPaid = invoiceRepository.countByUserAndStatus(user, "paid");
-        long countUnpaid = invoiceRepository.countByUserAndStatus(user, "unpaid");
-        long countCancelled = invoiceRepository.countByUserAndStatus(user, "cancelled");
+        long countUnpaid = invoiceRepository.countByUserAndStatus(user, InvoiceStatus.UNPAID);
+        long countCancelled = invoiceRepository.countByUserAndStatus(user, InvoiceStatus.CANCELLED);
         long countOverdue = invoiceRepository.countOverdueByUser(user, today);
         long countTotal = countPaid + countUnpaid + countCancelled;
 
@@ -156,7 +158,7 @@ public class InvoiceService {
     public UpdateInvoiceResponse update(User user, UUID id, UpdateInvoiceRequest request) {
         Invoice invoice = invoiceRepository.findByInvoiceIdAndUser(id, user)
             .orElseThrow(() -> new NotFoundException("Invoice not found"));
-        if (!"unpaid".equals(invoice.getStatus())) {
+        if (!InvoiceStatus.UNPAID.equals(invoice.getStatus())) {
             throw new BadRequestException("Only unpaid invoices can be edited");
         }
 
@@ -199,11 +201,11 @@ public class InvoiceService {
     public MarkPaidResponse markPaid(User user, UUID id, MarkPaidRequest request) {
         Invoice invoice = invoiceRepository.findByInvoiceIdAndUser(id, user)
             .orElseThrow(() -> new NotFoundException("Invoice not found"));
-        if (!"unpaid".equals(invoice.getStatus())) {
+        if (!InvoiceStatus.UNPAID.equals(invoice.getStatus())) {
             throw new BadRequestException("Only unpaid invoices can be marked as paid");
         }
 
-        LocalDateTime paidAt = (request != null && request.getPaidAt() != null)
+        LocalDateTime paidAt = (request != null && request.getPaidAt() != null && !request.getPaidAt().isBlank())
             ? LocalDateTime.parse(request.getPaidAt())
             : LocalDateTime.now();
 
@@ -217,7 +219,7 @@ public class InvoiceService {
         tx.setTransactionDate(paidAt.toLocalDate());
         tx = transactionRepository.save(tx);
 
-        invoice.setStatus("paid");
+        invoice.setStatus(InvoiceStatus.PAID);
         invoice.setPaidAt(paidAt);
         invoice.setTransaction(tx);
         invoiceRepository.save(invoice);
@@ -232,7 +234,7 @@ public class InvoiceService {
         MarkPaidResponse response = new MarkPaidResponse();
         response.setInvoiceId(invoice.getInvoiceId());
         response.setInvoiceRef(invoice.getInvoiceRef());
-        response.setStatus("paid");
+        response.setStatus(InvoiceStatus.PAID);
         response.setPaidAt(paidAt);
         response.setTransactionCreated(true);
         response.setTransactionId(tx.getTransactionId());
@@ -245,11 +247,11 @@ public class InvoiceService {
     public CancelInvoiceResponse cancel(User user, UUID id, CancelInvoiceRequest request) {
         Invoice invoice = invoiceRepository.findByInvoiceIdAndUser(id, user)
             .orElseThrow(() -> new NotFoundException("Invoice not found"));
-        if (!"unpaid".equals(invoice.getStatus())) {
+        if (!InvoiceStatus.UNPAID.equals(invoice.getStatus())) {
             throw new BadRequestException("Only unpaid invoices can be cancelled");
         }
 
-        invoice.setStatus("cancelled");
+        invoice.setStatus(InvoiceStatus.CANCELLED);
         invoice.setCancelledAt(LocalDateTime.now());
         if (request != null && request.getReason() != null) {
             invoice.setCancelReason(request.getReason());
@@ -259,7 +261,7 @@ public class InvoiceService {
         CancelInvoiceResponse response = new CancelInvoiceResponse();
         response.setInvoiceId(invoice.getInvoiceId());
         response.setInvoiceRef(invoice.getInvoiceRef());
-        response.setStatus("cancelled");
+        response.setStatus(InvoiceStatus.CANCELLED);
         response.setCancelledAt(invoice.getCancelledAt());
         return response;
     }
@@ -317,6 +319,7 @@ public class InvoiceService {
                 invoice.getClientName(),
                 invoice.getInvoiceRef(),
                 invoice.getTotalAmount().toPlainString(),
+                invoice.getDueDate() != null ? invoice.getDueDate().toString() : null,
                 baseUrl + "/api/v1/invoices/" + invoice.getInvoiceId() + "/pdf/download",
                 user.getFullName(),
                 user.getEmail()
@@ -380,15 +383,18 @@ public class InvoiceService {
 
     private String generateAndUploadPdf(Invoice invoice) {
         byte[] pdfBytes = pdfService.generateInvoicePdf(invoice);
-        return cloudinaryService.uploadPdf(pdfBytes, "invoices/" + invoice.getInvoiceRef() + ".pdf");
+        return cloudinaryService.uploadPdf(pdfBytes, "invoices/" + invoice.getInvoiceRef());
     }
 
     private byte[] fetchPdfBytes(Invoice invoice) {
+        if (invoice.getPdfUrl() == null || invoice.getPdfUrl().isBlank()) {
+            throw new RuntimeException("PDF_NOT_AVAILABLE");
+        }
         try {
             java.net.URL url = new java.net.URI(invoice.getPdfUrl()).toURL();
             return url.openStream().readAllBytes();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch PDF: " + e.getMessage());
+            throw new RuntimeException("PDF_NOT_AVAILABLE");
         }
     }
 
