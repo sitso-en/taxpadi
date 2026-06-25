@@ -1,20 +1,27 @@
 package com.taxpadi.api.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import com.taxpadi.api.model.SavingsVault;
-import com.taxpadi.api.model.User;
-import com.taxpadi.api.repository.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Optional;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.taxpadi.api.model.SavingsVault;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.repository.AuditLogRepository;
+import com.taxpadi.api.repository.InvoiceRepository;
+import com.taxpadi.api.repository.SavingsVaultRepository;
+import com.taxpadi.api.repository.TaxCalculationRepository;
+import com.taxpadi.api.repository.TaxReturnRepository;
+import com.taxpadi.api.repository.TransactionRepository;
+import com.taxpadi.api.repository.VatRecordRepository;
+import com.taxpadi.api.repository.VaultTransactionRepository;
 
 @Service
 public class DataExportService {

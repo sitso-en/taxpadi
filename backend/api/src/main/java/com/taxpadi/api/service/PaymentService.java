@@ -23,9 +23,16 @@ import com.taxpadi.api.exception.ForbiddenException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.ComplianceCertificate;
 import com.taxpadi.api.model.Payment;
+import com.taxpadi.api.constant.PenaltyStatus;
+import com.taxpadi.api.model.NotificationType;
 import com.taxpadi.api.model.Penalty;
 import com.taxpadi.api.model.TaxReturn;
 import com.taxpadi.api.model.User;
+import com.taxpadi.api.constant.CertificateStatus;
+import com.taxpadi.api.constant.PaymentMethod;
+import com.taxpadi.api.constant.PaymentStatus;
+import com.taxpadi.api.constant.SubscriptionPlan;
+import com.taxpadi.api.constant.SubscriptionStatus;
 import com.taxpadi.api.model.Subscription;
 import com.taxpadi.api.model.SubscriptionTier;
 import com.taxpadi.api.repository.ComplianceCertificateRepository;
@@ -40,9 +47,13 @@ import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.criteria.Predicate;
+import org.springframework.data.jpa.domain.Specification;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +71,7 @@ public class PaymentService {
     private final PaystackService paystackService;
     private final SubscriptionRepository subscriptionRepository;
     private final UserRepository userRepository;
+    private final NotificationService notificationService;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PaymentService(PaymentRepository paymentRepository,
@@ -68,7 +80,8 @@ public class PaymentService {
                           ComplianceCertificateRepository certificateRepository,
                           PaystackService paystackService,
                           SubscriptionRepository subscriptionRepository,
-                          UserRepository userRepository) {
+                          UserRepository userRepository,
+                          NotificationService notificationService) {
         this.paymentRepository = paymentRepository;
         this.taxReturnRepository = taxReturnRepository;
         this.penaltyRepository = penaltyRepository;
@@ -76,6 +89,7 @@ public class PaymentService {
         this.paystackService = paystackService;
         this.subscriptionRepository = subscriptionRepository;
         this.userRepository = userRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -87,17 +101,27 @@ public class PaymentService {
         LocalDateTime from = dateFrom != null ? LocalDate.parse(dateFrom).atStartOfDay() : null;
         LocalDateTime to = dateTo != null ? LocalDate.parse(dateTo).atTime(23, 59, 59) : null;
 
+        Specification<Payment> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.equal(root.get("user"), user));
+            if (status != null) predicates.add(cb.equal(root.get("status"), status));
+            if (method != null) predicates.add(cb.equal(root.get("paymentMethod"), method));
+            if (from != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from));
+            if (to != null) predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), to));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+
         PageRequest pageable = PageRequest.of(pageIndex, limit, Sort.by(Sort.Direction.DESC, "createdAt"));
-        Page<Payment> paymentsPage = paymentRepository.findFiltered(user, status, method, from, to, pageable);
+        Page<Payment> paymentsPage = paymentRepository.findAll(spec, pageable);
 
         List<PaymentListItem> items = paymentsPage.getContent().stream()
                 .map(this::toListItem)
                 .collect(Collectors.toList());
 
         PaymentSummary summary = new PaymentSummary();
-        summary.setTotalPaid(paymentRepository.sumByUserAndStatus(user, "successful"));
-        summary.setTotalPending(paymentRepository.sumByUserAndStatus(user, "pending"));
-        summary.setTotalFailed(paymentRepository.sumByUserAndStatus(user, "failed"));
+        summary.setTotalPaid(paymentRepository.sumByUserAndStatus(user, PaymentStatus.SUCCESSFUL));
+        summary.setTotalPending(paymentRepository.sumByUserAndStatus(user, PaymentStatus.PENDING));
+        summary.setTotalFailed(paymentRepository.sumByUserAndStatus(user, PaymentStatus.FAILED));
 
         PaymentListResponse response = new PaymentListResponse();
         response.setPayments(items);
@@ -120,11 +144,11 @@ public class PaymentService {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0)
             throw new BadRequestException("amount is required and must be greater than 0");
 
-        List<String> validMethods = Arrays.asList("momo", "bank_card", "ussd", "vault");
+        List<String> validMethods = Arrays.asList(PaymentMethod.MOMO, PaymentMethod.BANK_CARD, PaymentMethod.USSD, PaymentMethod.VAULT);
         if (paymentMethod == null || !validMethods.contains(paymentMethod))
             throw new BadRequestException("payment_method must be one of: momo, bank_card, ussd, vault");
 
-        if ("momo".equals(paymentMethod)) {
+        if (PaymentMethod.MOMO.equals(paymentMethod)) {
             if (request.getMomoNumber() == null || request.getMomoNumber().isBlank())
                 throw new BadRequestException("momo_number is required for momo payment");
             List<String> validProviders = Arrays.asList("mtn", "telecel", "airteltigo");
@@ -138,14 +162,14 @@ public class PaymentService {
         if (returnId != null) {
             taxReturn = taxReturnRepository.findById(returnId)
                     .orElseThrow(() -> new NotFoundException("Tax return not found"));
-            if (paymentRepository.existsByTaxReturnAndStatus(taxReturn, "successful"))
+            if (paymentRepository.existsByTaxReturnAndStatus(taxReturn, PaymentStatus.SUCCESSFUL))
                 throw new ConflictException("This tax return has already been paid");
         }
 
         if (penaltyId != null) {
             penalty = penaltyRepository.findById(penaltyId)
                     .orElseThrow(() -> new NotFoundException("Penalty not found"));
-            if (paymentRepository.existsByPenaltyAndStatus(penalty, "successful"))
+            if (paymentRepository.existsByPenaltyAndStatus(penalty, PaymentStatus.SUCCESSFUL))
                 throw new ConflictException("This penalty has already been paid");
         }
 
@@ -161,17 +185,17 @@ public class PaymentService {
         payment.setMomoNumber(request.getMomoNumber());
         payment.setMomoProvider(request.getMomoProvider());
         payment.setPaymentReference(reference);
-        payment.setStatus("pending");
+        payment.setStatus(PaymentStatus.PENDING);
         payment.setExpiresAt(LocalDateTime.now().plusSeconds(600));
         Payment saved = paymentRepository.save(payment);
 
         // Call Paystack (skip for vault — internal deduction)
         String authorizationUrl = null;
-        if (!"vault".equals(paymentMethod)) {
+        if (!PaymentMethod.VAULT.equals(paymentMethod)) {
             List<String> channels = switch (paymentMethod) {
-                case "momo" -> List.of("mobile_money");
-                case "bank_card" -> List.of("card");
-                case "ussd" -> List.of("ussd");
+                case PaymentMethod.MOMO -> List.of("mobile_money");
+                case PaymentMethod.BANK_CARD -> List.of("card");
+                case PaymentMethod.USSD -> List.of(PaymentMethod.USSD);
                 default -> List.of("mobile_money", "card");
             };
             PaystackInitResult init = paystackService.initialize(user.getEmail(), amount, reference, channels);
@@ -182,10 +206,10 @@ public class PaymentService {
         response.setPaymentId(saved.getPaymentId());
         response.setAmount(saved.getAmount());
         response.setPaymentMethod(saved.getPaymentMethod());
-        response.setStatus("pending");
+        response.setStatus(PaymentStatus.PENDING);
         response.setPaymentReference(reference);
         response.setAuthorizationUrl(authorizationUrl);
-        response.setMessage("vault".equals(paymentMethod)
+        response.setMessage(PaymentMethod.VAULT.equals(paymentMethod)
                 ? "Payment initiated from your savings vault."
                 : "Redirect the user to the authorization URL to complete payment.");
         return response;
@@ -217,7 +241,7 @@ public class PaymentService {
         Payment payment = paymentRepository.findByPaymentIdAndUser(paymentId, user)
                 .orElseThrow(() -> new NotFoundException("No payment found with this ID"));
 
-        if (!"pending".equals(payment.getStatus()))
+        if (!PaymentStatus.PENDING.equals(payment.getStatus()))
             throw new BadRequestException("Only pending payments can be confirmed");
 
         String reference = request.getPaymentReference();
@@ -229,7 +253,7 @@ public class PaymentService {
         boolean certificateGenerated = false;
         LinkedCertificateInfo certInfo = null;
 
-        if ("successful".equals(status)) {
+        if (PaymentStatus.SUCCESSFUL.equals(status)) {
             payment.setPaidAt(LocalDateTime.now());
             paymentRepository.save(payment);
 
@@ -241,7 +265,7 @@ public class PaymentService {
             cert.setUser(user);
             cert.setCertificateNumber(certNumber);
             cert.setCertificateType(certType);
-            cert.setStatus("ISSUED");
+            cert.setStatus(CertificateStatus.ISSUED);
             cert.setIssueDate(LocalDate.now());
             cert.setExpiryDate(LocalDate.now().plusYears(1));
             cert.setIssuedBy("Ghana Revenue Authority");
@@ -251,10 +275,29 @@ public class PaymentService {
             payment.setCertificate(savedCert);
             paymentRepository.save(payment);
 
+            // Auto-resolve linked penalty
+            if (payment.getPenalty() != null) {
+                Penalty penalty = payment.getPenalty();
+                penalty.setStatus(PenaltyStatus.PAID);
+                penalty.setPaidAt(LocalDateTime.now());
+                penaltyRepository.save(penalty);
+            }
+
             certInfo = new LinkedCertificateInfo();
             certInfo.setCertificateId(savedCert.getCertificateId());
             certInfo.setDocumentRef(savedCert.getCertificateNumber());
             certificateGenerated = true;
+
+            notificationService.send(user,
+                "Payment Confirmed",
+                "Your payment of GHS " + payment.getAmount() + " was successful.",
+                NotificationType.PAYMENT,
+                "/payments/" + paymentId);
+            notificationService.send(user,
+                "Compliance Certificate Issued",
+                "Your compliance certificate " + savedCert.getCertificateNumber() + " is ready to download.",
+                NotificationType.SYSTEM,
+                "/certificates/" + savedCert.getCertificateId());
         } else {
             paymentRepository.save(payment);
         }
@@ -275,9 +318,9 @@ public class PaymentService {
                 .orElseThrow(() -> new NotFoundException("No payment found with this ID"));
 
         String statusMessage = switch (payment.getStatus()) {
-            case "pending" -> "Your payment is still being processed.";
-            case "successful" -> "Your payment was successful.";
-            case "failed" -> "Your payment failed. Please try again.";
+            case PaymentStatus.PENDING -> "Your payment is still being processed.";
+            case PaymentStatus.SUCCESSFUL -> "Your payment was successful.";
+            case PaymentStatus.FAILED -> "Your payment failed. Please try again.";
             default -> "Unknown payment status.";
         };
 
@@ -391,13 +434,13 @@ public class PaymentService {
                 String reference = (String) data.get("reference");
 
                 paymentRepository.findByPaymentReference(reference).ifPresent(payment -> {
-                    if ("pending".equals(payment.getStatus())) {
+                    if (PaymentStatus.PENDING.equals(payment.getStatus())) {
                         confirmSuccessful(payment);
                     }
                 });
 
                 subscriptionRepository.findByPaymentReference(reference).ifPresent(sub -> {
-                    if ("pending".equals(sub.getStatus())) {
+                    if (SubscriptionStatus.PENDING.equals(sub.getStatus())) {
                         activateSubscription(sub);
                     }
                 });
@@ -410,9 +453,17 @@ public class PaymentService {
     }
 
     private void confirmSuccessful(Payment payment) {
-        payment.setStatus("successful");
+        payment.setStatus(PaymentStatus.SUCCESSFUL);
         payment.setPaidAt(LocalDateTime.now());
         paymentRepository.save(payment);
+
+        // Auto-resolve the linked penalty when payment succeeds
+        if (payment.getPenalty() != null) {
+            Penalty penalty = payment.getPenalty();
+            penalty.setStatus(PenaltyStatus.PAID);
+            penalty.setPaidAt(LocalDateTime.now());
+            penaltyRepository.save(penalty);
+        }
 
         String certNumber = "TXPD-" + LocalDate.now().getYear() + "-" +
                 String.format("%05d", new Random().nextInt(99999));
@@ -421,7 +472,7 @@ public class PaymentService {
         cert.setUser(payment.getUser());
         cert.setCertificateNumber(certNumber);
         cert.setCertificateType(resolveCertType(payment));
-        cert.setStatus("ISSUED");
+        cert.setStatus(CertificateStatus.ISSUED);
         cert.setIssueDate(LocalDate.now());
         cert.setExpiryDate(LocalDate.now().plusYears(1));
         cert.setIssuedBy("Ghana Revenue Authority");
@@ -430,19 +481,38 @@ public class PaymentService {
 
         payment.setCertificate(savedCert);
         paymentRepository.save(payment);
+
+        notificationService.send(payment.getUser(),
+            "Payment Confirmed",
+            "Your payment of GHS " + payment.getAmount() + " was successful.",
+            NotificationType.PAYMENT,
+            "/payments/" + payment.getPaymentId());
+        notificationService.send(payment.getUser(),
+            "Compliance Certificate Issued",
+            "Your compliance certificate " + savedCert.getCertificateNumber() + " is ready to download.",
+            NotificationType.SYSTEM,
+            "/certificates/" + savedCert.getCertificateId());
     }
 
     private void activateSubscription(Subscription sub) {
         LocalDateTime now = LocalDateTime.now();
-        sub.setStatus("active");
+        sub.setStatus(SubscriptionStatus.ACTIVE);
         sub.setSubscriptionTier(SubscriptionTier.PAID);
         sub.setStartedAt(now);
-        sub.setExpiresAt("monthly".equals(sub.getPlan()) ? now.plusMonths(1) : now.plusYears(1));
+        LocalDateTime expiresAt = SubscriptionPlan.MONTHLY.equals(sub.getPlan()) ? now.plusMonths(1) : now.plusYears(1);
+        sub.setExpiresAt(expiresAt);
         subscriptionRepository.save(sub);
 
         User user = sub.getUser();
         user.setSubscriptionTier(SubscriptionTier.PAID);
         userRepository.save(user);
+
+        String plan = SubscriptionPlan.MONTHLY.equals(sub.getPlan()) ? "monthly" : "annual";
+        notificationService.send(user,
+            "Subscription Activated",
+            "Your TaxPadi " + plan + " plan is now active. Enjoy full access until " + expiresAt.toLocalDate() + ".",
+            NotificationType.SYSTEM,
+            "/subscription");
     }
 
     private String resolveCertType(Payment payment) {

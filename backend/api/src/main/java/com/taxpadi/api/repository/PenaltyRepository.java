@@ -13,6 +13,7 @@ import java.util.UUID;
 public interface PenaltyRepository extends JpaRepository<Penalty, UUID> {
     List<Penalty> findByUser(User user);
     List<Penalty> findByUserAndStatus(User user, String status);
+    boolean existsByUserAndTaxTypeAndStatus(User user, String taxType, String status);
     @Query("SELECT COALESCE(SUM(p.penaltyAmount), 0) FROM Penalty p WHERE p.user = :user AND p.status = 'OUTSTANDING'")
     BigDecimal sumOutstandingByUser(@Param("user") User user);
 }

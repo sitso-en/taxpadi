@@ -95,6 +95,13 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         @Param("to") LocalDate to
     );
 
+    @Query("SELECT t FROM Transaction t WHERE t.user = :user AND t.transactionDate >= :from AND t.transactionDate <= :to ORDER BY t.transactionDate DESC")
+    List<Transaction> findAllByUserAndDateRange(
+        @Param("user") User user,
+        @Param("from") LocalDate from,
+        @Param("to") LocalDate to
+    );
+
     @Query("SELECT COUNT(t) FROM Transaction t WHERE t.user = :user AND t.transactionDate >= :from AND t.transactionDate <= :to")
     long countByUserAndDateRange(
         @Param("user") User user,
@@ -109,4 +116,14 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
     );
 
     Optional<Transaction> findTopByUserAndTypeOrderByTransactionDateDesc(User user, String type);
+
+    @Query("SELECT DISTINCT EXTRACT(YEAR FROM t.transactionDate) FROM Transaction t WHERE t.user = :user ORDER BY 1")
+    List<Integer> findDistinctYearsByUser(@Param("user") User user);
+
+    @Query("SELECT SUM(t.withholdingAmount) FROM Transaction t WHERE t.user = :user AND t.withholdingApplicable = true AND t.transactionDate >= :from AND t.transactionDate <= :to")
+    BigDecimal sumWithholdingByUserAndDateRange(
+        @Param("user") User user,
+        @Param("from") LocalDate from,
+        @Param("to") LocalDate to
+    );
 }

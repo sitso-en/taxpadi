@@ -1,9 +1,32 @@
 package com.taxpadi.api.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.taxpadi.api.constant.VaultTransactionStatus;
 import com.taxpadi.api.dto.common.PaginationInfo;
-import com.taxpadi.api.dto.vault.*;
+import com.taxpadi.api.dto.vault.ContributeRequest;
+import com.taxpadi.api.dto.vault.ContributeResponse;
+import com.taxpadi.api.dto.vault.LinkMomoRequest;
+import com.taxpadi.api.dto.vault.LinkMomoResponse;
+import com.taxpadi.api.dto.vault.VaultDto;
+import com.taxpadi.api.dto.vault.VaultSuggestionBasedOn;
+import com.taxpadi.api.dto.vault.VaultSuggestionDto;
+import com.taxpadi.api.dto.vault.VaultTarget;
+import com.taxpadi.api.dto.vault.VaultTransactionDto;
+import com.taxpadi.api.dto.vault.VaultTransactionsResponse;
+import com.taxpadi.api.dto.vault.VaultTxnSummary;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.model.NotificationType;
 import com.taxpadi.api.model.SavingsVault;
 import com.taxpadi.api.model.Transaction;
 import com.taxpadi.api.model.User;
@@ -11,16 +34,6 @@ import com.taxpadi.api.model.VaultTransaction;
 import com.taxpadi.api.repository.SavingsVaultRepository;
 import com.taxpadi.api.repository.TransactionRepository;
 import com.taxpadi.api.repository.VaultTransactionRepository;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.util.List;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class SavingsVaultService {
@@ -28,15 +41,19 @@ public class SavingsVaultService {
     private final SavingsVaultRepository vaultRepo;
     private final VaultTransactionRepository txnRepo;
     private final TransactionRepository transactionRepo;
+    private final NotificationService notificationService;
 
     public SavingsVaultService(SavingsVaultRepository vaultRepo,
                                 VaultTransactionRepository txnRepo,
-                                TransactionRepository transactionRepo) {
+                                TransactionRepository transactionRepo,
+                                NotificationService notificationService) {
         this.vaultRepo = vaultRepo;
         this.txnRepo = txnRepo;
         this.transactionRepo = transactionRepo;
+        this.notificationService = notificationService;
     }
 
+    @Transactional
     public VaultDto getVault(User user) {
         SavingsVault vault = requireVault(user);
         return toVaultDto(vault);
@@ -71,7 +88,7 @@ public class SavingsVaultService {
         txn.setAmount(request.getAmount());
         txn.setBalanceAfter(vault.getBalance().add(request.getAmount()));
         txn.setTrigger(request.getTrigger().toUpperCase());
-        txn.setStatus("PENDING");
+        txn.setStatus(VaultTransactionStatus.PENDING);
         txn.setDescription("Vault contribution via MoMo");
         txn.setReference("VLT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         txnRepo.save(txn);
@@ -80,7 +97,7 @@ public class SavingsVaultService {
         resp.setVaultTransactionId(txn.getTransactionId());
         resp.setAmount(request.getAmount());
         resp.setTrigger(txn.getTrigger());
-        resp.setStatus("PENDING");
+        resp.setStatus(VaultTransactionStatus.PENDING);
         resp.setMomoPromptSent(true);
         resp.setMessage("A payment prompt of GHS " + request.getAmount() + " has been sent. Please approve it.");
         resp.setNewBalanceOnConfirmation(txn.getBalanceAfter());
@@ -135,14 +152,30 @@ public class SavingsVaultService {
         VaultSuggestionDto dto = new VaultSuggestionDto();
         dto.setSuggestedAmount(suggested);
         dto.setBasedOn(basedOn);
-        dto.setMessage("Based on your latest income of GHS " + latestIncome +
-                " we suggest saving GHS " + suggested + " toward your tax bill.");
+        String message = "Based on your latest income of GHS " + latestIncome +
+                " we suggest saving GHS " + suggested + " toward your tax bill.";
+        dto.setMessage(message);
+
+        if (suggested.compareTo(BigDecimal.ZERO) > 0) {
+            notificationService.send(user,
+                "Tax Savings Suggestion",
+                message,
+                NotificationType.VAULT,
+                "/vault");
+        }
         return dto;
     }
 
     private SavingsVault requireVault(User user) {
-        return vaultRepo.findByUser(user)
-                .orElseThrow(() -> new NotFoundException("Vault not found for this user."));
+        return vaultRepo.findByUser(user).orElseGet(() -> {
+            SavingsVault vault = new SavingsVault();
+            vault.setUser(user);
+            vault.setVaultName("Tax Savings Vault");
+            vault.setBalance(BigDecimal.ZERO);
+            vault.setTargetAmount(BigDecimal.ZERO);
+            vault.setAutoSaveAmount(BigDecimal.ZERO);
+            return vaultRepo.save(vault);
+        });
     }
 
     private VaultDto toVaultDto(SavingsVault v) {

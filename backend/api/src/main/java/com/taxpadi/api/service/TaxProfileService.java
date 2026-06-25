@@ -107,7 +107,10 @@ public class TaxProfileService {
         dto.setPayeRegistered(p.getPayeRegistered());
         dto.setNhilRegistered(p.getNhilRegistered());
         dto.setTaxYearStart(p.getTaxYearStart());
-        dto.setOnboardingComplete(p.getOnboardingComplete());
+        User user = p.getUser();
+        boolean onboardingComplete = Boolean.TRUE.equals(p.getOnboardingComplete())
+                || (user.getTin() != null && !user.getTin().isBlank() && p.getTaxYearStart() != null);
+        dto.setOnboardingComplete(onboardingComplete);
         dto.setCreatedAt(p.getCreatedAt());
         dto.setUpdatedAt(p.getUpdatedAt());
         return dto;

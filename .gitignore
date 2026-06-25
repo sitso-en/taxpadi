@@ -56,3 +56,13 @@ CLAUDE.md
 .claude/
 
 google-services.json
+
+
+CBG-bank-statement.csv
+TaxPadi API-documentation.html
+docs/refactor1.md
+docs/refactor2.md
+docs/refactor3.md
+run.sh
+taxpadi-api.json
+test-statement-100.csv

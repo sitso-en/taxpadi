@@ -6,6 +6,7 @@ import com.taxpadi.api.model.Invoice;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.InvoiceService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -107,14 +108,15 @@ public class InvoiceController {
     }
 
     @GetMapping("/{id}/pdf/download")
-    public ResponseEntity<byte[]> downloadPdf(@PathVariable UUID id) {
+    public ResponseEntity<Void> downloadPdf(@PathVariable UUID id) {
         Invoice invoice = invoiceService.getInvoiceForDownload(id);
-        byte[] pdf = invoiceService.downloadPdfPublic(id);
-        String filename = invoice.getInvoiceRef() + ".pdf";
-        return ResponseEntity.ok()
-            .header("Content-Type", "application/pdf")
-            .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
-            .body(pdf);
+        String pdfUrl = invoice.getPdfUrl();
+        if (pdfUrl == null || pdfUrl.isBlank()) {
+            throw new RuntimeException("PDF_NOT_AVAILABLE");
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+            .header("Location", pdfUrl)
+            .build();
     }
 
     @PostMapping("/{id}/send")

@@ -9,6 +9,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taxpadi.api.constant.VatReturnStatus;
 import com.taxpadi.api.dto.vat.VatRecordDto;
 import com.taxpadi.api.dto.vat.VatRegisterRequest;
 import com.taxpadi.api.dto.vat.VatRegisterResponse;
@@ -90,7 +91,7 @@ public class VatService {
         record.setTotalPurchases(request.getTotalPurchases());
         record.setInputVat(request.getInputVat());
         record.setNetVatLiability(netLiability);
-        record.setReturnStatus("PENDING");
+        record.setReturnStatus(VatReturnStatus.PENDING);
         record.setDueDate(dueDate);
 
         vatRecordRepository.save(record);
@@ -99,7 +100,7 @@ public class VatService {
             month, year,
             record.getTotalSales(), outputVat,
             record.getTotalPurchases(), record.getInputVat(),
-            netLiability, EFFECTIVE_RATE, "PENDING", dueDate
+            netLiability, EFFECTIVE_RATE, VatReturnStatus.PENDING, dueDate
         );
     }
 

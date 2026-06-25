@@ -1,18 +1,20 @@
 package com.taxpadi.api.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.taxpadi.api.exception.BadRequestException;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-
-import javax.crypto.Mac;
-import javax.crypto.spec.SecretKeySpec;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+
+import javax.crypto.Mac;
+import javax.crypto.spec.SecretKeySpec;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taxpadi.api.exception.BadRequestException;
 
 @Service
 public class PaystackService {

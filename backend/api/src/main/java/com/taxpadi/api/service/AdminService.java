@@ -7,15 +7,19 @@ import com.taxpadi.api.exception.ConflictException;
 import com.taxpadi.api.exception.ForbiddenException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.*;
+import com.taxpadi.api.model.NotificationType;
 import com.taxpadi.api.repository.*;
+import jakarta.persistence.criteria.Predicate;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -32,6 +36,7 @@ public class AdminService {
     private final AuditLogRepository auditLogRepository;
     private final PartnerRepository partnerRepository;
     private final BCryptPasswordEncoder passwordEncoder;
+    private final NotificationService notificationService;
 
     public AdminService(UserRepository userRepository,
                         UserTaxProfileRepository userTaxProfileRepository,
@@ -40,7 +45,8 @@ public class AdminService {
                         ReferralOfferRepository referralOfferRepository,
                         AuditLogRepository auditLogRepository,
                         PartnerRepository partnerRepository,
-                        BCryptPasswordEncoder passwordEncoder) {
+                        BCryptPasswordEncoder passwordEncoder,
+                        NotificationService notificationService) {
         this.userRepository = userRepository;
         this.userTaxProfileRepository = userTaxProfileRepository;
         this.transactionRepository = transactionRepository;
@@ -49,14 +55,23 @@ public class AdminService {
         this.auditLogRepository = auditLogRepository;
         this.partnerRepository = partnerRepository;
         this.passwordEncoder = passwordEncoder;
+        this.notificationService = notificationService;
     }
 
     public AdminUserListResponse getUsers(SubscriptionTier subscriptionTier, TaxpayerCategory taxpayerCategory,
                                           Boolean isActive, LocalDateTime dateFrom, LocalDateTime dateTo, int page) {
         int limit = 20;
-        Page<User> result = userRepository.findAllByFilters(
-                subscriptionTier, taxpayerCategory, isActive, dateFrom, dateTo,
-                PageRequest.of(page - 1, limit));
+        Specification<User> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (subscriptionTier != null) predicates.add(cb.equal(root.get("subscriptionTier"), subscriptionTier));
+            if (taxpayerCategory != null) predicates.add(cb.equal(root.get("taxpayerCategory"), taxpayerCategory));
+            if (isActive != null) predicates.add(cb.equal(root.get("isActive"), isActive));
+            if (dateFrom != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), dateFrom));
+            if (dateTo != null) predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), dateTo));
+            query.orderBy(cb.desc(root.get("createdAt")));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        Page<User> result = userRepository.findAll(spec, PageRequest.of(page - 1, limit));
 
         List<AdminUserSummary> users = result.getContent().stream().map(u -> {
             AdminUserSummary s = new AdminUserSummary(
@@ -180,9 +195,16 @@ public class AdminService {
     public AdminAuditLogResponse getAuditLog(UUID userId, String action,
                                               LocalDateTime dateFrom, LocalDateTime dateTo, int page) {
         int limit = 50;
-        Page<AuditLog> result = auditLogRepository.findAllByFilters(
-                userId, action, dateFrom, dateTo,
-                PageRequest.of(page - 1, limit));
+        Specification<AuditLog> spec = (root, query, cb) -> {
+            List<Predicate> predicates = new ArrayList<>();
+            if (userId != null) predicates.add(cb.equal(root.get("user").get("userId"), userId));
+            if (action != null) predicates.add(cb.equal(root.get("action"), action));
+            if (dateFrom != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), dateFrom));
+            if (dateTo != null) predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), dateTo));
+            query.orderBy(cb.desc(root.get("createdAt")));
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        Page<AuditLog> result = auditLogRepository.findAll(spec, PageRequest.of(page - 1, limit));
 
         List<AdminAuditLogItem> logs = result.getContent().stream().map(log -> {
             AdminAuditLogItem item = new AdminAuditLogItem();
@@ -239,7 +261,21 @@ public class AdminService {
         response.setApiKey(rawApiKey);
         response.setActive(Boolean.TRUE.equals(partner.getIsActive()));
         response.setCreatedAt(partner.getCreatedAt());
+
+        String offerLabel = "LOAN".equalsIgnoreCase(partner.getOfferType()) ? "loan" : "insurance";
+        userRepository.findAll().forEach(user -> notificationService.send(user,
+            "New " + partner.getName() + " Offer Available",
+            "A new " + offerLabel + " offer from " + partner.getName() + " is now available for you. Check it out.",
+            NotificationType.REFERRAL,
+            "/referrals"));
+
         return response;
+    }
+
+    @Transactional
+    public void broadcastSystemUpdate(String title, String body) {
+        userRepository.findAll().forEach(user ->
+            notificationService.send(user, title, body, NotificationType.SYSTEM, null));
     }
 
     @Transactional

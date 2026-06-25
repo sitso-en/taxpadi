@@ -2,6 +2,8 @@ package com.taxpadi.api.service;
 
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -9,6 +11,8 @@ import com.cloudinary.Cloudinary;
 
 @Service
 public class CloudinaryService {
+
+    private static final Logger log = LoggerFactory.getLogger(CloudinaryService.class);
 
     private final Cloudinary cloudinary;
 
@@ -30,13 +34,21 @@ public class CloudinaryService {
                 pdfBytes,
                 Map.of(
                     "public_id", publicId,
-                    "resource_type", "auto",
+                    "resource_type", "raw",
                     "overwrite", true
                 )
             );
-            return (String) result.get("secure_url");
+            String url = (String) result.get("secure_url");
+            // Insert fl_attachment so browsers download instead of rendering inline
+            String downloadUrl = url.replace("/upload/", "/upload/fl_attachment/");
+            log.info("Cloudinary upload result download_url={}", downloadUrl);
+            return downloadUrl;
         } catch (Exception e) {
-            throw new RuntimeException("Failed to upload PDF to Cloudinary: " + e.getMessage());
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if (msg.contains("429") || msg.toLowerCase().contains("rate") || msg.toLowerCase().contains("capacity")) {
+                throw new RuntimeException("STORAGE_RATE_LIMITED");
+            }
+            throw new RuntimeException("STORAGE_ERROR");
         }
     }
 
@@ -52,7 +64,11 @@ public class CloudinaryService {
             );
             return (String) result.get("secure_url");
         } catch (Exception e) {
-            throw new RuntimeException("Failed to upload file to Cloudinary: " + e.getMessage());
+            String msg = e.getMessage() != null ? e.getMessage() : "";
+            if (msg.contains("429") || msg.toLowerCase().contains("rate") || msg.toLowerCase().contains("capacity")) {
+                throw new RuntimeException("STORAGE_RATE_LIMITED");
+            }
+            throw new RuntimeException("STORAGE_ERROR");
         }
     }
 }

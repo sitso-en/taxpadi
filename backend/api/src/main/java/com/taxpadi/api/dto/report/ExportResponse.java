@@ -3,6 +3,7 @@ package com.taxpadi.api.dto.report;
 import com.fasterxml.jackson.annotation.JsonInclude;
 
 import java.time.LocalDate;
+import java.util.Map;
 import java.util.UUID;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
@@ -16,6 +17,7 @@ public class ExportResponse {
     private String fileUrl;
     private String expiresAt;
     private String note;
+    private Map<String, Object> data;
 
     public UUID getExportId() { return exportId; }
     public void setExportId(UUID exportId) { this.exportId = exportId; }
@@ -40,4 +42,7 @@ public class ExportResponse {
 
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+
+    public Map<String, Object> getData() { return data; }
+    public void setData(Map<String, Object> data) { this.data = data; }
 }
