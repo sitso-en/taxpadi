@@ -2,8 +2,11 @@ package com.taxpadi.api.service;
 
 import com.taxpadi.api.dto.common.PaginationInfo;
 import com.taxpadi.api.dto.penalty.*;
+import com.taxpadi.api.constant.PenaltyStatus;
 import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.constant.PenaltyStatus;
 import com.taxpadi.api.exception.ForbiddenException;
+import com.taxpadi.api.constant.PenaltyStatus;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.Penalty;
 import com.taxpadi.api.model.TaxDeadline;
@@ -52,7 +55,7 @@ public class PenaltyService {
                 .map(Penalty::getPenaltyAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalResolved = all.stream()
-                .filter(p -> "PAID".equals(p.getStatus()))
+                .filter(p -> PenaltyStatus.PAID.equals(p.getStatus()))
                 .map(Penalty::getPenaltyAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         long activeCount = all.stream().filter(p -> "OUTSTANDING".equals(p.getStatus())).count();
@@ -71,7 +74,12 @@ public class PenaltyService {
         return toDetailDto(p);
     }
 
+    private static final List<String> VALID_TAX_TYPES = List.of("income-tax", "vat", "paye", "withholding");
+
     public PenaltyPreviewDto preview(String taxType, User user) {
+        if (!VALID_TAX_TYPES.contains(taxType.toLowerCase())) {
+            throw new BadRequestException("Invalid tax type. Must be one of: " + String.join(", ", VALID_TAX_TYPES));
+        }
         LocalDate deadline = resolveDeadline(taxType);
         LocalDate today = LocalDate.now();
         int daysLate = (int) Math.max(0, ChronoUnit.DAYS.between(deadline, today));
@@ -84,9 +92,7 @@ public class PenaltyService {
                 : BigDecimal.ZERO;
         BigDecimal total = basePenalty.add(dailyPenalty).add(interestAmount);
 
-        // Check for existing un-resolved penalty of this tax type
-        List<Penalty> existing = repo.findByUserAndStatus(user, "OUTSTANDING");
-        UUID existingId = existing.stream()
+        UUID existingId = repo.findByUserAndStatus(user, "OUTSTANDING").stream()
                 .filter(pen -> taxType.equals(pen.getTaxType()))
                 .map(Penalty::getPenaltyId)
                 .findFirst().orElse(null);
@@ -111,11 +117,11 @@ public class PenaltyService {
         if (!p.getUser().getUserId().equals(user.getUserId())) {
             throw new ForbiddenException("You do not have access to this penalty.");
         }
-        if ("PAID".equals(p.getStatus())) {
+        if (PenaltyStatus.PAID.equals(p.getStatus())) {
             throw new BadRequestException("This penalty has already been resolved.");
         }
         LocalDateTime resolvedAt = request.getResolvedAt() != null ? request.getResolvedAt() : LocalDateTime.now();
-        p.setStatus("PAID");
+        p.setStatus(PenaltyStatus.PAID);
         p.setPaidAt(resolvedAt);
         repo.save(p);
 
@@ -129,20 +135,20 @@ public class PenaltyService {
     }
 
     private LocalDate resolveDeadline(String taxType) {
-        // Look for a matching active deadline; fall back to hardcoded GRA defaults
+        String normalized = taxType.replace("-", "_").toLowerCase();
         List<TaxDeadline> deadlines = deadlineRepo.findByIsActiveTrue();
         return deadlines.stream()
-                .filter(d -> taxType.equalsIgnoreCase(d.getTaxType()))
+                .filter(d -> normalized.equalsIgnoreCase(d.getTaxType().replace("-", "_")))
                 .map(TaxDeadline::getDueDate)
                 .min(LocalDate::compareTo)
-                .orElseGet(() -> computeDefaultDeadline(taxType));
+                .orElseGet(() -> computeDefaultDeadline(normalized));
     }
 
     private LocalDate computeDefaultDeadline(String taxType) {
         LocalDate today = LocalDate.now();
         return switch (taxType.toLowerCase()) {
-            case "vat", "paye" -> today.withDayOfMonth(1).minusDays(1); // last day of previous month
-            case "income_tax" -> LocalDate.of(today.getYear(), 4, 30);
+            case "vat", "paye" -> today.withDayOfMonth(1).minusDays(1);
+            case "income_tax", "income-tax" -> LocalDate.of(today.getYear(), 4, 30);
             default -> today.minusDays(1);
         };
     }
@@ -155,7 +161,7 @@ public class PenaltyService {
         dto.setFilingDate(p.getFilingDate());
         dto.setDaysLate(p.getDaysLate());
         dto.setTotalPenalty(p.getPenaltyAmount());
-        dto.setResolved("PAID".equals(p.getStatus()));
+        dto.setResolved(PenaltyStatus.PAID.equals(p.getStatus()));
         dto.setResolvedAt(p.getPaidAt());
         return dto;
     }
@@ -170,7 +176,7 @@ public class PenaltyService {
         dto.setTotalPenalty(p.getPenaltyAmount());
         dto.setDailyRate(INCOME_TAX_DAILY_RATE);
         dto.setPenaltyGrowsByDaily(INCOME_TAX_DAILY_RATE);
-        dto.setResolved("PAID".equals(p.getStatus()));
+        dto.setResolved(PenaltyStatus.PAID.equals(p.getStatus()));
         dto.setResolvedAt(p.getPaidAt());
 
         String msg = "You are " + p.getDaysLate() + " days late. Your penalty is growing by GHS "
