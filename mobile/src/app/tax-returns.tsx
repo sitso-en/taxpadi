@@ -86,7 +86,7 @@ export default function TaxReturnsScreen() {
     setGenerating(true);
     try {
       const res = await generateTaxReturn(selectedType, currentYear, needsMonth ? selectedMonth! : undefined);
-      const returnId = res.data?.returnId ?? res.returnId;
+      const returnId = res.data?.return_id ?? res.data?.returnId;
       setShowGenModal(false);
       await refreshReturns();
       router.push({ pathname: "/tax-return-review", params: { returnId } });
@@ -160,7 +160,7 @@ export default function TaxReturnsScreen() {
               <ReturnCard
                 key={item.id}
                 item={item}
-                onAmend={item.status === "rejected" ? () => { setAmendTarget(item); setAmendReason(""); } : undefined}
+                onAmend={item.status === "submitted" ? () => { setAmendTarget(item); setAmendReason(""); } : undefined}
               />
             ))}
           </>
