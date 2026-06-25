@@ -1,5 +1,14 @@
 package com.taxpadi.api.service;
 
+import com.itextpdf.kernel.colors.ColorConstants;
+import com.itextpdf.kernel.pdf.PdfDocument;
+import com.itextpdf.kernel.pdf.PdfWriter;
+import com.itextpdf.layout.Document;
+import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Paragraph;
+import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.TextAlignment;
+import com.itextpdf.layout.properties.UnitValue;
 import com.taxpadi.api.dto.report.Averages;
 import com.taxpadi.api.dto.report.CategoryTotal;
 import com.taxpadi.api.dto.report.ExportResponse;
@@ -15,16 +24,26 @@ import com.taxpadi.api.dto.report.TaxLiabilityBreakdown;
 import com.taxpadi.api.dto.report.TaxTypeEntry;
 import com.taxpadi.api.dto.report.TaxpayerSummary;
 import com.taxpadi.api.dto.report.YearHistoryEntry;
+import com.taxpadi.api.constant.TaxReturnStatus;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.TaxCalculation;
 import com.taxpadi.api.model.TaxReturn;
+import com.taxpadi.api.model.Transaction;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.repository.TaxCalculationRepository;
 import com.taxpadi.api.repository.TaxReturnRepository;
 import com.taxpadi.api.repository.TransactionRepository;
+import org.apache.poi.ss.usermodel.FillPatternType;
+import org.apache.poi.ss.usermodel.IndexedColors;
+import org.apache.poi.xssf.usermodel.XSSFCellStyle;
+import org.apache.poi.xssf.usermodel.XSSFFont;
+import org.apache.poi.xssf.usermodel.XSSFRow;
+import org.apache.poi.xssf.usermodel.XSSFSheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
 
+import java.io.ByteArrayOutputStream;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -33,6 +52,7 @@ import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -46,13 +66,16 @@ public class ReportService {
     private final TransactionRepository transactionRepository;
     private final TaxCalculationRepository taxCalculationRepository;
     private final TaxReturnRepository taxReturnRepository;
+    private final CloudinaryService cloudinaryService;
 
     public ReportService(TransactionRepository transactionRepository,
                          TaxCalculationRepository taxCalculationRepository,
-                         TaxReturnRepository taxReturnRepository) {
+                         TaxReturnRepository taxReturnRepository,
+                         CloudinaryService cloudinaryService) {
         this.transactionRepository = transactionRepository;
         this.taxCalculationRepository = taxCalculationRepository;
         this.taxReturnRepository = taxReturnRepository;
+        this.cloudinaryService = cloudinaryService;
     }
 
     public SummaryResponse getSummary(User user, String period, LocalDate dateFrom, LocalDate dateTo) {
@@ -96,27 +119,194 @@ public class ReportService {
             throw new BadRequestException("Format must be one of: json, pdf, excel.");
         }
 
-        long txCount     = includeTransactions ? transactionRepository.countByUserAndDateRange(user, dateFrom, dateTo) : 0;
-        long returnCount = includeTaxReturns   ? taxReturnRepository.findAllByUserAndYearRange(user, dateFrom.getYear(), dateTo.getYear()).size() : 0;
-
-        RecordsIncluded recordsIncluded = new RecordsIncluded(
-            includeTransactions ? txCount     : 0,
-            includeTaxReturns   ? returnCount : 0,
-            0,
-            0
-        );
+        List<Transaction> transactions = includeTransactions
+            ? transactionRepository.findAllByUserAndDateRange(user, dateFrom, dateTo)
+            : List.of();
+        List<TaxReturn> taxReturns = includeTaxReturns
+            ? taxReturnRepository.findAllByUserAndYearRange(user, dateFrom.getYear(), dateTo.getYear())
+            : List.of();
 
         ExportResponse response = new ExportResponse();
         response.setExportId(UUID.randomUUID());
         response.setFormat(format);
         response.setPeriodStart(dateFrom);
         response.setPeriodEnd(dateTo);
-        response.setRecordsIncluded(recordsIncluded);
+        response.setRecordsIncluded(new RecordsIncluded(transactions.size(), taxReturns.size(), 0, 0));
 
-        if (!"json".equals(format)) {
-            response.setNote(format.toUpperCase() + " export requires S3 configuration. Use format=json for immediate data.");
+        String publicId = "exports/" + user.getUserId() + "/taxpadi-data-export-" + dateFrom + "-to-" + dateTo;
+        try {
+            switch (format) {
+                case "pdf" -> {
+                    byte[] bytes = buildPdf(user, dateFrom, dateTo, transactions, taxReturns);
+                    response.setFileUrl(cloudinaryService.uploadPdf(bytes, publicId + ".pdf"));
+                }
+                case "excel" -> {
+                    byte[] bytes = buildExcel(transactions, taxReturns);
+                    response.setFileUrl(cloudinaryService.uploadPdf(bytes, publicId + ".xlsx"));
+                }
+                default -> {
+                    Map<String, Object> data = buildJsonMap(user, dateFrom, dateTo, transactions, taxReturns);
+                    response.setData(data);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to generate export: " + e.getMessage());
         }
         return response;
+    }
+
+    private Map<String, Object> buildJsonMap(User user, LocalDate from, LocalDate to,
+                                              List<Transaction> transactions, List<TaxReturn> taxReturns) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("generated_at", LocalDateTime.now().toString());
+        data.put("taxpayer", user.getFullName());
+        data.put("period_start", from.toString());
+        data.put("period_end", to.toString());
+
+        data.put("transactions", transactions.stream().map(t -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("date", t.getTransactionDate().toString());
+            m.put("type", t.getType());
+            m.put("amount", t.getAmount());
+            m.put("category", t.getCategory());
+            m.put("description", t.getDescription());
+            m.put("tax_deductible", t.getTaxDeductible());
+            m.put("withholding_amount", t.getWithholdingAmount());
+            return m;
+        }).toList());
+
+        data.put("tax_returns", taxReturns.stream().map(r -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("tax_type", r.getTaxType());
+            m.put("tax_year", r.getTaxYear());
+            m.put("period_start", r.getPeriodStart().toString());
+            m.put("period_end", r.getPeriodEnd().toString());
+            m.put("status", r.getStatus());
+            m.put("tax_liability", r.getTaxLiability());
+            m.put("submitted_at", r.getSubmittedAt() != null ? r.getSubmittedAt().toString() : null);
+            return m;
+        }).toList());
+
+        return data;
+    }
+
+    private byte[] buildExcel(List<Transaction> transactions, List<TaxReturn> taxReturns) throws Exception {
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            XSSFCellStyle headerStyle = workbook.createCellStyle();
+            headerStyle.setFillForegroundColor(IndexedColors.DARK_RED.getIndex());
+            headerStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+            XSSFFont font = workbook.createFont();
+            font.setColor(IndexedColors.WHITE.getIndex());
+            font.setBold(true);
+            headerStyle.setFont(font);
+
+            // Transactions sheet
+            XSSFSheet txSheet = workbook.createSheet("Transactions");
+            String[] txHeaders = {"Date", "Type", "Amount (GHS)", "Category", "Description", "Tax Deductible", "WHT Amount"};
+            XSSFRow txHead = txSheet.createRow(0);
+            for (int i = 0; i < txHeaders.length; i++) {
+                var cell = txHead.createCell(i);
+                cell.setCellValue(txHeaders[i]);
+                cell.setCellStyle(headerStyle);
+                txSheet.setColumnWidth(i, 5000);
+            }
+            int txRow = 1;
+            for (Transaction t : transactions) {
+                XSSFRow row = txSheet.createRow(txRow++);
+                row.createCell(0).setCellValue(t.getTransactionDate().toString());
+                row.createCell(1).setCellValue(t.getType());
+                row.createCell(2).setCellValue(t.getAmount().doubleValue());
+                row.createCell(3).setCellValue(t.getCategory() != null ? t.getCategory() : "");
+                row.createCell(4).setCellValue(t.getDescription() != null ? t.getDescription() : "");
+                row.createCell(5).setCellValue(Boolean.TRUE.equals(t.getTaxDeductible()) ? "Yes" : "No");
+                row.createCell(6).setCellValue(t.getWithholdingAmount() != null ? t.getWithholdingAmount().doubleValue() : 0);
+            }
+
+            // Tax Returns sheet
+            XSSFSheet retSheet = workbook.createSheet("Tax Returns");
+            String[] retHeaders = {"Tax Type", "Year", "Period Start", "Period End", "Status", "Tax Liability (GHS)", "Submitted At"};
+            XSSFRow retHead = retSheet.createRow(0);
+            for (int i = 0; i < retHeaders.length; i++) {
+                var cell = retHead.createCell(i);
+                cell.setCellValue(retHeaders[i]);
+                cell.setCellStyle(headerStyle);
+                retSheet.setColumnWidth(i, 5500);
+            }
+            int retRow = 1;
+            for (TaxReturn r : taxReturns) {
+                XSSFRow row = retSheet.createRow(retRow++);
+                row.createCell(0).setCellValue(r.getTaxType());
+                row.createCell(1).setCellValue(r.getTaxYear());
+                row.createCell(2).setCellValue(r.getPeriodStart().toString());
+                row.createCell(3).setCellValue(r.getPeriodEnd().toString());
+                row.createCell(4).setCellValue(r.getStatus());
+                row.createCell(5).setCellValue(r.getTaxLiability() != null ? r.getTaxLiability().doubleValue() : 0);
+                row.createCell(6).setCellValue(r.getSubmittedAt() != null ? r.getSubmittedAt().toString() : "");
+            }
+
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            workbook.write(out);
+            return out.toByteArray();
+        }
+    }
+
+    private byte[] buildPdf(User user, LocalDate from, LocalDate to,
+                            List<Transaction> transactions, List<TaxReturn> taxReturns) {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        PdfWriter writer = new PdfWriter(out);
+        PdfDocument pdf = new PdfDocument(writer);
+        Document doc = new Document(pdf);
+
+        doc.add(new Paragraph("TaxPadi").setFontSize(22).setBold().setFontColor(new com.itextpdf.kernel.colors.DeviceRgb(184, 55, 41)));
+        doc.add(new Paragraph("Financial Export Report").setFontSize(14).setFontColor(ColorConstants.DARK_GRAY));
+        doc.add(new Paragraph("Taxpayer: " + user.getFullName()));
+        doc.add(new Paragraph("Period: " + from + " to " + to));
+        doc.add(new Paragraph("Generated: " + LocalDateTime.now().toLocalDate()));
+        doc.add(new Paragraph(" "));
+
+        if (!transactions.isEmpty()) {
+            doc.add(new Paragraph("Transactions").setFontSize(13).setBold());
+            Table table = new Table(UnitValue.createPercentArray(new float[]{15, 10, 15, 20, 30, 10}))
+                .setWidth(UnitValue.createPercentValue(100));
+            for (String h : new String[]{"Date","Type","Amount","Category","Description","Tax Ded."}) {
+                table.addHeaderCell(new Cell().add(new Paragraph(h).setBold())
+                    .setBackgroundColor(new com.itextpdf.kernel.colors.DeviceRgb(184, 55, 41))
+                    .setFontColor(ColorConstants.WHITE));
+            }
+            for (Transaction t : transactions) {
+                table.addCell(t.getTransactionDate().toString());
+                table.addCell(t.getType());
+                table.addCell("GHS " + t.getAmount().setScale(2, RoundingMode.HALF_UP));
+                table.addCell(t.getCategory() != null ? t.getCategory() : "");
+                table.addCell(t.getDescription() != null ? t.getDescription() : "");
+                table.addCell(Boolean.TRUE.equals(t.getTaxDeductible()) ? "Yes" : "No");
+            }
+            doc.add(table);
+            doc.add(new Paragraph(" "));
+        }
+
+        if (!taxReturns.isEmpty()) {
+            doc.add(new Paragraph("Tax Returns").setFontSize(13).setBold());
+            Table table = new Table(UnitValue.createPercentArray(new float[]{20, 10, 15, 15, 20, 20}))
+                .setWidth(UnitValue.createPercentValue(100));
+            for (String h : new String[]{"Tax Type","Year","Period Start","Period End","Status","Liability (GHS)"}) {
+                table.addHeaderCell(new Cell().add(new Paragraph(h).setBold())
+                    .setBackgroundColor(new com.itextpdf.kernel.colors.DeviceRgb(184, 55, 41))
+                    .setFontColor(ColorConstants.WHITE));
+            }
+            for (TaxReturn r : taxReturns) {
+                table.addCell(r.getTaxType());
+                table.addCell(String.valueOf(r.getTaxYear()));
+                table.addCell(r.getPeriodStart().toString());
+                table.addCell(r.getPeriodEnd().toString());
+                table.addCell(r.getStatus());
+                table.addCell(r.getTaxLiability() != null ? "GHS " + r.getTaxLiability().setScale(2, RoundingMode.HALF_UP) : "-");
+            }
+            doc.add(table);
+        }
+
+        doc.close();
+        return out.toByteArray();
     }
 
     public IncomeStatementResponse getIncomeStatement(User user, int months) {
@@ -165,7 +355,7 @@ public class ReportService {
         BigDecimal avgExp    = sumExp.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP);
 
         List<TaxReturn> returns = taxReturnRepository.findAllByUserAndYearRange(user, from.getYear(), to.getYear());
-        boolean allFiled = !returns.isEmpty() && returns.stream().allMatch(r -> "submitted".equals(r.getStatus()));
+        boolean allFiled = !returns.isEmpty() && returns.stream().allMatch(r -> TaxReturnStatus.SUBMITTED.equals(r.getStatus()));
         String score = returns.isEmpty() ? "No Data" : allFiled ? "Good" : "Needs Attention";
 
         IncomeStatementResponse response = new IncomeStatementResponse();
@@ -203,12 +393,12 @@ public class ReportService {
                     tt.setReturnStatus(r.getStatus());
                     tt.setTaxLiability(r.getTaxLiability());
                     tt.setFiledOn(r.getSubmittedAt());
-                    tt.setCompliant("submitted".equals(r.getStatus()));
+                    tt.setCompliant(TaxReturnStatus.SUBMITTED.equals(r.getStatus()));
                     return tt;
                 }).toList();
 
                 boolean overallCompliant = entry.getValue().stream()
-                    .allMatch(r -> "submitted".equals(r.getStatus()));
+                    .allMatch(r -> TaxReturnStatus.SUBMITTED.equals(r.getStatus()));
 
                 return new YearHistoryEntry(entry.getKey(), taxTypes, overallCompliant);
             }).toList();
