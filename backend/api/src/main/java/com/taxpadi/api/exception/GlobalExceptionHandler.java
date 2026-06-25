@@ -9,9 +9,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingPathVariableException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.HttpServerErrorException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
@@ -64,6 +71,46 @@ public class GlobalExceptionHandler {
         log.warn("Missing request parameter: {}", ex.getMessage());
         return ResponseEntity.badRequest()
                 .body(new ApiResponse<>(false, null, "Missing required parameter: " + ex.getParameterName()));
+    }
+
+    // Request sent without multipart/form-data content type — 400
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMultipart(MultipartException ex) {
+        log.warn("Not a multipart request: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(false, null, "This endpoint requires a multipart/form-data request with a file attached"));
+    }
+
+    // Missing required multipart file (e.g. forgot to attach audio/image) — 400
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingPart(MissingServletRequestPartException ex) {
+        log.warn("Missing multipart part: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(false, null, "Missing required file: " + ex.getRequestPartName()));
+    }
+
+    // Missing path variable (e.g. /resource/ with no ID) — 400
+    @ExceptionHandler(MissingPathVariableException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMissingPathVariable(MissingPathVariableException ex) {
+        log.warn("Missing path variable: {}", ex.getVariableName());
+        return ResponseEntity.badRequest()
+                .body(new ApiResponse<>(false, null, "Missing required path variable: " + ex.getVariableName()));
+    }
+
+    // File too large — 413
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMaxUploadSize(MaxUploadSizeExceededException ex) {
+        log.warn("File too large: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                .body(new ApiResponse<>(false, null, "File is too large. Maximum allowed size is 25MB"));
+    }
+
+    // Wrong Content-Type (e.g. sending JSON to a multipart endpoint) — 415
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleMediaTypeNotSupported(HttpMediaTypeNotSupportedException ex) {
+        log.warn("Unsupported media type: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(new ApiResponse<>(false, null, "Unsupported content type: " + ex.getContentType()));
     }
 
     // Bean validation on method-level params (outside @RequestBody) — 400
@@ -149,11 +196,11 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(false, null, ex.getMessage()));
     }
 
-    // Bad credentials / invalid input (e.g. wrong OTP code) — 401
+    // Invalid input (e.g. bad enum value, malformed argument) — 400
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleIllegalArgument(IllegalArgumentException ex) {
-        log.warn("Unauthorized: {}", ex.getMessage());
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+        log.warn("Bad request: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
                 .body(new ApiResponse<>(false, null, ex.getMessage()));
     }
 
@@ -163,6 +210,49 @@ public class GlobalExceptionHandler {
         log.warn("Invalid JWT: {}", ex.getMessage());
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                 .body(new ApiResponse<>(false, null, "The reset token is invalid or has expired"));
+    }
+
+    // External API returned a client error (Anthropic, Paystack, AssemblyAI) — 503
+    @ExceptionHandler(HttpClientErrorException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExternalClientError(HttpClientErrorException ex) {
+        log.error("External API client error: {} {}", ex.getStatusCode(), ex.getMessage());
+        if (ex.getStatusCode().value() == 401 || ex.getStatusCode().value() == 403) {
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new ApiResponse<>(false, null, "A third-party service is not properly configured"));
+        }
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiResponse<>(false, null, "A third-party service returned an error. Please try again"));
+    }
+
+    // External API returned a server error — 503
+    @ExceptionHandler(HttpServerErrorException.class)
+    public ResponseEntity<ApiResponse<Void>> handleExternalServerError(HttpServerErrorException ex) {
+        log.error("External API server error: {} {}", ex.getStatusCode(), ex.getMessage());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                .body(new ApiResponse<>(false, null, "A third-party service is temporarily unavailable. Please try again"));
+    }
+
+    // Storage service errors (Cloudinary upload failures) — 503
+    @ExceptionHandler(RuntimeException.class)
+    public ResponseEntity<ApiResponse<Void>> handleRuntime(RuntimeException ex) {
+        if ("STORAGE_RATE_LIMITED".equals(ex.getMessage())) {
+            log.warn("Storage rate limited: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new ApiResponse<>(false, null, "File storage is temporarily busy. Please try again in a moment"));
+        }
+        if ("STORAGE_ERROR".equals(ex.getMessage())) {
+            log.error("Storage upload error: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                    .body(new ApiResponse<>(false, null, "File could not be uploaded. Please try again"));
+        }
+        if ("PDF_NOT_AVAILABLE".equals(ex.getMessage())) {
+            log.warn("PDF not available for download");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(new ApiResponse<>(false, null, "The PDF for this invoice is not yet available. Please try again shortly"));
+        }
+        log.error("Unhandled runtime exception: {}", ex.getMessage(), ex);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(new ApiResponse<>(false, null, "An unexpected error occurred"));
     }
 
     // Catch-all — 500
