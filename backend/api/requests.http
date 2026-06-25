@@ -1047,27 +1047,31 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/reports/summary?date_from=2026-01-01&date_to=2026-05-31
 Authorization: Bearer {{accessToken}}
 
-### 4. Export Data (JSON)
-GET {{baseUrl}}/api/v1/reports/export?format=json&date_from=2026-01-01&date_to=2026-05-31
+### 4. Export Data (JSON — inline in response)
+GET {{baseUrl}}/api/v1/reports/export?format=json&date_from=2024-01-01&date_to=2024-12-31
 Authorization: Bearer {{accessToken}}
 
-### 5. Export Data (PDF — stub, requires S3)
-GET {{baseUrl}}/api/v1/reports/export?format=pdf&date_from=2026-01-01&date_to=2026-05-31
+### 5. Export Data (PDF — returns Cloudinary file_url)
+GET {{baseUrl}}/api/v1/reports/export?format=pdf&date_from=2024-01-01&date_to=2024-12-31
 Authorization: Bearer {{accessToken}}
 
-### 6. Get Income Statement (default 6 months)
+### 6. Export Data (Excel — returns Cloudinary file_url)
+GET {{baseUrl}}/api/v1/reports/export?format=excel&date_from=2024-01-01&date_to=2024-12-31
+Authorization: Bearer {{accessToken}}
+
+### 7. Get Income Statement (default 6 months)
 GET {{baseUrl}}/api/v1/reports/income-statement
 Authorization: Bearer {{accessToken}}
 
-### 7. Get Income Statement (3 months)
+### 8. Get Income Statement (3 months)
 GET {{baseUrl}}/api/v1/reports/income-statement?months=3
 Authorization: Bearer {{accessToken}}
 
-### 8. Get Tax History (all available years)
+### 9. Get Tax History (all available years)
 GET {{baseUrl}}/api/v1/reports/tax-history
 Authorization: Bearer {{accessToken}}
 
-### 9. Get Tax History (specific range)
+### 10. Get Tax History (specific range)
 GET {{baseUrl}}/api/v1/reports/tax-history?year_from=2025&year_to=2026
 Authorization: Bearer {{accessToken}}
 
@@ -1385,8 +1389,16 @@ Authorization: Bearer {{accessToken}}
 GET {{baseUrl}}/api/v1/penalties/{{penaltyId}}
 Authorization: Bearer {{accessToken}}
 
-### 3. Preview penalty for a tax type (income_tax | vat | paye | withholding)
-GET {{baseUrl}}/api/v1/penalties/preview/income_tax
+### 3. Preview penalty — income tax
+GET {{baseUrl}}/api/v1/penalties/preview/income-tax
+Authorization: Bearer {{accessToken}}
+
+### 3b. Preview penalty — VAT
+GET {{baseUrl}}/api/v1/penalties/preview/vat
+Authorization: Bearer {{accessToken}}
+
+### 3c. Preview penalty — PAYE
+GET {{baseUrl}}/api/v1/penalties/preview/paye
 Authorization: Bearer {{accessToken}}
 
 ### 4. Resolve (mark as paid) a penalty
