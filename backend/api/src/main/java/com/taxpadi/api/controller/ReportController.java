@@ -49,9 +49,8 @@ public class ReportController {
             @RequestParam(name = "include_transactions", defaultValue = "true")  boolean includeTransactions,
             @RequestParam(name = "include_tax_returns",  defaultValue = "true")  boolean includeTaxReturns) {
         User user = userDetails.getUser();
-        return ResponseEntity.ok(new ApiResponse<>(true,
-            reportService.exportData(user, format, dateFrom, dateTo, includeTransactions, includeTaxReturns),
-            "Export generated successfully."));
+        ExportResponse export = reportService.exportData(user, format, dateFrom, dateTo, includeTransactions, includeTaxReturns);
+        return ResponseEntity.ok(new ApiResponse<>(true, export, "Export generated successfully."));
     }
 
     @GetMapping("/income-statement")
