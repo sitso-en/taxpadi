@@ -9,15 +9,13 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.taxpadi.api.constant.VatReturnStatus;
 import com.taxpadi.api.dto.vat.VatRecordDto;
 import com.taxpadi.api.dto.vat.VatRegisterRequest;
 import com.taxpadi.api.dto.vat.VatRegisterResponse;
 import com.taxpadi.api.dto.vat.VatStatusResponse;
-import com.taxpadi.api.constant.VatReturnStatus;
 import com.taxpadi.api.exception.BadRequestException;
-import com.taxpadi.api.constant.VatReturnStatus;
 import com.taxpadi.api.exception.ConflictException;
-import com.taxpadi.api.constant.VatReturnStatus;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.model.VatRecord;

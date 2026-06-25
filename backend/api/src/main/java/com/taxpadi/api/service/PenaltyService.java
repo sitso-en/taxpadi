@@ -1,21 +1,5 @@
 package com.taxpadi.api.service;
 
-import com.taxpadi.api.dto.common.PaginationInfo;
-import com.taxpadi.api.dto.penalty.*;
-import com.taxpadi.api.constant.PenaltyStatus;
-import com.taxpadi.api.exception.BadRequestException;
-import com.taxpadi.api.constant.PenaltyStatus;
-import com.taxpadi.api.exception.ForbiddenException;
-import com.taxpadi.api.constant.PenaltyStatus;
-import com.taxpadi.api.exception.NotFoundException;
-import com.taxpadi.api.model.Penalty;
-import com.taxpadi.api.model.TaxDeadline;
-import com.taxpadi.api.model.User;
-import com.taxpadi.api.repository.PenaltyRepository;
-import com.taxpadi.api.repository.TaxDeadlineRepository;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -24,6 +8,28 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.taxpadi.api.constant.PenaltyStatus;
+import com.taxpadi.api.dto.common.PaginationInfo;
+import com.taxpadi.api.dto.penalty.PenaltyDetailDto;
+import com.taxpadi.api.dto.penalty.PenaltyDto;
+import com.taxpadi.api.dto.penalty.PenaltyGuidance;
+import com.taxpadi.api.dto.penalty.PenaltyListResponse;
+import com.taxpadi.api.dto.penalty.PenaltyPreviewDto;
+import com.taxpadi.api.dto.penalty.PenaltySummary;
+import com.taxpadi.api.dto.penalty.ResolvePenaltyRequest;
+import com.taxpadi.api.dto.penalty.ResolvePenaltyResponse;
+import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.exception.ForbiddenException;
+import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.model.Penalty;
+import com.taxpadi.api.model.TaxDeadline;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.repository.PenaltyRepository;
+import com.taxpadi.api.repository.TaxDeadlineRepository;
 
 @Service
 public class PenaltyService {

@@ -1,17 +1,18 @@
 package com.taxpadi.api.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.taxpadi.api.exception.BadRequestException;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.taxpadi.api.exception.BadRequestException;
 
 @Service
 public class SpeechService {
