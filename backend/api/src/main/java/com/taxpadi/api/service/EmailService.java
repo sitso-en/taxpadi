@@ -153,14 +153,67 @@ public class EmailService {
     }
 
     public void sendInvoice(String to, String clientName, String invoiceRef,
-                            String totalAmount, String pdfUrl,
+                            String totalAmount, String dueDate, String pdfUrl,
                             String senderName, String senderEmail) {
         String subject = "Invoice " + invoiceRef + " from " + senderName;
-        String body = "<h2>Hello " + clientName + ",</h2>"
-            + "<p>Please find your invoice <strong>" + invoiceRef + "</strong> for <strong>GHS " + totalAmount + "</strong>.</p>"
-            + "<p><a href=\"" + pdfUrl + "\">Download Invoice PDF</a></p>"
-            + "<p>Thank you for your business.</p>"
-            + "<p>" + senderName + "</p>";
+        String dueLine = (dueDate != null && !dueDate.isBlank())
+            ? "<tr><td style=\"padding:8px 0;color:#6b7280;font-size:14px;\">Due Date</td>"
+              + "<td style=\"padding:8px 0;color:#111827;font-size:14px;font-weight:600;text-align:right;\">" + dueDate + "</td></tr>"
+            : "";
+        String body = "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head><body style=\"margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;\">"
+            + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f3f4f6;padding:40px 0;\">"
+            + "<tr><td align=\"center\">"
+            + "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:8px;overflow:hidden;\">"
+
+            // Header
+            + "<tr><td style=\"background:#B83729;padding:32px 40px;text-align:center;\">"
+            + "<p style=\"margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;\">TaxPadi</p>"
+            + "</td></tr>"
+
+            // Body
+            + "<tr><td style=\"padding:40px 40px 24px;\">"
+            + "<p style=\"margin:0 0 8px;font-size:16px;color:#111827;\">Hello <strong>" + clientName + "</strong>,</p>"
+            + "<p style=\"margin:0 0 28px;font-size:15px;color:#374151;line-height:1.6;\">"
+            + "<strong>" + senderName + "</strong> has sent you an invoice via TaxPadi. "
+            + "Please review the details below and download your copy using the button provided.</p>"
+
+            // Invoice details card
+            + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f9fafb;border:1px solid #e5e7eb;border-radius:6px;padding:20px 24px;margin-bottom:28px;\">"
+            + "<tr><td style=\"padding:0 0 12px;\"><p style=\"margin:0;font-size:12px;font-weight:700;color:#6b7280;letter-spacing:1px;text-transform:uppercase;\">Invoice Summary</p></td></tr>"
+            + "<tr><td style=\"padding:8px 0;color:#6b7280;font-size:14px;\">Invoice Number</td>"
+            + "<td style=\"padding:8px 0;color:#111827;font-size:14px;font-weight:600;text-align:right;\">" + invoiceRef + "</td></tr>"
+            + "<tr><td colspan=\"2\" style=\"border-top:1px solid #e5e7eb;\"></td></tr>"
+            + dueLine
+            + "<tr><td colspan=\"2\" style=\"border-top:1px solid #e5e7eb;\"></td></tr>"
+            + "<tr><td style=\"padding:12px 0 4px;color:#111827;font-size:15px;font-weight:700;\">Total Amount</td>"
+            + "<td style=\"padding:12px 0 4px;color:#B83729;font-size:18px;font-weight:700;text-align:right;\">GHS " + totalAmount + "</td></tr>"
+            + "</table>"
+
+            // CTA button
+            + "<table cellpadding=\"0\" cellspacing=\"0\" style=\"margin-bottom:28px;\">"
+            + "<tr><td style=\"background:#B83729;border-radius:6px;\">"
+            + "<a href=\"" + pdfUrl + "\" style=\"display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;\">Download Invoice PDF</a>"
+            + "</td></tr></table>"
+
+            + "<p style=\"margin:0;font-size:14px;color:#6b7280;line-height:1.6;\">If the button doesn't work, copy and paste this link into your browser:</p>"
+            + "<p style=\"margin:6px 0 0;font-size:13px;color:#B83729;word-break:break-all;\">" + pdfUrl + "</p>"
+            + "</td></tr>"
+
+            // Divider + sender info
+            + "<tr><td style=\"padding:0 40px 32px;\">"
+            + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\"><tr><td style=\"border-top:1px solid #e5e7eb;padding-top:24px;\">"
+            + "<p style=\"margin:0;font-size:14px;color:#374151;\">Questions about this invoice? Reply to this email or contact <strong>" + senderName + "</strong> directly at "
+            + "<a href=\"mailto:" + senderEmail + "\" style=\"color:#B83729;\">" + senderEmail + "</a>.</p>"
+            + "</td></tr></table>"
+            + "</td></tr>"
+
+            // Footer
+            + "<tr><td style=\"background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;\">"
+            + "<p style=\"margin:0;font-size:12px;color:#9ca3af;text-align:center;\">This invoice was sent via <strong>TaxPadi</strong> &mdash; Smart Tax Management for Ghana.</p>"
+            + "<p style=\"margin:6px 0 0;font-size:12px;color:#9ca3af;text-align:center;\">You received this email because " + senderName + " sent you an invoice.</p>"
+            + "</td></tr>"
+
+            + "</table></td></tr></table></body></html>";
         try {
             Email from = new Email(fromEmail, senderName + " via TaxPadi");
             Email toEmail = new Email(to);
