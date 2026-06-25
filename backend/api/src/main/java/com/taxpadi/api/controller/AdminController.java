@@ -158,4 +158,15 @@ public class AdminController {
                 taxRateService.updateRates(request, admin.getUserId()),
                 "Tax rates updated. New rates are effective immediately."));
     }
+
+    @PostMapping("/notifications/broadcast")
+    public ResponseEntity<ApiResponse<Void>> broadcast(
+            @RequestBody java.util.Map<String, String> body) {
+        String title = body.get("title");
+        String message = body.get("message");
+        if (title == null || message == null)
+            throw new com.taxpadi.api.exception.BadRequestException("title and message are required");
+        adminService.broadcastSystemUpdate(title, message);
+        return ResponseEntity.ok(new ApiResponse<>(true, null, "System notification sent to all users."));
+    }
 }
