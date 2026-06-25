@@ -133,46 +133,59 @@ public class SpeechService {
 
         String lower = transcription.toLowerCase();
 
-        // Extract amount — match patterns like "500", "GHS 120.50", "500 cedis"
-        BigDecimal amount = extractAmount(lower);
-        if (amount == null) {
+        // Extract all amounts found in the transcription
+        List<BigDecimal> allAmounts = extractAllAmounts(lower);
+        if (allAmounts.isEmpty()) {
             throw new BadRequestException("Could not detect an amount in the audio");
         }
 
+        // Use the largest amount as the primary (most likely the main transaction value)
+        BigDecimal amount = allAmounts.stream().max(BigDecimal::compareTo).orElseThrow();
+
         // Determine transaction type from keywords
-        boolean isIncome = lower.matches(".*(received|earned|paid me|income|sales|sold|sale|got paid|profit).*");
+        boolean isIncome = lower.matches(".*(received|earned|paid me|income|sales|sold|sale|got paid|profit|salary|allowance).*");
         String type = isIncome ? "income" : "expense";
 
         // Determine category from keywords
         String category = inferCategory(lower, type);
 
-        // Determine confidence based on transcription quality
-        String confidence = amount.compareTo(BigDecimal.ZERO) > 0 ? "high" : "low";
-        boolean needsReview = "low".equals(confidence);
+        // Flag for review if: multiple amounts detected, hesitation words present, or transcription is long/complex
+        boolean multipleAmounts = allAmounts.size() > 1;
+        boolean hasHesitation = lower.matches(".*(um|uh|hmm|actually|i mean|wait|no|sorry).*");
+        boolean needsReview = multipleAmounts || hasHesitation;
+        String confidence = needsReview ? "low" : "high";
 
         SpeechResult result = new SpeechResult();
         result.transcription = transcription;
         result.amount = amount;
         result.type = type;
         result.category = category;
-        result.description = truncate(transcription, 255);
+        result.description = transcription;
         result.confidence = confidence;
         result.needsReview = needsReview;
         return result;
     }
 
-    private BigDecimal extractAmount(String text) {
-        // Match numbers optionally followed by cedis/ghc/ghs/gh¢
-        Pattern pattern = Pattern.compile("(\\d{1,10}(?:[.,]\\d{1,2})?)\\s*(?:cedis?|ghc|ghs|gh)?");
+    private List<BigDecimal> extractAllAmounts(String text) {
+        // Match: optional currency prefix, then number with optional thousand separators and decimal
+        // Handles: 2,000 / 2000 / 1,300.50 / GHS 500 / 500 cedis
+        Pattern pattern = Pattern.compile(
+            "(?:ghs?|gh¢|\\$)?\\s*(\\d{1,3}(?:,\\d{3})*(?:\\.\\d{1,2})?|\\d+(?:\\.\\d{1,2})?)\\s*(?:cedis?|ghc|ghs|gh¢|thousand|million)?",
+            Pattern.CASE_INSENSITIVE
+        );
         Matcher matcher = pattern.matcher(text);
-        if (matcher.find()) {
+        List<BigDecimal> amounts = new java.util.ArrayList<>();
+        while (matcher.find()) {
             try {
-                return new BigDecimal(matcher.group(1).replace(",", "."));
-            } catch (NumberFormatException e) {
-                return null;
+                String raw = matcher.group(1).replace(",", "");
+                BigDecimal val = new BigDecimal(raw);
+                if (val.compareTo(BigDecimal.ZERO) > 0) {
+                    amounts.add(val);
+                }
+            } catch (NumberFormatException ignored) {
             }
         }
-        return null;
+        return amounts;
     }
 
     private String inferCategory(String text, String type) {
