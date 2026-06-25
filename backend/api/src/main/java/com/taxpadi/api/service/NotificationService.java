@@ -149,6 +149,9 @@ public class NotificationService {
     }
 
     public void send(User user, String title, String body, NotificationType type, String actionUrl) {
+        java.util.Map<String, Boolean> prefs = user.getNotificationPreferences();
+        if (prefs != null && Boolean.FALSE.equals(prefs.get(preferenceKey(type)))) return;
+
         Notification n = new Notification();
         n.setUser(user);
         n.setTitle(title);
@@ -177,6 +180,17 @@ public class NotificationService {
                 // don't fail if push delivery fails — notification is already saved to the db
             }
         }
+    }
+
+    private String preferenceKey(NotificationType type) {
+        return switch (type) {
+            case DEADLINE -> "deadline_reminders";
+            case PENALTY  -> "penalty_alerts";
+            case VAULT    -> "vault_suggestions";
+            case REFERRAL -> "referral_offers";
+            case PAYMENT  -> "payment_confirmations";
+            case SYSTEM   -> "system_updates";
+        };
     }
 
     private NotificationItem toItem(Notification n) {
