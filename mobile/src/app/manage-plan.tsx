@@ -82,6 +82,7 @@ export default function ManagePlanScreen() {
     user?.phoneNumber?.replace(/\s/g, "") ?? ""
   );
   const [momoProvider, setMomoProvider] = useState("mtn");
+  const [momoError, setMomoError] = useState("");
 
   const [subscribing, setSubscribing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
@@ -136,7 +137,7 @@ export default function ManagePlanScreen() {
     }
     if (!selectedPlan || !paymentMethod) return;
     if (paymentMethod === "momo" && !momoNumber.trim()) {
-      showToast("Enter your MoMo number.", "error");
+      setMomoError("Enter your MoMo number.");
       return;
     }
     if (subscribing) return;
@@ -378,13 +379,17 @@ export default function ManagePlanScreen() {
               <>
                 <Text style={styles.fieldLabel}>MOMO NUMBER</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, momoError ? styles.inputError : null]}
                   value={momoNumber}
-                  onChangeText={setMomoNumber}
+                  onChangeText={(t) => {
+                    setMomoNumber(t);
+                    if (momoError) setMomoError("");
+                  }}
                   placeholder="0241234567"
                   keyboardType="phone-pad"
                   placeholderTextColor="#9CA3AF"
                 />
+                {momoError ? <Text style={styles.errorText}>{momoError}</Text> : null}
                 <Text style={styles.fieldLabel}>PROVIDER</Text>
                 <Dropdown
                   style={styles.dropdown}
@@ -723,6 +728,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#EFEFED",
     ...(Platform.OS === "web" ? { outlineWidth: 0 } : {}),
+  },
+  inputError: {
+    borderColor: "#EF4444",
+  },
+  errorText: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: -4,
+    marginBottom: 12,
   },
   dropdown: {
     backgroundColor: "#FFFFFF",
