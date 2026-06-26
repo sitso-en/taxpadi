@@ -41,8 +41,6 @@ mobile/*.mobileprovision
 *.env
 !.env.example
 
-# Application properties (contains secrets)
-backend/api/src/main/resources/application.properties
 
 # IDE files
 .vscode/
