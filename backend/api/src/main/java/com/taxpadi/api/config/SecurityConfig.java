@@ -55,6 +55,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/invoices/*/pdf/download").permitAll()
                 .requestMatchers("/api/v1/payments/webhook/paystack").permitAll()
                 .requestMatchers("/api/v1/subscriptions/plans").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/v1/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
