@@ -13,14 +13,12 @@ import com.taxpadi.api.model.OtpVerification;
 import com.taxpadi.api.model.User;
 
 public interface OtpVerificationRepository extends JpaRepository<OtpVerification, UUID> {
-    @Query("SELECT o FROM OtpVerification o WHERE o.purpose = :purpose AND o.user = :user AND o.used = :used ORDER BY o.createdAt DESC LIMIT 1")
-    Optional<OtpVerification> findByPurposeAndUserAndUsed(@Param("purpose") OtpPurpose purpose, @Param("user") User user, @Param("used") Boolean used);
+    Optional<OtpVerification> findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(OtpPurpose purpose, User user, Boolean used);
 
     @Modifying
     @Query("UPDATE OtpVerification o SET o.used = true WHERE o.user = :user AND o.purpose = :purpose AND o.used = false")
     void invalidateActiveOtps(@Param("user") User user, @Param("purpose") OtpPurpose purpose);
 
 
-    @Query("SELECT o FROM OtpVerification o WHERE o.user = :user AND o.purpose = :purpose AND o.used = true AND o.resetTokenHash IS NOT NULL")
-    Optional<OtpVerification> findByUserAndPurposeAndRestTokenHash(@Param("user") User user, @Param("purpose") OtpPurpose purpose);
+    Optional<OtpVerification> findByUserAndPurposeAndResetTokenHash(User user, OtpPurpose purpose, String resetTokenHash);
 }

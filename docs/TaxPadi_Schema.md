@@ -223,7 +223,7 @@ Stores client invoices created by users. When an invoice is marked as paid a lin
 CREATE TABLE invoices (
     invoice_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id         UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    transaction_id  UUID REFERENCES transactions(transaction_id),
+    transaction_id  UUID REFERENCES transactions(transaction_id) ON DELETE SET NULL,
     client_name     VARCHAR(150) NOT NULL,
     client_email    VARCHAR(150),
     client_phone    VARCHAR(20),
@@ -774,25 +774,23 @@ CREATE TABLE import_history (
 
 ### Table 23: device_tokens
 
-Stores FCM push notification tokens per device per user.
+Stores biometric login tokens (SHA-256 hashed) per device per user.
 
 ```sql
 CREATE TABLE device_tokens (
     token_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id      UUID NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
-    fcm_token    VARCHAR(500) NOT NULL UNIQUE,
+    token_hash   VARCHAR(64) NOT NULL UNIQUE,
     device_info  VARCHAR(255),
-    platform     VARCHAR(10) NOT NULL CHECK (platform IN ('android', 'ios')),
-    is_active    BOOLEAN DEFAULT TRUE,
-    created_at   TIMESTAMP DEFAULT NOW(),
-    updated_at   TIMESTAMP DEFAULT NOW()
+    is_active    BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at   TIMESTAMP NOT NULL DEFAULT NOW()
 );
 ```
 
 | Column | Type | Notes |
 |---|---|---|
-| fcm_token | VARCHAR UNIQUE NOT NULL | Firebase Cloud Messaging token for the specific device. |
-| platform | VARCHAR CHECK | `android` or `ios`. Determines FCM payload format. |
+| token_hash | VARCHAR(64) NOT NULL UNIQUE | SHA-256 hash of the biometric token generated on-device. Raw token never stored. |
+| device_info | VARCHAR | Human-readable device identifier (e.g. "iPhone 15, iOS 17"). Stored for audit/display. |
 | is_active | BOOLEAN | Set to false on logout. Inactive tokens are skipped by the notification engine. |
 
 ---

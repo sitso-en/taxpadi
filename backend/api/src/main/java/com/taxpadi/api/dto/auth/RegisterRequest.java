@@ -6,10 +6,7 @@ import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
-import tools.jackson.databind.PropertyNamingStrategies;
-import tools.jackson.databind.annotation.JsonNaming;
 
-@JsonNaming(PropertyNamingStrategies.SnakeCaseStrategy.class)
 public class RegisterRequest {
 
     @NotBlank(message = "Full name is required")

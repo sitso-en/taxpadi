@@ -50,7 +50,6 @@ public class OtpVerification {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
-    // --- JPA Lifecycle Callbacks ---
     
     @PrePersist
     protected void onCreate() {
@@ -59,7 +58,6 @@ public class OtpVerification {
 
 
 
-    // --- Getters and Setters ---
 
     public UUID getOtpId() {
         return otpId;
