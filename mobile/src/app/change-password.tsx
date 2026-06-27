@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import axios from "axios";
 import React, { useState } from "react";
 import {
   KeyboardAvoidingView,
@@ -88,7 +89,7 @@ export default function ChangePasswordScreen() {
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [errors, setErrors] = useState<Record<string, string | undefined>>({});
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -112,6 +113,19 @@ export default function ChangePasswordScreen() {
       showToast("Password changed. Other sessions have been logged out.", "success");
       router.back();
     } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const low = ((error.response?.data?.message ?? "") as string).toLowerCase();
+        // Wrong current password belongs under the current-password field, not a
+        // generic "password requirements" toast.
+        if (low.includes("current password is incorrect")) {
+          setErrors((prev) => ({ ...prev, current: "Current password is incorrect." }));
+          return;
+        }
+        if (low.includes("do not match")) {
+          setErrors((prev) => ({ ...prev, confirm: "Passwords do not match." }));
+          return;
+        }
+      }
       showToast(getUserFriendlyError(error), "error");
     } finally {
       setSaving(false);
