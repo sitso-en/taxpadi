@@ -1,145 +1,292 @@
+import { useUser } from "../../context/UserContext";
+import { useTransactions } from "../../context/TransactionContext";
+import { usePayments } from "../../context/PaymentContext";
+import { useNotifications } from "../../context/NotificationContext";
+import { useDeadlines } from "../../context/DeadlineContext";
+
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TouchableOpacity,
-    View,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import { useReturns } from "../../context/ReturnContext";
 
 export default function HomeScreen() {
-  const { returns } = useReturns();
+  const { user } = useUser();
+  const { transactions } = useTransactions();
+  const { payments } = usePayments();
+  const { unreadCount } = useNotifications();
+  const { deadlines } = useDeadlines();
 
-  const filedReturns = returns.filter((r) => r.status === "Filed").length;
+  const firstName =
+    user.fullName?.split(" ")[0] || "User";
 
-  const pendingReturns = returns.filter((r) => r.status === "Pending").length;
+  const currentDate = new Date().toLocaleDateString(
+    "en-US",
+    {
+      month: "long",
+      year: "numeric",
+    }
+  );
 
-  const complianceRate =
-    filedReturns + pendingReturns === 0
-      ? 100
-      : Math.round((filedReturns / (filedReturns + pendingReturns)) * 100);
+  // Financial calculations
+
+  const totalIncome = transactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  const totalExpenses = transactions
+    .filter((t) => t.type === "expense")
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Only deductible expenses reduce taxes
+  const deductibleExpenses = transactions
+    .filter(
+      (t) =>
+        t.type === "expense" &&
+        t.isDeductible
+    )
+    .reduce((sum, t) => sum + t.amount, 0);
+
+  // Taxable profit after deductions
+   const taxableProfit = totalIncome - deductibleExpenses; const totalPayments = payments.reduce( (sum, payment) => sum + payment.amount, 0 );
+    // Taxes 
+    const vatDue = totalIncome * 0.15; const payeDue = totalIncome * 0.055; const incomeTax = taxableProfit > 0 ? taxableProfit * 0.25 : 0; const withholdingTax = totalIncome * 0.05; 
+    // Total tax liability 
+  const totalTaxLiability = vatDue + payeDue + incomeTax + withholdingTax;
+   // Actual amount left to pay
+    const netTaxLiability = totalTaxLiability - totalPayments;
+  const calculateDaysLeft = (
+    dueDate: string
+  ) => {
+    const today = new Date();
+
+    const difference =
+      new Date(dueDate).getTime() -
+      today.getTime();
+
+    return Math.ceil(
+      difference / (1000 * 60 * 60 * 24)
+    );
+  };
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{ paddingBottom: 120 }}
+      showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.greeting}>Welcome Back 👋</Text>
+      {/* Header */}
 
-      <View style={styles.heroCard}>
-        <Text style={styles.heroLabel}>Compliance Score</Text>
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.greeting}>
+            Good morning, {firstName} 👋
+          </Text>
 
-        <Text style={styles.heroScore}>{complianceRate}%</Text>
+          <Text style={styles.date}>
+            {currentDate}
+          </Text>
+        </View>
 
-        <Text style={styles.heroSubtext}>Based on your tax filings</Text>
+        <TouchableOpacity
+          style={styles.notificationContainer}
+          onPress={() =>
+            router.push(
+              "/notification-preferences"
+            )
+          }
+        >
+          <Ionicons
+            name="notifications-outline"
+            size={26}
+            color="#111827"
+          />
+
+          {unreadCount > 0 && (
+            <View
+              style={styles.notificationDot}
+            >
+              <Text
+                style={
+                  styles.notificationCount
+                }
+              >
+                {unreadCount}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
+
+      {/* Net Tax Liability Card */}
+
+      <View style={styles.taxCard}>
+        <View style={styles.taxCircle}>
+          <View
+            style={styles.taxCircleInner}
+          />
+        </View>
+
+        <View>
+          <Text style={styles.taxLabel}>
+            NET TAX LIABILITY
+          </Text>
+
+          <Text style={styles.taxAmount}>
+            GH¢{" "}
+            {Math.max(
+              netTaxLiability,
+              0
+            ).toFixed(2)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Summary Grid */}
 
       <View style={styles.grid}>
-        <View style={styles.statCard}>
-          <Ionicons name="document-text-outline" size={24} color="#2563EB" />
+        <View style={styles.summaryCard}>
+          <Text
+            style={styles.summaryTitle}
+          >
+            Income
+          </Text>
 
-          <Text style={styles.statNumber}>{filedReturns}</Text>
-
-          <Text style={styles.statLabel}>Filed</Text>
+          <Text
+            style={styles.summaryAmount}
+          >
+            GH¢ {totalIncome.toFixed(2)}
+          </Text>
         </View>
 
-        <View style={styles.statCard}>
-          <Ionicons name="time-outline" size={24} color="#E65100" />
+        <View style={styles.summaryCard}>
+          <Text
+            style={styles.summaryTitle}
+          >
+            Expenses
+          </Text>
 
-          <Text style={styles.statNumber}>{pendingReturns}</Text>
-
-          <Text style={styles.statLabel}>Pending</Text>
+          <Text
+            style={styles.summaryAmount}
+          >
+            GH¢ {totalExpenses.toFixed(2)}
+          </Text>
         </View>
 
-        <View style={styles.statCard}>
-          <Ionicons name="shield-checkmark-outline" size={24} color="#34A853" />
+        <View style={styles.summaryCard}>
+          <Text
+            style={styles.summaryTitle}
+          >
+            Total Tax Liability
+          </Text>
 
-          <Text style={styles.statNumber}>{complianceRate}%</Text>
-
-          <Text style={styles.statLabel}>Compliance</Text>
+          <Text
+            style={styles.summaryAmount}
+          >
+            GH¢{" "}
+            {totalTaxLiability.toFixed(2)}
+          </Text>
         </View>
 
-        <View style={styles.statCard}>
-          <Ionicons name="cash-outline" size={24} color="#C44736" />
+        <View style={styles.summaryCard}>
+          <Text
+            style={styles.summaryTitle}
+          >
+            Tax Paid
+          </Text>
 
-          <Text style={styles.statNumber}>GHS 0</Text>
-
-          <Text style={styles.statLabel}>Tax Due</Text>
+          <Text
+            style={styles.summaryAmount}
+          >
+            GH¢ {totalPayments.toFixed(2)}
+          </Text>
         </View>
       </View>
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
+      {/* Deadlines */}
 
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/add-transaction")}
-        >
-          <Ionicons name="add-circle-outline" size={20} color="#C44736" />
-
-          <Text style={styles.actionText}>Log Transaction</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/returns")}
-        >
-          <Ionicons name="document-outline" size={20} color="#C44736" />
-
-          <Text style={styles.actionText}>File Tax Return</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.actionButton}
-          onPress={() => router.push("/payments")}
-        >
-          <Ionicons name="card-outline" size={20} color="#C44736" />
-
-          <Text style={styles.actionText}>Make Payment</Text>
-        </TouchableOpacity>
-      </View>
-
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Compliance Status</Text>
-
-        <Text
-          style={{
-            color: pendingReturns === 0 ? "#34A853" : "#E65100",
-            fontWeight: "bold",
-            fontSize: 18,
-          }}
-        >
-          {pendingReturns === 0 ? "Good Standing" : "Action Required"}
+      <View style={styles.deadlineHeader}>
+        <Text style={styles.sectionTitle}>
+          Upcoming Deadlines
         </Text>
+
+        <TouchableOpacity
+          onPress={() =>
+            router.push("/deadlines")
+          }
+        >
+          <Text style={styles.seeAll}>
+            See all →
+          </Text>
+        </TouchableOpacity>
       </View>
 
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Upcoming Deadlines</Text>
+      {deadlines.map((deadline) => {
+        const daysLeft =
+          calculateDaysLeft(
+            deadline.dueDate
+          );
 
-        <View style={styles.deadlineItem}>
-          <Text style={styles.deadlineTitle}>VAT Filing</Text>
+        return (
+          <View
+            key={deadline.id}
+            style={styles.deadlineCard}
+          >
+            <View>
+              <Text
+                style={
+                  styles.deadlineTitle
+                }
+              >
+                {deadline.title}
+              </Text>
 
-          <Text style={styles.deadlineDate}>15 June 2026</Text>
-        </View>
+              <Text
+                style={
+                  styles.deadlineDate
+                }
+              >
+                {new Date(
+                  deadline.dueDate
+                ).toLocaleDateString(
+                  "en-US",
+                  {
+                    month: "short",
+                    day: "numeric",
+                  }
+                )}
+              </Text>
+            </View>
 
-        <View style={styles.deadlineItem}>
-          <Text style={styles.deadlineTitle}>PAYE Filing</Text>
-
-          <Text style={styles.deadlineDate}>30 June 2026</Text>
-        </View>
-      </View>
-
-      <View style={styles.sectionCard}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-
-        <Text style={styles.activityText}>• Dashboard viewed</Text>
-
-        <Text style={styles.activityText}>• Tax profile checked</Text>
-
-        <Text style={styles.activityText}>• Reports generated</Text>
-      </View>
+            {daysLeft >= 0 ? (
+              <Text
+                style={styles.daysLeft}
+              >
+                {daysLeft}d left
+              </Text>
+            ) : (
+              <View
+                style={
+                  styles.overdueBadge
+                }
+              >
+                <Text
+                  style={
+                    styles.overdueText
+                  }
+                >
+                  Overdue
+                </Text>
+              </View>
+            )}
+          </View>
+        );
+      })}
     </ScrollView>
   );
 }
@@ -148,105 +295,175 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    padding: 20,
-    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingTop: 55,
+  },
+
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+
+  notificationContainer: {
+    position: "relative",
+    padding: 6,
+  },
+
+  notificationDot: {
+    position: "absolute",
+    top: -2,
+    right: -2,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#C44736",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+
+  notificationCount: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontFamily: "Inter_700Bold",
   },
 
   greeting: {
-    fontSize: 30,
-    fontWeight: "bold",
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+  },
+
+  date: {
+    marginTop: 4,
+    color: "#6B7280",
+    fontFamily: "Inter_400Regular",
+  },
+
+  taxCard: {
+    backgroundColor: "#C44736",
+    borderRadius: 18,
+    padding: 24,
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 18,
   },
 
-  heroCard: {
+  taxCircle: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 18,
+  },
+
+  taxCircleInner: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 20,
   },
 
-  heroLabel: {
-    color: "#666",
+  taxLabel: {
+    color: "#FDECEC",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
 
-  heroScore: {
-    fontSize: 34,
-    fontWeight: "bold",
-    color: "#111",
-    marginTop: 8,
-  },
-
-  heroSubtext: {
-    color: "#666",
-    marginTop: 6,
+  taxAmount: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_700Bold",
+    fontSize: 30,
+    marginTop: 4,
   },
 
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 20,
+    marginBottom: 24,
   },
 
-  statCard: {
+  summaryCard: {
     width: "48%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 18,
     marginBottom: 12,
-    alignItems: "center",
   },
 
-  statNumber: {
+  summaryTitle: {
+    color: "#6B7280",
+    fontFamily: "Inter_500Medium",
+    marginBottom: 8,
+  },
+
+  summaryAmount: {
     fontSize: 22,
-    fontWeight: "bold",
-    marginTop: 8,
+    color: "#111827",
+    fontFamily: "Inter_700Bold",
   },
 
-  statLabel: {
-    color: "#666",
-    marginTop: 4,
-  },
-
-  sectionCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
+  deadlineHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 14,
   },
 
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
   },
 
-  actionButton: {
+  seeAll: {
+    color: "#C44736",
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  deadlineCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 18,
+    marginBottom: 12,
     flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    paddingVertical: 12,
-  },
-
-  actionText: {
-    marginLeft: 10,
-    fontWeight: "600",
-  },
-
-  deadlineItem: {
-    marginBottom: 12,
   },
 
   deadlineTitle: {
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    fontSize: 16,
   },
 
   deadlineDate: {
-    color: "#666",
-    marginTop: 2,
+    color: "#6B7280",
+    marginTop: 4,
+    fontFamily: "Inter_400Regular",
   },
 
-  activityText: {
-    marginBottom: 8,
-    color: "#444",
+  daysLeft: {
+    color: "#C44736",
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  overdueBadge: {
+    backgroundColor: "#C44736",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+
+  overdueText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
 });

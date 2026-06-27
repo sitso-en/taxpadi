@@ -1,3 +1,4 @@
+
 import {
   Inter_400Regular,
   Inter_600SemiBold,
@@ -7,10 +8,10 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
 import FloatingTaxBot from "../../components/FloatingTaxBot";
-import { InvoiceProvider } from "../../context/InvoiceContext";
-import { PaymentProvider } from "../../context/PaymentContext";
-import { ReturnProvider } from "../../context/ReturnContext";
-import { TransactionProvider } from "../../context/TransactionContext";
+
+
+
+
 
 export default function Layout() {
   const [fontsLoaded] = useFonts({
@@ -24,10 +25,7 @@ export default function Layout() {
   }
 
   return (
-    <TransactionProvider>
-      <PaymentProvider>
-        <ReturnProvider>
-          <InvoiceProvider>
+    
             <>
               <Tabs
                 screenOptions={{
@@ -68,18 +66,18 @@ export default function Layout() {
                 />
 
                 <Tabs.Screen
-                  name="returns"
-                  options={{
-                    title: "Tax",
-                    tabBarIcon: ({ color, size }) => (
-                      <Ionicons
-                        name="document-text-outline"
-                        size={size}
-                        color={color}
-                      />
-                    ),
-                  }}
-                />
+  name="tax"
+  options={{
+    title: "Tax",
+    tabBarIcon: ({ color, size }) => (
+      <Ionicons
+        name="document-text-outline"
+        size={size}
+        color={color}
+      />
+    ),
+  }}
+/>
 
                 <Tabs.Screen
                   name="payments"
@@ -235,13 +233,12 @@ export default function Layout() {
                     href: null,
                   }}
                 />
+                
+
               </Tabs>
 
               <FloatingTaxBot />
             </>
-          </InvoiceProvider>
-        </ReturnProvider>
-      </PaymentProvider>
-    </TransactionProvider>
+          
   );
 }

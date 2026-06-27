@@ -1,333 +1,725 @@
+import React, {
+  useMemo,
+  useState,
+} from "react";
+
 import { Ionicons } from "@expo/vector-icons";
-import { useState } from "react";
+import { router } from "expo-router";
+import { useUser } from "../../context/UserContext";
+
 import {
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+
 import { usePayments } from "../../context/PaymentContext";
+import { useTransactions } from "../../context/TransactionContext";
+import { useNotifications } from "../../context/NotificationContext";
+
+import { Payment } from "../../data/payments";
+import { Transaction } from "../../data/transactions";
 
 export default function PaymentsScreen() {
-  const { payments, addPayment, deletePayment } = usePayments();
+  const { user } = useUser();
+  const { payments, addPayment } =
+    usePayments();
 
-  const [description, setDescription] = useState("");
-  const [amount, setAmount] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"momo" | "bank">("momo");
+  const { transactions } =
+    useTransactions();
 
-  const paymentsMade = payments.reduce(
-    (sum, payment) => sum + payment.amount,
-    0,
+  const { addNotification } =
+    useNotifications();
+
+  const [paymentMethod, setPaymentMethod] =
+    useState<"momo" | "bank">(
+      "momo"
+    );
+
+  const [processing, setProcessing] =
+    useState(false);
+
+  // Dynamic calculations
+
+  const totalIncome = useMemo(
+    () =>
+      transactions
+        .filter(
+          (
+            transaction: Transaction
+          ) =>
+            transaction.type ===
+            "income"
+        )
+        .reduce(
+          (
+            sum: number,
+            transaction: Transaction
+          ) =>
+            sum +
+            transaction.amount,
+          0
+        ),
+    [transactions]
   );
 
-  const totalDue = 5000;
-  const outstandingBalance = totalDue - paymentsMade;
+  const totalExpense = useMemo(
+    () =>
+      transactions
+        .filter(
+          (
+            transaction: Transaction
+          ) =>
+            transaction.type ===
+            "expense"
+        )
+        .reduce(
+          (
+            sum: number,
+            transaction: Transaction
+          ) =>
+            sum +
+            transaction.amount,
+          0
+        ),
+    [transactions]
+  );
 
-  const handleAddPayment = () => {
-    if (!description || !amount) return;
+  const taxDue =
+    Math.max(
+      totalIncome -
+        totalExpense,
+      0
+    ) * 0.1;
 
-    addPayment({
-      id: Date.now(),
-      description,
-      amount: Number(amount),
-      date: new Date().toLocaleDateString(),
-      status: "Paid",
-    });
+  const penalties =
+    taxDue * 0.15;
 
-    setDescription("");
-    setAmount("");
+  const totalOutstanding =
+    taxDue + penalties;
+
+  const totalPaid =
+    payments
+      .filter(
+        (payment: Payment) =>
+          payment.status ===
+          "Paid"
+      )
+      .reduce(
+        (
+          sum: number,
+          payment: Payment
+        ) =>
+          sum + payment.amount,
+        0
+      );
+
+  const remainingBalance =
+    Math.max(
+      totalOutstanding -
+        totalPaid,
+      0
+    );
+
+  const handlePayment = () => {
+    if (processing) return;
+
+    if (
+      remainingBalance <= 0
+    ) {
+      Alert.alert(
+        "No Outstanding Balance",
+        "You currently have no outstanding payments."
+      );
+
+      return;
+    }
+
+    Alert.alert(
+      "Confirm Payment",
+      `Pay GH¢ ${remainingBalance.toFixed(
+        2
+      )} using ${
+        paymentMethod === "momo"
+          ? "Mobile Money"
+          : "Bank Transfer"
+      }?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+
+        {
+          text: "Pay",
+
+          onPress: () => {
+            setProcessing(true);
+
+            const newPayment: Payment =
+              {
+                id: Date.now(),
+
+                description:
+                  paymentMethod ===
+                  "momo"
+                    ? "Mobile Money Payment"
+                    : "Bank Transfer",
+
+                amount:
+                  remainingBalance,
+
+                date:
+                  new Date().toISOString(),
+
+                status: "Paid",
+              };
+
+            addPayment(
+              newPayment
+            );
+
+            addNotification(
+              "Payment Successful",
+              `You successfully paid GH¢ ${remainingBalance.toFixed(
+                2
+              )} via ${
+                paymentMethod ===
+                "momo"
+                  ? "Mobile Money"
+                  : "Bank Transfer"
+              }.`
+            );
+
+            setProcessing(
+              false
+            );
+
+            Alert.alert(
+              "Success",
+              "Payment completed successfully."
+            );
+          },
+        },
+      ]
+    );
   };
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      showsVerticalScrollIndicator={
+        false
+      }
+      contentContainerStyle={{
+        paddingBottom: 120,
+      }}
     >
-      <Text style={styles.title}>Payments</Text>
+      {/* Header */}
 
-      <View style={styles.balanceCard}>
-        <Text style={styles.balanceLabel}>Outstanding Balance</Text>
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() =>
+            router.back()
+          }
+        >
+          <Ionicons
+            name="chevron-back"
+            size={26}
+            color="#111827"
+          />
+        </TouchableOpacity>
 
-        <Text style={styles.balanceAmount}>
-          GHS {outstandingBalance.toFixed(2)}
-        </Text>
-
-        <Text style={styles.balanceSubtext}>
-          Total Due: GHS {totalDue.toFixed(2)}
+        <Text style={styles.title}>
+          Payments
         </Text>
       </View>
 
-      <View style={styles.summaryRow}>
-        <View style={styles.summaryCard}>
-          <Ionicons name="checkmark-circle-outline" size={24} color="#34A853" />
+      {/* Outstanding */}
 
-          <Text style={styles.summaryValue}>GHS {paymentsMade.toFixed(2)}</Text>
+      <View
+        style={styles.balanceCard}
+      >
+        <Text
+          style={
+            styles.balanceLabel
+          }
+        >
+          TOTAL OUTSTANDING
+        </Text>
 
-          <Text style={styles.summaryLabel}>Paid</Text>
-        </View>
+        <Text
+          style={
+            styles.balanceAmount
+          }
+        >
+          GH¢{" "}
+          {remainingBalance.toFixed(
+            2
+          )}
+        </Text>
 
-        <View style={styles.summaryCard}>
-          <Ionicons name="wallet-outline" size={24} color="#C44736" />
+        <Text
+          style={
+            styles.balanceSubText
+          }
+        >
+          Tax: GH¢{" "}
+          {taxDue.toFixed(2)}
+          {" • "}
+          Penalties: GH¢{" "}
+          {penalties.toFixed(
+            2
+          )}
+        </Text>
+      </View>
+            {/* Payment Method */}
 
-          <Text style={styles.summaryValue}>
-            GHS {outstandingBalance.toFixed(2)}
+      <Text
+        style={styles.sectionLabel}
+      >
+        PAYMENT METHOD
+      </Text>
+
+      <View
+        style={
+          styles.methodContainer
+        }
+      >
+        <TouchableOpacity
+          style={[
+            styles.methodButton,
+            paymentMethod ===
+              "momo" &&
+              styles.selectedMethod,
+          ]}
+          onPress={() =>
+            setPaymentMethod(
+              "momo"
+            )
+          }
+        >
+          <Ionicons
+            name="phone-portrait-outline"
+            size={18}
+            color={
+              paymentMethod ===
+              "momo"
+                ? "#C44736"
+                : "#6B7280"
+            }
+          />
+
+          <Text
+            style={
+              paymentMethod ===
+              "momo"
+                ? styles.selectedMethodText
+                : styles.methodText
+            }
+          >
+            Mobile Money
           </Text>
-
-          <Text style={styles.summaryLabel}>Due</Text>
-        </View>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Make Payment</Text>
-
-        <Text style={styles.fieldLabel}>Payment Method</Text>
-
-        <TouchableOpacity
-          style={[
-            styles.methodButton,
-            paymentMethod === "momo" && styles.selectedMethod,
-          ]}
-          onPress={() => setPaymentMethod("momo")}
-        >
-          <Ionicons name="phone-portrait-outline" size={20} color="#34A853" />
-
-          <Text style={styles.methodText}>Mobile Money</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[
             styles.methodButton,
-            paymentMethod === "bank" && styles.selectedMethod,
+            paymentMethod ===
+              "bank" &&
+              styles.selectedMethod,
           ]}
-          onPress={() => setPaymentMethod("bank")}
+          onPress={() =>
+            setPaymentMethod(
+              "bank"
+            )
+          }
         >
-          <Ionicons name="business-outline" size={20} color="#2563EB" />
+          <Ionicons
+            name="business-outline"
+            size={18}
+            color={
+              paymentMethod ===
+              "bank"
+                ? "#C44736"
+                : "#6B7280"
+            }
+          />
 
-          <Text style={styles.methodText}>Bank Transfer</Text>
-        </TouchableOpacity>
-
-        <TextInput
-          style={styles.input}
-          placeholder="Payment Description"
-          value={description}
-          onChangeText={setDescription}
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Amount"
-          keyboardType="numeric"
-          value={amount}
-          onChangeText={setAmount}
-        />
-
-        <TouchableOpacity style={styles.addButton} onPress={handleAddPayment}>
-          <Text style={styles.addButtonText}>Submit Payment</Text>
+          <Text
+            style={
+              paymentMethod ===
+              "bank"
+                ? styles.selectedMethodText
+                : styles.methodText
+            }
+          >
+            Bank Transfer
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Payment History</Text>
+      {/* Account Details */}
 
-        {payments.length === 0 ? (
-          <Text style={styles.emptyText}>No payments recorded</Text>
+     <View style={styles.numberCard}>
+  <Text style={styles.numberLabel}>
+    {paymentMethod === "momo"
+      ? "MOMO NUMBER"
+      : "BANK ACCOUNT"}
+  </Text>
+
+  <Text style={styles.numberText}>
+    {paymentMethod === "momo"
+      ? user.phoneNumber || "No phone number available"
+      : `${user.fullName || "TaxPadi User"} • ${
+          user.email || "No email available"
+        }`}
+  </Text>
+</View>
+
+      {/* Pay Button */}
+
+      <TouchableOpacity
+        disabled={
+          processing ||
+          remainingBalance <= 0
+        }
+        style={[
+          styles.payButton,
+
+          remainingBalance <=
+            0 && {
+            backgroundColor:
+              "#9CA3AF",
+          },
+        ]}
+        onPress={
+          handlePayment
+        }
+      >
+        <Text
+          style={
+            styles.payButtonText
+          }
+        >
+          {processing
+            ? "Processing..."
+            : remainingBalance >
+              0
+            ? `Pay GH¢ ${remainingBalance.toFixed(
+                2
+              )}`
+            : "Nothing To Pay"}
+        </Text>
+      </TouchableOpacity>
+
+      {/* History */}
+
+      <Text
+        style={styles.sectionLabel}
+      >
+        PAYMENT HISTORY
+      </Text>
+
+      <View
+        style={styles.historyCard}
+      >
+        {payments.length ===
+        0 ? (
+          <Text
+            style={{
+              textAlign:
+                "center",
+              color:
+                "#6B7280",
+            }}
+          >
+            No payment history
+            available.
+          </Text>
         ) : (
-          payments.map((payment) => (
-            <View key={payment.id} style={styles.paymentItem}>
-              <View style={styles.paymentRow}>
-                <View>
-                  <Text style={styles.paymentTitle}>{payment.description}</Text>
+          payments
+            .slice()
+            .reverse()
+            .map(
+              (
+                item: Payment
+              ) => (
+                <View
+                  key={item.id}
+                  style={
+                    styles.historyRow
+                  }
+                >
+                  <View
+                    style={
+                      styles.leftSection
+                    }
+                  >
+                    <View
+                      style={
+                        styles.dot
+                      }
+                    />
 
-                  <Text style={styles.paymentDate}>{payment.date}</Text>
+                    <View>
+                      <Text
+                        style={
+                          styles.historyTitle
+                        }
+                      >
+                        {
+                          item.description
+                        }
+                      </Text>
+
+                      <Text
+                        style={
+                          styles.historyRef
+                        }
+                      >
+                        Ref:
+                        PAY-
+                        {item.id}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View
+                    style={
+                      styles.rightSection
+                    }
+                  >
+                    <Text
+                      style={
+                        styles.historyAmount
+                      }
+                    >
+                      GH¢{" "}
+                      {item.amount.toFixed(
+                        2
+                      )}
+                    </Text>
+
+                    <Text style={styles.historyDate}>
+  {new Date(item.date).toLocaleString("en-US", {
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+})}
+</Text>
+                  </View>
                 </View>
-
-                <Text style={styles.paymentAmount}>GHS {payment.amount}</Text>
-              </View>
-
-              <TouchableOpacity
-                style={styles.deleteButton}
-                onPress={() => deletePayment(payment.id)}
-              >
-                <Ionicons name="trash-outline" size={18} color="#C44736" />
-
-                <Text style={styles.deleteText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
-          ))
+              )
+            )
         )}
       </View>
     </ScrollView>
   );
 }
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        "#FAFAFA",
+      paddingHorizontal: 20,
+      paddingTop: 55,
+    },
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FAFAFA",
-    padding: 20,
-    paddingTop: 50,
-  },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 24,
+    },
 
-  title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    marginBottom: 20,
-  },
+    title: {
+      fontSize: 28,
+      color: "#111827",
+      fontFamily:
+        "Inter_700Bold",
+      marginLeft: 8,
+    },
 
-  balanceCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 20,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: "#EFEFEF",
-  },
+    balanceCard: {
+      backgroundColor:
+        "#C44736",
+      borderRadius: 18,
+      padding: 22,
+      marginBottom: 24,
+    },
 
-  balanceLabel: {
-    color: "#666",
-  },
+    balanceLabel: {
+      color: "#FDECEC",
+      fontSize: 11,
+      fontFamily:
+        "Inter_600SemiBold",
+    },
 
-  balanceAmount: {
-    color: "#111",
-    fontSize: 30,
-    fontWeight: "bold",
-    marginTop: 8,
-  },
+    balanceAmount: {
+      color: "#FFFFFF",
+      fontSize: 34,
+      fontFamily:
+        "Inter_700Bold",
+      marginTop: 8,
+    },
 
-  balanceSubtext: {
-    color: "#888",
-    marginTop: 6,
-  },
+    balanceSubText: {
+      color: "#FDECEC",
+      marginTop: 8,
+      fontFamily:
+        "Inter_400Regular",
+    },
 
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 20,
-  },
+    sectionLabel: {
+      color: "#C44736",
+      fontSize: 11,
+      marginBottom: 10,
+      fontFamily:
+        "Inter_600SemiBold",
+    },
 
-  summaryCard: {
-    width: "48%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 18,
-    alignItems: "center",
-  },
+    methodContainer: {
+      flexDirection: "row",
+      justifyContent:
+        "space-between",
+      marginBottom: 20,
+    },
 
-  summaryValue: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 8,
-  },
+    methodButton: {
+      flex: 1,
+      backgroundColor:
+        "#F3F4F6",
+      padding: 14,
+      borderRadius: 12,
+      flexDirection: "row",
+      justifyContent:
+        "center",
+      alignItems: "center",
+      marginHorizontal: 4,
+    },
 
-  summaryLabel: {
-    color: "#666",
-    marginTop: 4,
-  },
+    selectedMethod: {
+      borderWidth: 1.5,
+      borderColor:
+        "#C44736",
+      backgroundColor:
+        "#FFF5F3",
+    },
 
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
-  },
+    selectedMethodText: {
+      color: "#C44736",
+      marginLeft: 6,
+      fontFamily:
+        "Inter_600SemiBold",
+      fontSize: 12,
+    },
 
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
+    methodText: {
+      color: "#6B7280",
+      marginLeft: 6,
+      fontFamily:
+        "Inter_500Medium",
+      fontSize: 12,
+    },
 
-  fieldLabel: {
-    fontWeight: "600",
-    marginBottom: 10,
-    color: "#444",
-  },
+    numberCard: {
+      backgroundColor:
+        "#F3F4F6",
+      borderRadius: 14,
+      padding: 18,
+      marginBottom: 24,
+    },
 
-  methodButton: {
-    backgroundColor: "#F7F7F7",
-    padding: 14,
-    borderRadius: 14,
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-  },
+    numberLabel: {
+      color: "#C44736",
+      fontSize: 10,
+      fontFamily:
+        "Inter_600SemiBold",
+    },
 
-  selectedMethod: {
-    borderWidth: 2,
-    borderColor: "#C44736",
-  },
+    numberText: {
+      color: "#111827",
+      marginTop: 8,
+      fontFamily:
+        "Inter_500Medium",
+    },
 
-  methodText: {
-    marginLeft: 10,
-    fontWeight: "600",
-  },
+    payButton: {
+      backgroundColor:
+        "#C44736",
+      borderRadius: 12,
+      paddingVertical: 16,
+      alignItems: "center",
+      marginBottom: 30,
+    },
 
-  input: {
-    backgroundColor: "#F5F5F5",
-    borderRadius: 999,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    marginTop: 10,
-  },
+    payButtonText: {
+      color: "#FFFFFF",
+      fontSize: 16,
+      fontFamily:
+        "Inter_600SemiBold",
+    },
 
-  addButton: {
-    backgroundColor: "#C44736",
-    padding: 15,
-    borderRadius: 12,
-    marginTop: 16,
-  },
+    historyCard: {
+      backgroundColor:
+        "#FFFFFF",
+      borderRadius: 16,
+      padding: 18,
+    },
 
-  addButtonText: {
-    color: "#FFFFFF",
-    textAlign: "center",
-    fontWeight: "bold",
-  },
+    historyRow: {
+      flexDirection: "row",
+      justifyContent:
+        "space-between",
+      marginBottom: 22,
+    },
 
-  emptyText: {
-    color: "#666",
-  },
+    leftSection: {
+      flexDirection: "row",
+      alignItems: "center",
+    },
 
-  paymentItem: {
-    borderTopWidth: 1,
-    borderColor: "#EEE",
-    paddingTop: 12,
-    marginTop: 12,
-  },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor:
+        "#34A853",
+      marginRight: 10,
+      marginTop: 6,
+    },
 
-  paymentRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+    historyTitle: {
+      color: "#111827",
+      fontFamily:
+        "Inter_600SemiBold",
+    },
 
-  paymentTitle: {
-    fontWeight: "600",
-  },
+    historyRef: {
+      color: "#6B7280",
+      fontSize: 11,
+      marginTop: 3,
+    },
 
-  paymentDate: {
-    color: "#666",
-    marginTop: 2,
-  },
+    rightSection: {
+      alignItems: "flex-end",
+    },
 
-  paymentAmount: {
-    fontWeight: "bold",
-  },
+    historyAmount: {
+      color: "#111827",
+      fontFamily:
+        "Inter_600SemiBold",
+    },
 
-  deleteButton: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#FCE8E6",
-    borderRadius: 10,
-    padding: 10,
-    marginTop: 10,
-  },
-
-  deleteText: {
-    color: "#C44736",
-    marginLeft: 6,
-    fontWeight: "600",
-  },
-});
+    historyDate: {
+      color: "#6B7280",
+      fontSize: 11,
+      marginTop: 3,
+    },
+  });

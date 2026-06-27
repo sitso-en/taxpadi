@@ -1,179 +1,515 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useNotifications } from "../context/NotificationContext";
+
+import React from "react";
+
 import {
+  Alert,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
 export default function NotificationPreferencesScreen() {
-  const [deadlineReminders, setDeadlineReminders] = useState(true);
-  const [penaltyAlerts, setPenaltyAlerts] = useState(true);
-  const [vaultSuggestions, setVaultSuggestions] = useState(true);
-  const [referralOffers, setReferralOffers] = useState(true);
-  const [paymentConfirmations, setPaymentConfirmations] = useState(true);
-  const [systemUpdates, setSystemUpdates] = useState(true);
+  const {
+    notifications,
+    unreadCount,
+    markAsRead,
+    markAllAsRead,
+    deleteNotification,
+    clearNotifications,
+  } = useNotifications();
 
-  const PreferenceItem = ({
-    title,
-    description,
-    value,
-    onValueChange,
-  }: any) => (
-    <View style={styles.preferenceCard}>
-      <View style={styles.preferenceContent}>
-        <Text style={styles.preferenceTitle}>{title}</Text>
+  const getIcon = (title: string) => {
+    const text = title.toLowerCase();
 
-        <Text style={styles.preferenceDescription}>{description}</Text>
-      </View>
+    if (text.includes("payment"))
+      return "checkmark-circle-outline";
 
-      <Switch
-        value={value}
-        onValueChange={onValueChange}
-        trackColor={{
-          false: "#E5E7EB",
-          true: "#A7F3D0",
-        }}
-        thumbColor="#FFFFFF"
-      />
-    </View>
-  );
+    if (
+      text.includes("deadline")
+    )
+      return "calendar-outline";
+
+    if (text.includes("vat"))
+      return "document-text-outline";
+
+    if (
+      text.includes("savings")
+    )
+      return "wallet-outline";
+
+    if (
+      text.includes("penalty")
+    )
+      return "warning-outline";
+
+    return "notifications-outline";
+  };
+
+  const formatTime = (
+    dateString: string
+  ) => {
+    const now = new Date();
+
+    const date = new Date(
+      dateString
+    );
+
+    const diff =
+      now.getTime() -
+      date.getTime();
+
+    const minutes = Math.floor(
+      diff / (1000 * 60)
+    );
+
+    const hours = Math.floor(
+      diff / (1000 * 60 * 60)
+    );
+
+    const days = Math.floor(
+      diff /
+        (1000 *
+          60 *
+          60 *
+          24)
+    );
+
+    if (minutes < 1)
+      return "Just now";
+
+    if (minutes < 60)
+      return `${minutes}m ago`;
+
+    if (hours < 24)
+      return `${hours}h ago`;
+
+    if (days === 1)
+      return "Yesterday";
+
+    if (days < 7)
+      return `${days} days ago`;
+
+    return date.toLocaleDateString();
+  };
+
+  const handleDelete = (
+    id: number
+  ) => {
+    Alert.alert(
+      "Delete Notification",
+      "Remove this notification?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+
+        {
+          text: "Delete",
+          style: "destructive",
+
+          onPress: () =>
+            deleteNotification(id),
+        },
+      ]
+    );
+  };
+
+  const handleClearAll =
+    () => {
+      Alert.alert(
+        "Clear Notifications",
+        "Delete all notifications?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+
+          {
+            text: "Clear",
+            style:
+              "destructive",
+
+            onPress:
+              clearNotifications,
+          },
+        ]
+      );
+    };
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{
+        paddingBottom: 50,
+      }}
+      showsVerticalScrollIndicator={
+        false
+      }
     >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.push("/settings")}>
-          <Ionicons name="chevron-back" size={28} color="#222" />
+      {/* Header */}
+
+      <View
+        style={styles.header}
+      >
+        <TouchableOpacity
+          onPress={() => {
+            if (
+              router.canGoBack()
+            ) {
+              router.back();
+            } else {
+              router.replace(
+                "/dashboard"
+              );
+            }
+          }}
+        >
+          <Ionicons
+            name="arrow-back"
+            size={24}
+            color="#111827"
+          />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Notifications</Text>
+        <Text
+          style={styles.title}
+        >
+          Notifications
+        </Text>
       </View>
 
-      <Text style={styles.subtitle}>
-        Choose which notifications you want to receive.
-      </Text>
+      {/* Top Row */}
 
-      <PreferenceItem
-        title="Deadline Reminders"
-        description="Get notified about upcoming tax deadlines."
-        value={deadlineReminders}
-        onValueChange={setDeadlineReminders}
-      />
-
-      <PreferenceItem
-        title="Penalty Alerts"
-        description="Receive alerts when penalties may apply."
-        value={penaltyAlerts}
-        onValueChange={setPenaltyAlerts}
-      />
-
-      <PreferenceItem
-        title="Vault Suggestions"
-        description="Receive tax savings recommendations."
-        value={vaultSuggestions}
-        onValueChange={setVaultSuggestions}
-      />
-
-      <PreferenceItem
-        title="Referral Offers"
-        description="Receive referral rewards and offers."
-        value={referralOffers}
-        onValueChange={setReferralOffers}
-      />
-
-      <PreferenceItem
-        title="Payment Confirmations"
-        description="Receive payment confirmations."
-        value={paymentConfirmations}
-        onValueChange={setPaymentConfirmations}
-      />
-
-      <PreferenceItem
-        title="System Updates"
-        description="Receive important announcements."
-        value={systemUpdates}
-        onValueChange={setSystemUpdates}
-      />
-
-      <TouchableOpacity
-        style={styles.saveButton}
-        onPress={() => alert("Preferences saved successfully!")}
+      <View
+        style={styles.topRow}
       >
-        <Text style={styles.saveButtonText}>Save Preferences</Text>
-      </TouchableOpacity>
+        <View
+          style={
+            styles.unreadBadge
+          }
+        >
+          <Text
+            style={
+              styles.unreadText
+            }
+          >
+            {unreadCount} unread
+          </Text>
+        </View>
+
+        <View
+          style={
+            styles.actionsRow
+          }
+        >
+          {unreadCount >
+            0 && (
+            <TouchableOpacity
+              onPress={
+                markAllAsRead
+              }
+            >
+              <Text
+                style={
+                  styles.actionText
+                }
+              >
+                Mark all read
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {notifications.length >
+            0 && (
+            <TouchableOpacity
+              onPress={
+                handleClearAll
+              }
+            >
+              <Text
+                style={
+                  styles.actionText
+                }
+              >
+                Clear all
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Empty State */}
+
+      {notifications.length ===
+        0 && (
+        <View
+          style={
+            styles.emptyContainer
+          }
+        >
+          <Ionicons
+            name="notifications-off-outline"
+            size={60}
+            color="#9CA3AF"
+          />
+
+          <Text
+            style={
+              styles.emptyTitle
+            }
+          >
+            No Notifications
+            Yet
+          </Text>
+
+          <Text
+            style={
+              styles.emptyText
+            }
+          >
+            New alerts,
+            reminders and
+            updates will
+            appear here.
+          </Text>
+        </View>
+      )}
+
+      {/* Notifications */}
+
+      {notifications.map(
+        (item) => (
+          <TouchableOpacity
+            key={item.id}
+            style={[
+              styles.notificationCard,
+
+              !item.read &&
+                styles.unreadNotification,
+            ]}
+            onPress={() => {
+              if (
+                !item.read
+              ) {
+                markAsRead(
+                  item.id
+                );
+              }
+            }}
+            onLongPress={() =>
+              handleDelete(
+                item.id
+              )
+            }
+          >
+            <Ionicons
+              name={
+                getIcon(
+                  item.title
+                ) as any
+              }
+              size={22}
+              color="#6B7280"
+              style={{
+                marginTop: 4,
+              }}
+            />
+
+            <View
+              style={
+                styles.content
+              }
+            >
+              <View
+                style={
+                  styles.notificationHeader
+                }
+              >
+                <Text
+                  style={
+                    styles.notificationTitle
+                  }
+                >
+                  {item.title}
+                </Text>
+
+                <Text
+                  style={
+                    styles.time
+                  }
+                >
+                  {formatTime(
+                    item.date
+                  )}
+                </Text>
+              </View>
+
+              <Text
+                style={
+                  styles.message
+                }
+              >
+                {item.message}
+              </Text>
+            </View>
+
+            {!item.read && (
+              <View
+                style={
+                  styles.redDot
+                }
+              />
+            )}
+          </TouchableOpacity>
+        )
+      )}
     </ScrollView>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FAFAFA",
-    padding: 20,
-    paddingTop: 50,
-  },
+const styles =
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor:
+        "#FAFAFA",
+      paddingHorizontal: 20,
+      paddingTop: 55,
+    },
 
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 24,
+    },
 
-  title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    marginLeft: 10,
-  },
+    title: {
+      fontSize: 30,
+      color: "#111827",
+      fontFamily:
+        "Inter_700Bold",
+      marginLeft: 10,
+    },
 
-  subtitle: {
-    color: "#666",
-    marginBottom: 20,
-  },
+    topRow: {
+      flexDirection: "row",
+      justifyContent:
+        "space-between",
+      alignItems: "center",
+      marginBottom: 20,
+    },
 
-  preferenceCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 12,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
+    unreadBadge: {
+      backgroundColor:
+        "#FCE8E6",
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
 
-  preferenceContent: {
-    flex: 1,
-    marginRight: 10,
-  },
+    unreadText: {
+      color: "#C44736",
+      fontSize: 12,
+      fontFamily:
+        "Inter_600SemiBold",
+    },
 
-  preferenceTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
+    actionsRow: {
+      flexDirection: "row",
+      gap: 16,
+    },
 
-  preferenceDescription: {
-    fontSize: 13,
-    color: "#666",
-    marginTop: 4,
-  },
+    actionText: {
+      color: "#C44736",
+      fontFamily:
+        "Inter_600SemiBold",
+    },
 
-  saveButton: {
-    backgroundColor: "#C44736",
-    borderRadius: 12,
-    padding: 16,
-    alignItems: "center",
-    marginTop: 12,
-  },
+    notificationCard: {
+      backgroundColor:
+        "#FFFFFF",
+      borderRadius: 18,
+      padding: 18,
+      marginBottom: 14,
+      flexDirection: "row",
+      alignItems:
+        "flex-start",
+    },
 
-  saveButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-});
+    unreadNotification: {
+      borderWidth: 1,
+      borderColor:
+        "#FCE8E6",
+      backgroundColor:
+        "#FFFDFC",
+    },
+
+    content: {
+      flex: 1,
+      marginLeft: 14,
+    },
+
+    notificationHeader: {
+      flexDirection: "row",
+      justifyContent:
+        "space-between",
+      marginBottom: 6,
+    },
+
+    notificationTitle: {
+      color: "#111827",
+      fontFamily:
+        "Inter_600SemiBold",
+      flex: 1,
+    },
+
+    time: {
+      color: "#9CA3AF",
+      fontSize: 12,
+      marginLeft: 8,
+    },
+
+    message: {
+      color: "#6B7280",
+      lineHeight: 18,
+      fontSize: 13,
+    },
+
+    redDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor:
+        "#C44736",
+      marginLeft: 10,
+      marginTop: 6,
+    },
+
+    emptyContainer: {
+      alignItems: "center",
+      marginTop: 60,
+      paddingHorizontal: 30,
+    },
+
+    emptyTitle: {
+      marginTop: 16,
+      fontSize: 18,
+      color: "#111827",
+      fontFamily:
+        "Inter_700Bold",
+    },
+
+    emptyText: {
+      marginTop: 8,
+      color: "#6B7280",
+      textAlign: "center",
+      lineHeight: 20,
+    },
+  });

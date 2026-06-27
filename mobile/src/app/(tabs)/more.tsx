@@ -8,111 +8,280 @@ import {
   View,
 } from "react-native";
 
+import { useUser } from "../../context/UserContext";
+import { useNotifications } from "../../context/NotificationContext";
+import { useDeadlines } from "../../context/DeadlineContext";
+import { useSavings } from "../../context/SavingsContext";
+import { useReferrals } from "../../context/ReferralContext";
+import { useCertificates } from "../../context/CertificateContext";
+
 export default function MoreScreen() {
+  const { user } = useUser();
+
+  const { unreadCount } =
+    useNotifications();
+
+  const { deadlines } =
+    useDeadlines();
+
+  const { totalSaved } =
+    useSavings();
+
+  const { availableOffers } =
+    useReferrals();
+
+  const { validCertificates } =
+    useCertificates();
+
+  // Count future deadlines only
+  const upcomingDeadlines =
+    deadlines.filter(
+      (deadline) =>
+        new Date(deadline.dueDate) >=
+        new Date()
+    ).length;
+
+  // User initials
+  const initials =
+    user.fullName
+      ?.split(" ")
+      .map((name) => name[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "U";
+
+  const menuItems = [
+    {
+      title: "Savings Vault",
+      subtitle:
+        totalSaved === 0
+          ? "No savings yet"
+          : `GH¢ ${totalSaved.toFixed(
+              2
+            )} saved`,
+      icon: "wallet-outline",
+      route: "/savings-vault",
+      color: "#34A853",
+    },
+
+    {
+      title: "Deadlines & Penalties",
+      subtitle:
+        upcomingDeadlines === 0
+          ? "No upcoming deadlines"
+          : `${upcomingDeadlines} upcoming deadline${
+              upcomingDeadlines > 1
+                ? "s"
+                : ""
+            }`,
+      icon: "calendar-outline",
+      route: "/deadlines",
+      color: "#EA4335",
+    },
+
+    {
+      title:
+        "Compliance Certificate",
+      subtitle:
+        validCertificates === 0
+          ? "No certificates available"
+          : `${validCertificates} certificate${
+              validCertificates > 1
+                ? "s"
+                : ""
+            } available`,
+      icon:
+        "shield-checkmark-outline",
+      route:
+        "/compliance-certificate",
+      color: "#F4B400",
+    },
+
+    {
+      title: "Invoices",
+      subtitle:
+        "Create and manage invoices",
+      icon: "receipt-outline",
+      route: "/invoices",
+      color: "#C44736",
+    },
+
+    {
+      title: "Reports & Export",
+      subtitle:
+        "Download as PDF or CSV",
+      icon: "bar-chart-outline",
+      route: "/reports",
+      color: "#34A853",
+    },
+
+    {
+      title: "Referral Offers",
+      subtitle:
+        availableOffers === 0
+          ? "No available offers"
+          : `${availableOffers} available offer${
+              availableOffers > 1
+                ? "s"
+                : ""
+            }`,
+      icon: "gift-outline",
+      route: "/referral-offers",
+      color: "#FF6F00",
+    },
+
+    {
+      title: "Notifications",
+      subtitle:
+        unreadCount === 0
+          ? "No unread notifications"
+          : `${unreadCount} unread notification${
+              unreadCount > 1
+                ? "s"
+                : ""
+            }`,
+      icon:
+        "notifications-outline",
+      route:
+        "/notification-preferences",
+      color: "#F4B400",
+    },
+
+    {
+      title: "Profile & Settings",
+      subtitle:
+        "Manage your account",
+      icon: "settings-outline",
+      route: "/settings",
+      color: "#6B7280",
+    },
+  ];
+
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 30 }}
+      showsVerticalScrollIndicator={
+        false
+      }
+      contentContainerStyle={{
+        paddingBottom: 120,
+      }}
     >
-      <Text style={styles.title}>More</Text>
+      <Text style={styles.title}>
+        More
+      </Text>
+
+      {/* Profile Card */}
 
       <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/settings")}
+        style={styles.profileCard}
+        onPress={() =>
+          router.push("/settings")
+        }
       >
-        <View style={styles.row}>
-          <Ionicons name="settings-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>Settings</Text>
+        <View style={styles.avatar}>
+          <Text
+            style={styles.avatarText}
+          >
+            {initials}
+          </Text>
+        </View>
+
+        <View style={{ flex: 1 }}>
+          <Text
+            style={styles.profileName}
+          >
+            {user.fullName || "User"}
+          </Text>
+
+          <Text
+            style={styles.profilePhone}
+          >
+            {user.phoneNumber ||
+              "No phone number"}
+          </Text>
+        </View>
+
+        <View style={styles.proBadge}>
+          <Text style={styles.proText}>
+            {user.plan}
+          </Text>
         </View>
       </TouchableOpacity>
 
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/subscription")}
-      >
-        <View style={styles.row}>
-          <Ionicons name="card-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>Subscription</Text>
-        </View>
-      </TouchableOpacity>
+      {/* Menu Items */}
+
+      {menuItems.map((item) => (
+        <TouchableOpacity
+          key={item.title}
+          style={styles.menuItem}
+          onPress={() =>
+            router.push(item.route as any)
+          }
+        >
+          <View
+            style={[
+              styles.iconContainer,
+              {
+                backgroundColor:
+                  item.color + "20",
+              },
+            ]}
+          >
+            <Ionicons
+              name={item.icon as any}
+              size={18}
+              color={item.color}
+            />
+          </View>
+
+          <View
+            style={styles.textContainer}
+          >
+            <Text
+              style={styles.menuTitle}
+            >
+              {item.title}
+            </Text>
+
+            <Text
+              style={
+                styles.menuSubtitle
+              }
+            >
+              {item.subtitle}
+            </Text>
+          </View>
+
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color="#9CA3AF"
+          />
+        </TouchableOpacity>
+      ))}
+
+      {/* Logout */}
 
       <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/tax-profile")}
+        style={styles.logoutButton}
+        onPress={() =>
+          router.push(
+            "/logout-confirmation"
+          )
+        }
       >
-        <View style={styles.row}>
-          <Ionicons name="document-text-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>Tax Profile</Text>
-        </View>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/reports")}
-      >
-        <View style={styles.row}>
-          <Ionicons name="bar-chart-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>Reports</Text>
-        </View>
-      </TouchableOpacity>
+        <Ionicons
+          name="log-out-outline"
+          size={22}
+          color="#C44736"
+        />
 
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/invoices")}
-      >
-        <View style={styles.row}>
-          <Ionicons name="receipt-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>Invoices</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/taxbot")}
-      >
-        <View style={styles.row}>
-          <Ionicons name="chatbubble-ellipses-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>TaxBot</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/savings-vault")}
-      >
-        <View style={styles.row}>
-          <Ionicons name="wallet-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>Savings Vault</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/compliance-certificate")}
-      >
-        <View style={styles.row}>
-          <Ionicons name="shield-checkmark-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>Compliance Certificate</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/referral-offers")}
-      >
-        <View style={styles.row}>
-          <Ionicons name="gift-outline" size={24} color="#222" />
-          <Text style={styles.itemText}>Referral Offers</Text>
-        </View>
-      </TouchableOpacity>
-
-      <TouchableOpacity
-        style={styles.item}
-        onPress={() => router.push("/logout-confirmation")}
-      >
-        <View style={styles.row}>
-          <Ionicons name="log-out-outline" size={24} color="#C44736" />
-          <Text style={[styles.itemText, { color: "#C44736" }]}>Logout</Text>
-        </View>
+        <Text
+          style={styles.logoutText}
+        >
+          Logout
+        </Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -122,43 +291,114 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingTop: 55,
   },
 
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginTop: 50,
+    fontSize: 30,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
     marginBottom: 20,
-    color: "#111",
   },
 
-  item: {
-    backgroundColor: "#FFFFFF",
+  profileCard: {
+    backgroundColor: "#C44736",
+    borderRadius: 18,
     padding: 18,
-    borderRadius: 16,
-    marginBottom: 12,
-
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-
-    elevation: 2,
-  },
-
-  row: {
     flexDirection: "row",
     alignItems: "center",
+    marginBottom: 24,
   },
 
-  itemText: {
-    marginLeft: 14,
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: "#FFFFFF",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+
+  avatarText: {
+    color: "#C44736",
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+  },
+
+  profileName: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_700Bold",
     fontSize: 16,
-    color: "#222",
-    fontWeight: "500",
+  },
+
+  profilePhone: {
+    color: "#FDECEC",
+    marginTop: 4,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+  },
+
+  proBadge: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+
+  proText: {
+    color: "#C44736",
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#ECECEC",
+  },
+
+  iconContainer: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+
+  textContainer: {
+    flex: 1,
+  },
+
+  menuTitle: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    fontSize: 15,
+  },
+
+  menuSubtitle: {
+    color: "#6B7280",
+    fontSize: 12,
+    marginTop: 2,
+    fontFamily: "Inter_400Regular",
+  },
+
+  logoutButton: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 30,
+    marginBottom: 30,
+  },
+
+  logoutText: {
+    color: "#C44736",
+    marginLeft: 8,
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
   },
 });

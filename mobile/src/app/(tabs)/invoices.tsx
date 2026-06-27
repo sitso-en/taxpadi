@@ -1,5 +1,5 @@
-import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import React, { useMemo, useEffect } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -8,64 +8,353 @@ import {
   View,
 } from "react-native";
 
-import { useInvoices } from "../../context/InvoiceContext";
+import {
+  useInvoices,
+  InvoiceStatus,
+} from "../../context/InvoiceContext";
 
 export default function InvoicesScreen() {
-  const { invoices, deleteInvoice } = useInvoices();
+  const {
+    invoices,
+    updateInvoiceStatus,
+  } = useInvoices();
+
+  const [selectedFilter, setSelectedFilter] =
+    React.useState("All");
+
+  // Automatically mark overdue invoices
+
+  useEffect(() => {
+    const today = new Date();
+
+    invoices.forEach((invoice) => {
+      const dueDate = new Date(
+        invoice.dueDate
+      );
+
+      if (
+        invoice.status !== "Paid" &&
+        invoice.status !== "Draft" &&
+        dueDate < today
+      ) {
+        updateInvoiceStatus(
+          invoice.id,
+          "Overdue"
+        );
+      }
+    });
+  }, [invoices]);
+
+  // Filter invoices
+
+  const filteredInvoices = useMemo(() => {
+    if (selectedFilter === "All") {
+      return invoices;
+    }
+
+    return invoices.filter(
+      (invoice) =>
+        invoice.status === selectedFilter
+    );
+  }, [invoices, selectedFilter]);
+
+  // Summary cards
+
+  const totalAmount = invoices.reduce(
+    (sum, invoice) =>
+      sum + invoice.amount,
+    0
+  );
+
+  const paidAmount = invoices
+    .filter(
+      (invoice) =>
+        invoice.status === "Paid"
+    )
+    .reduce(
+      (sum, invoice) =>
+        sum + invoice.amount,
+      0
+    );
+
+  const unpaidAmount = invoices
+    .filter(
+      (invoice) =>
+        invoice.status !== "Paid"
+    )
+    .reduce(
+      (sum, invoice) =>
+        sum + invoice.amount,
+      0
+    );
+
+  const getStatusColor = (
+    status: InvoiceStatus
+  ) => {
+    switch (status) {
+      case "Paid":
+        return "#34A853";
+
+      case "Sent":
+        return "#4285F4";
+
+      case "Overdue":
+        return "#EA4335";
+
+      case "Draft":
+        return "#B7791F";
+
+      default:
+        return "#6B7280";
+    }
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{
-        paddingBottom: 80,
-      }}
-    >
-      <TouchableOpacity
-        onPress={() => router.push("/more")}
-        style={styles.backButton}
+    <View style={styles.container}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{
+          paddingBottom: 120,
+        }}
       >
-        <Ionicons name="arrow-back" size={24} color="#C44736" />
-      </TouchableOpacity>
-      <Text style={styles.title}>Invoices</Text>
+        {/* Header */}
 
-      <Text style={styles.count}>Total Invoices: {invoices.length}</Text>
-
-      {invoices.length === 0 ? (
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>No invoices yet</Text>
-
-          <Text style={styles.cardText}>
-            Create and manage invoices for your customers.
+        <View style={styles.header}>
+          <Text style={styles.title}>
+            Invoices
           </Text>
         </View>
-      ) : (
-        invoices.map((invoice) => (
-          <View key={invoice.id} style={styles.invoiceCard}>
-            <Text style={styles.invoiceNumber}>{invoice.invoiceNumber}</Text>
 
-            <Text>{invoice.customerName}</Text>
+        {/* Summary */}
 
-            <Text>GHS {invoice.amount.toFixed(2)}</Text>
-
-            <Text>Due: {invoice.dueDate}</Text>
-
-            <TouchableOpacity
-              style={styles.deleteButton}
-              onPress={() => deleteInvoice(invoice.id)}
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryCard}>
+            <Text
+              style={styles.summaryLabel}
             >
-              <Text style={styles.deleteText}>Delete</Text>
-            </TouchableOpacity>
+              Total
+            </Text>
+
+            <Text
+              style={styles.summaryAmount}
+            >
+              GH¢{" "}
+              {totalAmount.toFixed(0)}
+            </Text>
           </View>
-        ))
-      )}
+
+          <View style={styles.summaryCard}>
+            <Text
+              style={styles.summaryLabel}
+            >
+              Paid
+            </Text>
+
+            <Text
+              style={styles.summaryAmount}
+            >
+              GH¢{" "}
+              {paidAmount.toFixed(0)}
+            </Text>
+          </View>
+
+          <View style={styles.summaryCard}>
+            <Text
+              style={styles.summaryLabel}
+            >
+              Unpaid
+            </Text>
+
+            <Text
+              style={styles.summaryAmount}
+            >
+              GH¢{" "}
+              {unpaidAmount.toFixed(0)}
+            </Text>
+          </View>
+        </View>
+
+        {/* Filters */}
+
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={
+            false
+          }
+          style={styles.filterContainer}
+        >
+          {[
+            "All",
+            "Draft",
+            "Sent",
+            "Paid",
+            "Overdue",
+          ].map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={[
+                styles.filterButton,
+                selectedFilter ===
+                  item &&
+                  styles.selectedFilterButton,
+              ]}
+              onPress={() =>
+                setSelectedFilter(item)
+              }
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  selectedFilter ===
+                    item &&
+                    styles.selectedFilterText,
+                ]}
+              >
+                {item}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        {/* Invoice List */}
+
+        {filteredInvoices.length ===
+        0 ? (
+          <View style={styles.emptyCard}>
+            <Text
+              style={styles.emptyTitle}
+            >
+              No invoices found
+            </Text>
+
+            <Text
+              style={styles.emptyText}
+            >
+              No invoices match this
+              filter.
+            </Text>
+          </View>
+        ) : (
+          filteredInvoices.map(
+            (invoice) => (
+              <View
+                key={invoice.id}
+                style={
+                  styles.invoiceItem
+                }
+              >
+                <View
+                  style={styles.leftSection}
+                >
+                  <Text
+                    style={[
+                      styles.invoiceStatus,
+                      {
+                        color:
+                          getStatusColor(
+                            invoice.status
+                          ),
+                      },
+                    ]}
+                  >
+                    {invoice.status}
+                  </Text>
+
+                  <View>
+                    <Text
+                      style={
+                        styles.invoiceNumber
+                      }
+                    >
+                      {
+                        invoice.invoiceNumber
+                      }
+                    </Text>
+
+                    <Text
+                      style={
+                        styles.customerName
+                      }
+                    >
+                      {
+                        invoice.customerName
+                      }
+                    </Text>
+
+                    <Text
+                      style={styles.date}
+                    >
+                      Due:{" "}
+                      {invoice.dueDate}
+                    </Text>
+                  </View>
+                </View>
+
+                <View
+                  style={{
+                    alignItems:
+                      "flex-end",
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.amount,
+                      {
+                        color:
+                          getStatusColor(
+                            invoice.status
+                          ),
+                      },
+                    ]}
+                  >
+                    GH¢{" "}
+                    {invoice.amount.toFixed(
+                      2
+                    )}
+                  </Text>
+
+                  {invoice.status !==
+                    "Paid" && (
+                    <TouchableOpacity
+                      style={
+                        styles.payButton
+                      }
+                      onPress={() =>
+                        updateInvoiceStatus(
+                          invoice.id,
+                          "Paid"
+                        )
+                      }
+                    >
+                      <Text
+                        style={
+                          styles.payButtonText
+                        }
+                      >
+                        Mark Paid
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+            )
+          )
+        )}
+      </ScrollView>
 
       <TouchableOpacity
         style={styles.fab}
-        onPress={() => router.push("/create-invoice")}
+        onPress={() =>
+          router.push(
+            "/create-invoice"
+          )
+        }
       >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
+        <Text style={styles.fabText}>
+          +
+        </Text>
       </TouchableOpacity>
-    </ScrollView>
+    </View>
   );
 }
 
@@ -73,74 +362,162 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingTop: 55,
+  },
+
+  header: {
+    marginBottom: 20,
   },
 
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginTop: 50,
-    marginBottom: 10,
+    fontSize: 30,
+    fontFamily:
+      "Inter_700Bold",
+    color: "#111827",
   },
 
-  count: {
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent:
+      "space-between",
     marginBottom: 20,
+  },
+
+  summaryCard: {
+    width: "31%",
+    backgroundColor: "#C44736",
+    borderRadius: 14,
+    padding: 12,
+  },
+
+  summaryLabel: {
+    color: "#FDECEC",
+    fontSize: 12,
+    marginBottom: 6,
+  },
+
+  summaryAmount: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily:
+      "Inter_700Bold",
+  },
+
+  filterContainer: {
+    marginBottom: 20,
+  },
+
+  filterButton: {
+    backgroundColor: "#EFEFEF",
+    borderRadius: 20,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    marginRight: 8,
+  },
+
+  selectedFilterButton: {
+    backgroundColor: "#C44736",
+  },
+
+  filterText: {
     color: "#666",
   },
 
-  card: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
+  selectedFilterText: {
+    color: "#FFFFFF",
   },
 
-  cardTitle: {
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 30,
+    alignItems: "center",
+  },
+
+  emptyTitle: {
     fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 8,
+    fontFamily:
+      "Inter_600SemiBold",
   },
 
-  cardText: {
+  emptyText: {
     color: "#666",
   },
 
-  invoiceCard: {
+  invoiceItem: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 16,
+    padding: 18,
     marginBottom: 12,
+    flexDirection: "row",
+    justifyContent:
+      "space-between",
+  },
+
+  leftSection: {
+    flexDirection: "row",
+    flex: 1,
+  },
+
+  invoiceStatus: {
+    width: 70,
+    fontFamily:
+      "Inter_600SemiBold",
   },
 
   invoiceNumber: {
-    fontWeight: "bold",
+    color: "#9CA3AF",
     marginBottom: 4,
   },
 
-  deleteButton: {
-    backgroundColor: "#FCE8E6",
-    padding: 10,
-    borderRadius: 8,
-    marginTop: 10,
+  customerName: {
+    fontSize: 16,
+    fontFamily:
+      "Inter_600SemiBold",
   },
 
-  deleteText: {
-    textAlign: "center",
-    color: "#C44736",
-    fontWeight: "600",
+  amount: {
+    fontSize: 18,
+    fontFamily:
+      "Inter_700Bold",
+  },
+
+  date: {
+    marginTop: 4,
+    color: "#9CA3AF",
+  },
+
+  payButton: {
+    marginTop: 10,
+    backgroundColor: "#34A853",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+
+  payButtonText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontFamily:
+      "Inter_600SemiBold",
   },
 
   fab: {
     position: "absolute",
     right: 24,
-    bottom: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
+    bottom: 24,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: "#C44736",
     justifyContent: "center",
     alignItems: "center",
   },
-  backButton: {
-    marginBottom: 15,
+
+  fabText: {
+    color: "#FFFFFF",
+    fontSize: 30,
   },
 });
+

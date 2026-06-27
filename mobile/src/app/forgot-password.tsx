@@ -1,18 +1,22 @@
 import { router } from "expo-router";
-import { useState } from "react";
+import React, { useState } from "react";
 import {
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
 } from "react-native";
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState("");
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
       <Text style={styles.title}>Forgot Password</Text>
 
       <Text style={styles.subtitle}>
@@ -22,6 +26,9 @@ export default function ForgotPasswordScreen() {
       <TextInput
         style={styles.input}
         placeholder="Email Address"
+        placeholderTextColor="#6B7280"
+        keyboardType="email-address"
+        autoCapitalize="none"
         value={email}
         onChangeText={setEmail}
       />
@@ -36,7 +43,7 @@ export default function ForgotPasswordScreen() {
       <TouchableOpacity onPress={() => router.replace("/login")}>
         <Text style={styles.link}>Back to Login</Text>
       </TouchableOpacity>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -50,40 +57,50 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 30,
-    fontWeight: "bold",
+    fontFamily: "Inter_700Bold",
     textAlign: "center",
+    color: "#111827",
   },
 
   subtitle: {
     textAlign: "center",
-    color: "#666",
+    color: "#6B7280",
     marginTop: 10,
     marginBottom: 30,
+    fontFamily: "Inter_400Regular",
+    fontSize: 16,
+    lineHeight: 24,
   },
 
   input: {
-    backgroundColor: "#F5F5F5",
-    borderRadius: 999,
+    backgroundColor: "#F1F5F9",
+    borderRadius: 16,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 16,
     marginBottom: 20,
+    color: "#111827",
+    fontFamily: "Inter_400Regular",
+    fontSize: 16,
   },
 
   button: {
     backgroundColor: "#C44736",
     padding: 16,
-    borderRadius: 12,
+    borderRadius: 16,
     alignItems: "center",
   },
 
   buttonText: {
     color: "#FFFFFF",
-    fontWeight: "bold",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
   },
 
   link: {
     textAlign: "center",
     marginTop: 20,
     color: "#C44736",
+    fontFamily: "Inter_500Medium",
   },
 });
+

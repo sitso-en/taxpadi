@@ -1,93 +1,441 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from "react-native";
 
 import { useInvoices } from "../../context/InvoiceContext";
+
+type LineItem = {
+  id: number;
+  description: string;
+  quantity: string;
+  unitPrice: string;
+};
 
 export default function CreateInvoiceScreen() {
   const { addInvoice } = useInvoices();
 
   const [customerName, setCustomerName] = useState("");
-  const [invoiceNumber, setInvoiceNumber] = useState("");
-  const [amount, setAmount] = useState("");
-  const [dueDate, setDueDate] = useState("");
 
-  const handleCreateInvoice = () => {
+  const [invoiceNumber] = useState(
+    `INV-${Date.now().toString().slice(-6)}`
+  );
+
+  const [issueDate] = useState(new Date());
+
+  const [dueDate, setDueDate] = useState(new Date());
+
+  const [showDatePicker, setShowDatePicker] =
+    useState(false);
+
+  const [feedbackText, setFeedbackText] =
+    useState("");
+
+  const [feedbackType, setFeedbackType] =
+    useState<"error" | "success" | "">("");
+
+  const [lineItems, setLineItems] =
+    useState<LineItem[]>([
+      {
+        id: 1,
+        description: "",
+        quantity: "",
+        unitPrice: "",
+      },
+    ]);
+
+  // Calculations
+
+  const subtotal = useMemo(() => {
+    return lineItems.reduce((sum, item) => {
+      const quantity =
+        Number(item.quantity) || 0;
+
+      const unitPrice =
+        Number(item.unitPrice) || 0;
+
+      return sum + quantity * unitPrice;
+    }, 0);
+  }, [lineItems]);
+
+  const vat = subtotal * 0.15;
+
+  const total = subtotal + vat;
+
+  // Add new line item
+
+  const addLineItem = () => {
+    setLineItems((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        description: "",
+        quantity: "",
+        unitPrice: "",
+      },
+    ]);
+  };
+
+  // Update line item
+
+  const updateLineItem = (
+    id: number,
+    field: keyof LineItem,
+    value: string
+  ) => {
+    setLineItems((prev) =>
+      prev.map((item) =>
+        item.id === id
+          ? { ...item, [field]: value }
+          : item
+      )
+    );
+  };
+
+  // Save invoice
+
+  const saveInvoice = (
+    status: "Draft" | "Sent"
+  ) => {
+    const hasInvalidItem =
+      lineItems.some(
+        (item) =>
+          !item.description.trim() ||
+          !item.quantity.trim() ||
+          !item.unitPrice.trim()
+      );
+
     if (
       !customerName.trim() ||
-      !invoiceNumber.trim() ||
-      !amount.trim() ||
-      !dueDate.trim()
+      hasInvalidItem
     ) {
-      alert("Please fill in all fields.");
+      setFeedbackText(
+        "Please complete all required fields."
+      );
+
+      setFeedbackType("error");
+
       return;
     }
 
     addInvoice({
-      id: Date.now(),
-      customerName,
-      invoiceNumber,
-      amount: Number(amount),
-      dueDate,
-    });
+  id: Date.now(),
+  customerName,
+  invoiceNumber,
+  amount: total,
+  issueDate: issueDate.toLocaleDateString(),
+  dueDate: dueDate.toLocaleDateString(),
+  status,
+});
+    setFeedbackText(
+      status === "Draft"
+        ? "Invoice saved as draft."
+        : "Invoice sent successfully."
+    );
 
-    alert("Invoice created successfully!");
+    setFeedbackType("success");
 
-    router.replace("/invoices");
+    setTimeout(() => {
+      router.replace("/invoices");
+    }, 1200);
   };
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{
+        paddingBottom: 120,
+      }}
+      showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>Create Invoice</Text>
+      {/* Feedback Card */}
 
-      <Text style={styles.label}>Customer Name</Text>
+      {feedbackText !== "" && (
+        <View
+          style={[
+            styles.messageCard,
+            feedbackType === "error"
+              ? styles.errorCard
+              : styles.successCard,
+          ]}
+        >
+          <Ionicons
+            name={
+              feedbackType === "error"
+                ? "alert-circle-outline"
+                : "checkmark-circle-outline"
+            }
+            size={22}
+            color={
+              feedbackType === "error"
+                ? "#C44736"
+                : "#34A853"
+            }
+          />
+
+          <Text
+            style={[
+              styles.messageText,
+              {
+                color:
+                  feedbackType === "error"
+                    ? "#C44736"
+                    : "#34A853",
+              },
+            ]}
+          >
+            {feedbackText}
+          </Text>
+        </View>
+      )}
+
+      {/* Header */}
+
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() =>
+            router.push("/invoices")
+          }
+        >
+          <Ionicons
+            name="chevron-back"
+            size={26}
+            color="#111827"
+          />
+        </TouchableOpacity>
+
+        <Text style={styles.title}>
+          New Invoice
+        </Text>
+      </View>
+
+      {/* Customer */}
+
+      <Text style={styles.label}>
+        CLIENT NAME
+      </Text>
+
       <TextInput
         style={styles.input}
-        placeholder="Enter customer name"
+        placeholder="e.g. Kofi Mensah Ltd"
+        placeholderTextColor="#9CA3AF"
         value={customerName}
         onChangeText={setCustomerName}
       />
 
-      <Text style={styles.label}>Invoice Number</Text>
+      {/* Invoice Number */}
+
+      <Text style={styles.label}>
+        INVOICE NUMBER
+      </Text>
+
       <TextInput
         style={styles.input}
-        placeholder="e.g. INV-001"
+        editable={false}
         value={invoiceNumber}
-        onChangeText={setInvoiceNumber}
       />
 
-      <Text style={styles.label}>Amount (GHS)</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="e.g. 2500"
-        keyboardType="numeric"
-        value={amount}
-        onChangeText={setAmount}
-      />
+      {/* Dates */}
 
-      <Text style={styles.label}>Due Date</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="e.g. 30/06/2026"
-        value={dueDate}
-        onChangeText={setDueDate}
-      />
+      <View style={styles.dateRow}>
+        <View style={styles.dateCard}>
+          <Text style={styles.label}>
+            ISSUE DATE
+          </Text>
+
+          <Text style={styles.dateText}>
+            {issueDate.toLocaleDateString()}
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.dateCard}
+          onPress={() =>
+            setShowDatePicker(true)
+          }
+        >
+          <Text style={styles.label}>
+            DUE DATE
+          </Text>
+
+          <Text style={styles.dateText}>
+            {dueDate.toLocaleDateString()}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={dueDate}
+          mode="date"
+          display={
+            Platform.OS === "ios"
+              ? "spinner"
+              : "default"
+          }
+          onChange={(
+            event,
+            selectedDate
+          ) => {
+            setShowDatePicker(false);
+
+            if (selectedDate) {
+              setDueDate(selectedDate);
+            }
+          }}
+        />
+      )}
+
+      {/* Line Items */}
+
+      <Text style={styles.sectionTitle}>
+        LINE ITEMS
+      </Text>
+
+      {lineItems.map((item, index) => {
+        const amount =
+          (Number(item.quantity) || 0) *
+          (Number(item.unitPrice) || 0);
+
+        return (
+          <View
+            key={item.id}
+            style={styles.itemCard}
+          >
+            <Text style={styles.itemTitle}>
+              Item {index + 1}
+            </Text>
+
+            <TextInput
+              style={styles.input}
+              placeholder="Description"
+              value={item.description}
+              onChangeText={(text) =>
+                updateLineItem(
+                  item.id,
+                  "description",
+                  text
+                )
+              }
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Quantity"
+              keyboardType="numeric"
+              value={item.quantity}
+              onChangeText={(text) =>
+                updateLineItem(
+                  item.id,
+                  "quantity",
+                  text
+                )
+              }
+            />
+
+            <TextInput
+              style={styles.input}
+              placeholder="Unit Price"
+              keyboardType="numeric"
+              value={item.unitPrice}
+              onChangeText={(text) =>
+                updateLineItem(
+                  item.id,
+                  "unitPrice",
+                  text
+                )
+              }
+            />
+
+            <Text style={styles.amountText}>
+              Amount: GH¢{" "}
+              {amount.toFixed(2)}
+            </Text>
+          </View>
+        );
+      })}
 
       <TouchableOpacity
-        style={styles.createButton}
-        onPress={handleCreateInvoice}
+        style={styles.addItemButton}
+        onPress={addLineItem}
       >
-        <Text style={styles.createButtonText}>Create Invoice</Text>
+        <Text style={styles.addItemText}>
+          + Add Line Item
+        </Text>
       </TouchableOpacity>
+
+      {/* Totals */}
+
+      <View style={styles.totalSection}>
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>
+            Subtotal
+          </Text>
+
+          <Text style={styles.totalValue}>
+            GH¢ {subtotal.toFixed(2)}
+          </Text>
+        </View>
+
+        <View style={styles.totalRow}>
+          <Text style={styles.totalLabel}>
+            VAT (15%)
+          </Text>
+
+          <Text style={styles.totalValue}>
+            GH¢ {vat.toFixed(2)}
+          </Text>
+        </View>
+
+        <View style={styles.totalRow}>
+          <Text style={styles.finalLabel}>
+            Total
+          </Text>
+
+          <Text style={styles.finalAmount}>
+            GH¢ {total.toFixed(2)}
+          </Text>
+        </View>
+      </View>
+
+      {/* Buttons */}
+
+      <View style={styles.buttonRow}>
+        <TouchableOpacity
+          style={styles.draftButton}
+          onPress={() =>
+            saveInvoice("Draft")
+          }
+        >
+          <Text
+            style={styles.draftButtonText}
+          >
+            Save Draft
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.sendButton}
+          onPress={() =>
+            saveInvoice("Sent")
+          }
+        >
+          <Text
+            style={styles.sendButtonText}
+          >
+            Send Invoice
+          </Text>
+        </TouchableOpacity>
+      </View>
     </ScrollView>
   );
 }
@@ -96,40 +444,177 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    padding: 24,
-    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingTop: 55,
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 25,
   },
 
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 24,
+    fontSize: 24,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginLeft: 10,
   },
 
   label: {
-    fontWeight: "600",
-    marginBottom: 6,
-    marginTop: 10,
+    color: "#C44736",
+    fontSize: 11,
+    marginBottom: 8,
+    fontFamily: "Inter_600SemiBold",
   },
 
   input: {
-    backgroundColor: "#FFFFFF",
-    padding: 14,
+    backgroundColor: "#F3F4F6",
     borderRadius: 12,
+    padding: 16,
+    marginBottom: 14,
+    fontFamily: "Inter_400Regular",
+  },
+
+  dateRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 20,
+  },
+
+  dateCard: {
+    width: "48%",
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    padding: 14,
+  },
+
+  dateText: {
+    color: "#111827",
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  sectionTitle: {
+    color: "#111827",
+    fontSize: 16,
+    marginBottom: 12,
+    fontFamily: "Inter_700Bold",
+  },
+
+  itemCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 16,
     marginBottom: 12,
   },
 
-  createButton: {
-    backgroundColor: "#C44736",
-    padding: 15,
-    borderRadius: 12,
-    alignItems: "center",
-    marginTop: 12,
+  itemTitle: {
+    color: "#111827",
+    marginBottom: 12,
+    fontFamily: "Inter_600SemiBold",
   },
 
-  createButtonText: {
+  amountText: {
+    color: "#C44736",
+    fontFamily: "Inter_700Bold",
+  },
+
+  addItemButton: {
+    backgroundColor: "#FDECEC",
+    borderRadius: 12,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginBottom: 25,
+  },
+
+  addItemText: {
+    color: "#C44736",
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  totalSection: {
+    marginBottom: 30,
+  },
+
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+
+  totalLabel: {
+    color: "#6B7280",
+    fontFamily: "Inter_400Regular",
+  },
+
+  totalValue: {
+    color: "#111827",
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  finalLabel: {
+    color: "#111827",
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+
+  finalAmount: {
+    color: "#C44736",
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+  },
+
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+
+  draftButton: {
+    width: "47%",
+    backgroundColor: "#ECECEC",
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+
+  draftButtonText: {
+    color: "#111827",
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  sendButton: {
+    width: "47%",
+    backgroundColor: "#C44736",
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: "center",
+  },
+
+  sendButtonText: {
     color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  messageCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 20,
+  },
+
+  errorCard: {
+    backgroundColor: "#FDECEC",
+  },
+
+  successCard: {
+    backgroundColor: "#E8F5E9",
+  },
+
+  messageText: {
+    marginLeft: 10,
+    flex: 1,
+    fontFamily: "Inter_600SemiBold",
   },
 });
+

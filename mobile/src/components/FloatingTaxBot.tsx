@@ -13,13 +13,16 @@ export default function FloatingTaxBot() {
     new Animated.ValueXY({
       x: 0,
       y: 0,
-    }),
+    })
   ).current;
 
   const panResponder = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_, gestureState) => {
-        return Math.abs(gestureState.dx) > 5 || Math.abs(gestureState.dy) > 5;
+        return (
+          Math.abs(gestureState.dx) > 5 ||
+          Math.abs(gestureState.dy) > 5
+        );
       },
 
       onPanResponderGrant: () => {
@@ -28,67 +31,67 @@ export default function FloatingTaxBot() {
 
       onPanResponderMove: Animated.event(
         [null, { dx: position.x, dy: position.y }],
-        { useNativeDriver: false },
+        { useNativeDriver: false }
       ),
 
       onPanResponderRelease: () => {
         position.flattenOffset();
       },
-    }),
+    })
   ).current;
 
   return (
     <Animated.View
       {...panResponder.panHandlers}
       style={[
-        styles.floatingContainer,
+        styles.container,
         {
-          transform: position.getTranslateTransform(),
+          transform:
+            position.getTranslateTransform(),
         },
       ]}
     >
       <TouchableOpacity
-        activeOpacity={1}
-        style={styles.button}
-        onPress={() => router.push("/taxbot")}
-      >
+  activeOpacity={0.9}
+  style={styles.button}
+  onPress={() => router.push("/taxbot")}
+>
         <Ionicons
-          name="chatbubble-ellipses-outline"
-          size={24}
-          color="#FFFFFF"
-        />
+  name="chatbubble-ellipses"
+  size={26}
+  color="#FFFFFF"
+/>
       </TouchableOpacity>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  floatingContainer: {
+  container: {
     position: "absolute",
-    bottom: 100,
+    bottom: 95,
     right: 20,
-    zIndex: 99999,
+    zIndex: 9999,
   },
 
-  button: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+ button: {
+  width: 58,
+  height: 58,
+  borderRadius: 29,
 
-    backgroundColor: "#C44736",
-    opacity: 0.8,
+  backgroundColor: "rgba(196, 71, 54, 0.8)",
 
-    justifyContent: "center",
-    alignItems: "center",
+  justifyContent: "center",
+  alignItems: "center",
 
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-
-    elevation: 10,
+  shadowColor: "#000",
+  shadowOffset: {
+    width: 0,
+    height: 4,
   },
+  shadowOpacity: 0.2,
+  shadowRadius: 6,
+
+  elevation: 8,
+},
 });

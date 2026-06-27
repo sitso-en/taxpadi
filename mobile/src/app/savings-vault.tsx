@@ -1,107 +1,488 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
-export default function SavingsVaultScreen() {
-  const [goal, setGoal] = useState("Tax Reserve Fund");
-  const [targetAmount, setTargetAmount] = useState("5000");
-  const [savedAmount, setSavedAmount] = useState(1200);
-  const [deposit, setDeposit] = useState("");
+import { useSavings } from "../context/SavingsContext";
 
-  const progress = (savedAmount / Number(targetAmount || 1)) * 100;
+export default function SavingsVaultScreen() {
+  const {
+  savings,
+  totalSaved,
+  addSaving,
+  deleteSaving,
+} = useSavings();
+  const [amount, setAmount] =
+    useState("");
+
+  const [selectedActivity, setSelectedActivity] =
+    useState<number | null>(null);
+
+  // Local withdrawals until
+  // SavingsContext is extended
+
+  const [withdrawals, setWithdrawals] =
+    useState<
+      {
+        id: number;
+        amount: number;
+        date: string;
+      }[]
+    >([]);
+
+  // Current balance
+
+  const currentBalance =
+    totalSaved -
+    withdrawals.reduce(
+      (sum, item) =>
+        sum + item.amount,
+      0
+    );
+
+  // Current month deposits
+
+  const monthlySaved = useMemo(() => {
+    const now = new Date();
+
+    return savings
+      .filter((saving) => {
+        const date = new Date(
+          saving.date
+        );
+
+        return (
+          date.getMonth() ===
+            now.getMonth() &&
+          date.getFullYear() ===
+            now.getFullYear()
+        );
+      })
+      .reduce(
+        (sum, saving) =>
+          sum + saving.amount,
+        0
+      );
+  }, [savings]);
+
+  // Suggested amount
+
+  const suggestedAmount =
+    Math.max(
+      currentBalance * 0.2,
+      100
+    );
+
+  // Activity feed
+
+  const activity = useMemo(() => {
+    const deposits = savings.map(
+      (saving) => ({
+        id: saving.id,
+        type: "Deposit",
+        amount: saving.amount,
+        date: saving.date,
+        positive: true,
+      })
+    );
+
+    const withdrawalsList =
+      withdrawals.map((item) => ({
+        id: item.id,
+        type: "Withdrawal",
+        amount: item.amount,
+        date: item.date,
+        positive: false,
+      }));
+
+    return [
+      ...deposits,
+      ...withdrawalsList,
+    ].sort(
+      (a, b) =>
+        new Date(b.date).getTime() -
+        new Date(a.date).getTime()
+    );
+  }, [savings, withdrawals]);
+
+  // Deposit
 
   const handleDeposit = () => {
-    if (!deposit) return;
+    const value = Number(amount);
 
-    setSavedAmount(savedAmount + Number(deposit));
-    setDeposit("");
+    if (
+      !amount.trim() ||
+      value <= 0
+    ) {
+      Alert.alert(
+        "Invalid Amount",
+        "Enter a valid amount."
+      );
+
+      return;
+    }
+
+    addSaving(value);
+
+    Alert.alert(
+      "Success",
+      `GH¢ ${value.toFixed(
+        2
+      )} deposited successfully.`
+    );
+
+    setAmount("");
   };
 
+  // Withdraw
+
+  const handleWithdraw = () => {
+    const value = Number(amount);
+
+    if (
+      !amount.trim() ||
+      value <= 0
+    ) {
+      Alert.alert(
+        "Invalid Amount",
+        "Enter a valid amount."
+      );
+
+      return;
+    }
+
+    if (value > currentBalance) {
+      Alert.alert(
+        "Insufficient Funds",
+        "You do not have enough savings."
+      );
+
+      return;
+    }
+
+    setWithdrawals((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        amount: value,
+        date:
+          new Date().toISOString(),
+      },
+    ]);
+
+    Alert.alert(
+      "Success",
+      `GH¢ ${value.toFixed(
+        2
+      )} withdrawn successfully.`
+    );
+
+    setAmount("");
+  };
+
+  // Delete Activity
+
+ const handleDeleteActivity = (id: number) => {
+  console.log("Delete tapped:", id, "deleteSaving type:", typeof deleteSaving);
+
+  const isWithdrawal =
+  withdrawals.some(
+    (item) => item.id === id
+  );
+
+if (isWithdrawal) {
+  setWithdrawals((prev) =>
+    prev.filter(
+      (item) => item.id !== id
+    )
+  );
+} else {
+  deleteSaving(id);
+}
+
+setSelectedActivity(null);
+};
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      showsVerticalScrollIndicator={
+        false
+      }
+      contentContainerStyle={{
+        paddingBottom: 120,
+      }}
     >
-      <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-        <Ionicons name="arrow-back" size={24} color="#C44736" />
-      </TouchableOpacity>
+      {/* Header */}
 
-      <Text style={styles.title}>Savings Vault</Text>
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() =>
+            router.back()
+          }
+        >
+          <Ionicons
+            name="chevron-back"
+            size={26}
+            color="#111827"
+          />
+        </TouchableOpacity>
+
+        <Text style={styles.title}>
+          Savings Vault
+        </Text>
+      </View>
+
+      {/* Hero */}
 
       <View style={styles.heroCard}>
-        <Text style={styles.heroLabel}>Current Savings</Text>
-
-        <Text style={styles.heroAmount}>GHS {savedAmount.toFixed(2)}</Text>
-
-        <Text style={styles.heroSubText}>Goal: {goal}</Text>
-      </View>
-
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Savings Goal</Text>
-
-        <TextInput
-          style={styles.input}
-          value={goal}
-          onChangeText={setGoal}
-          placeholder="Goal Name"
-        />
-
-        <TextInput
-          style={styles.input}
-          value={targetAmount}
-          onChangeText={setTargetAmount}
-          keyboardType="numeric"
-          placeholder="Target Amount"
-        />
-
-        <Text>Progress: {progress.toFixed(0)}%</Text>
-
-        <View style={styles.progressBar}>
-          <View
-            style={[
-              styles.progressFill,
-              {
-                width: `${Math.min(progress, 100)}%`,
-              },
-            ]}
+        <View
+          style={styles.iconCircle}
+        >
+          <Ionicons
+            name="wallet-outline"
+            size={28}
+            color="#C44736"
           />
         </View>
+
+        <Text
+          style={styles.heroLabel}
+        >
+          VAULT BALANCE
+        </Text>
+
+        <Text
+          style={styles.heroAmount}
+        >
+          GH¢{" "}
+          {currentBalance.toLocaleString()}
+        </Text>
+
+        <Text
+          style={styles.heroSubText}
+        >
+          GH¢{" "}
+          {monthlySaved.toFixed(2)}{" "}
+          added this month
+        </Text>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Add Savings</Text>
+      {/* Suggested */}
 
-        <TextInput
-          style={styles.input}
-          value={deposit}
-          onChangeText={setDeposit}
-          keyboardType="numeric"
-          placeholder="Amount"
+      <View
+        style={styles.suggestionCard}
+      >
+        <Ionicons
+          name="bulb-outline"
+          size={18}
+          color="#F4B400"
         />
 
-        <TouchableOpacity style={styles.button} onPress={handleDeposit}>
-          <Ionicons name="wallet-outline" size={18} color="#FFFFFF" />
+        <View
+          style={{
+            flex: 1,
+            marginLeft: 10,
+          }}
+        >
+          <Text
+            style={
+              styles.suggestionTitle
+            }
+          >
+            Suggested savings
+          </Text>
 
-          <Text style={styles.buttonText}>Deposit Funds</Text>
+          <Text
+            style={
+              styles.suggestionText
+            }
+          >
+            Based on your current
+            vault activity.
+          </Text>
+        </View>
+
+        <Text
+          style={
+            styles.suggestedAmount
+          }
+        >
+          GH¢{" "}
+          {suggestedAmount.toFixed(
+            2
+          )}
+        </Text>
+      </View>
+
+      {/* Buttons */}
+
+      <View
+        style={styles.buttonRow}
+      >
+        <TouchableOpacity
+          style={
+            styles.depositButton
+          }
+          onPress={
+            handleDeposit
+          }
+        >
+          <Text
+            style={
+              styles.depositButtonText
+            }
+          >
+            + Deposit
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={
+            styles.withdrawButton
+          }
+          onPress={
+            handleWithdraw
+          }
+        >
+          <Text
+            style={
+              styles.withdrawButtonText
+            }
+          >
+            - Withdraw
+          </Text>
         </TouchableOpacity>
       </View>
 
-      <View style={styles.card}>
-        <Text style={styles.sectionTitle}>Recommendation</Text>
+      {/* Amount */}
 
-        <Text>
-          Set aside part of your monthly income to cover future tax obligations
-          and avoid penalties.
-        </Text>
-      </View>
+      <TextInput
+        style={styles.input}
+        placeholder="Enter amount"
+        keyboardType="numeric"
+        value={amount}
+        onChangeText={setAmount}
+      />
+
+      {/* Activity */}
+
+      <Text
+        style={styles.sectionTitle}
+      >
+        VAULT ACTIVITY
+      </Text>
+
+      {activity.length === 0 ? (
+        <View
+          style={
+            styles.emptyActivity
+          }
+        >
+          <Text>
+            No vault activity yet.
+          </Text>
+        </View>
+      ) : (
+        activity.map((item) => (
+          <View
+            key={item.id}
+            style={
+              styles.activityWrapper
+            }
+          >
+            {selectedActivity ===
+              item.id && (
+              <TouchableOpacity
+                style={
+                  styles.deleteButton
+                }
+                onPress={() =>
+                  handleDeleteActivity(
+                    item.id
+                  )
+                }
+              >
+                <Ionicons
+                  name="trash-outline"
+                  size={18}
+                  color="#FFFFFF"
+                />
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() =>
+                setSelectedActivity(
+                  selectedActivity ===
+                    item.id
+                    ? null
+                    : item.id
+                )
+              }
+              style={[
+                styles.activityItem,
+                selectedActivity ===
+                  item.id && {
+                  transform: [
+                    {
+                      translateX: 45,
+                    },
+                  ],
+                },
+              ]}
+            >
+              <View>
+                <Text
+                  style={
+                    styles.activityTitle
+                  }
+                >
+                  {item.type}
+                </Text>
+
+                <Text
+                  style={
+                    styles.activityDate
+                  }
+                >
+                  {new Date(
+                    item.date
+                  ).toLocaleDateString()}
+                </Text>
+              </View>
+
+              <Text
+                style={[
+                  styles.activityAmount,
+                  {
+                    color:
+                      item.positive
+                        ? "#34A853"
+                        : "#C44736",
+                  },
+                ]}
+              >
+                {item.positive
+                  ? "+"
+                  : "-"}
+                GH¢{" "}
+                {item.amount.toFixed(
+                  2
+                )}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ))
+      )}
     </ScrollView>
   );
 }
@@ -109,88 +490,203 @@ export default function SavingsVaultScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
-    padding: 20,
-    paddingTop: 50,
+    backgroundColor:
+      "#FAFAFA",
+    paddingHorizontal: 20,
+    paddingTop: 55,
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
   },
 
   title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    marginBottom: 20,
+    fontSize: 24,
+    fontFamily:
+      "Inter_700Bold",
+    color: "#111827",
+    marginLeft: 10,
   },
 
   heroCard: {
-    backgroundColor: "#C44736",
+    backgroundColor:
+      "#C44736",
     borderRadius: 18,
-    padding: 20,
-    marginBottom: 20,
+    padding: 24,
+    alignItems: "center",
+    marginBottom: 18,
+  },
+
+  iconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor:
+      "#FFFFFF",
+    justifyContent:
+      "center",
+    alignItems: "center",
+    marginBottom: 12,
   },
 
   heroLabel: {
-    color: "#FFFFFF",
+    color: "#FDECEC",
+    fontSize: 11,
+    fontFamily:
+      "Inter_600SemiBold",
   },
 
   heroAmount: {
     color: "#FFFFFF",
-    fontSize: 30,
-    fontWeight: "bold",
+    fontSize: 32,
+    fontFamily:
+      "Inter_700Bold",
     marginTop: 8,
   },
 
   heroSubText: {
-    color: "#FFFFFF",
+    color: "#FDECEC",
     marginTop: 6,
+    fontFamily:
+      "Inter_400Regular",
   },
 
-  card: {
-    backgroundColor: "#FFFFFF",
+  suggestionCard: {
+    backgroundColor:
+      "#FFFFFF",
     borderRadius: 16,
-    padding: 18,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  suggestionTitle: {
+    fontFamily:
+      "Inter_600SemiBold",
+    color: "#111827",
+  },
+
+  suggestionText: {
+    color: "#6B7280",
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  suggestedAmount: {
+    color: "#C44736",
+    fontFamily:
+      "Inter_700Bold",
+    fontSize: 16,
+  },
+
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent:
+      "space-between",
     marginBottom: 16,
   },
 
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-
-  input: {
-    backgroundColor: "#F5F5F5",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 10,
-  },
-
-  progressBar: {
-    height: 12,
-    backgroundColor: "#E5E7EB",
-    borderRadius: 999,
-    marginTop: 10,
-    overflow: "hidden",
-  },
-
-  progressFill: {
-    height: "100%",
-    backgroundColor: "#34A853",
-  },
-
-  button: {
-    backgroundColor: "#C44736",
+  depositButton: {
+    width: "48%",
+    backgroundColor:
+      "#C44736",
     borderRadius: 12,
-    padding: 14,
-    flexDirection: "row",
-    justifyContent: "center",
+    paddingVertical: 15,
     alignItems: "center",
   },
 
-  buttonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    marginLeft: 8,
+  withdrawButton: {
+    width: "48%",
+    backgroundColor:
+      "#FFFFFF",
+    borderRadius: 12,
+    paddingVertical: 15,
+    alignItems: "center",
   },
-  backButton: {
-    marginBottom: 15,
+
+  depositButtonText: {
+    color: "#FFFFFF",
+    fontFamily:
+      "Inter_600SemiBold",
+  },
+
+  withdrawButtonText: {
+    color: "#111827",
+    fontFamily:
+      "Inter_600SemiBold",
+  },
+
+  input: {
+    backgroundColor:
+      "#FFFFFF",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+  },
+
+  sectionTitle: {
+    color: "#C44736",
+    fontSize: 11,
+    marginBottom: 12,
+    fontFamily:
+      "Inter_600SemiBold",
+  },
+
+ activityWrapper: {
+  position: "relative",
+  marginBottom: 10,
+  overflow: "visible", // add this
+},
+
+deleteButton: {
+  position: "absolute",
+  left: 10, // change from 0 to 10
+  top: 18, // center vertically
+  width: 36, // slightly smaller
+  height: 36,
+  borderRadius: 18,
+  backgroundColor: "#C44736",
+  justifyContent: "center",
+  alignItems: "center",
+  zIndex: 1,
+},
+
+activityItem: {
+  backgroundColor: "#FFFFFF",
+  borderRadius: 14,
+  padding: 16,
+  flexDirection: "row",
+  justifyContent: "space-between",
+  alignItems: "center",
+  minHeight: 80, 
+},
+  activityTitle: {
+    color: "#111827",
+    fontFamily:
+      "Inter_600SemiBold",
+  },
+
+  activityDate: {
+    color: "#6B7280",
+    marginTop: 4,
+    fontSize: 12,
+  },
+
+  activityAmount: {
+    fontFamily:
+      "Inter_700Bold",
+    fontSize: 15,
+  },
+
+  emptyActivity: {
+    backgroundColor:
+      "#FFFFFF",
+    borderRadius: 14,
+    padding: 24,
+    alignItems: "center",
   },
 });
+

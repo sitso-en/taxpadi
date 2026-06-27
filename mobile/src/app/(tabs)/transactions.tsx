@@ -1,128 +1,157 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import React, { useState } from "react";
 import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { useTransactions } from "../../context/TransactionContext";
 
 export default function TransactionsScreen() {
-  const { transactions, deleteTransaction } = useTransactions();
+  const { transactions } = useTransactions();
+  const [selectedFilter, setSelectedFilter] = useState("All");
+  const [search, setSearch] = useState("");
 
-  const totalIncome = transactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
+  const filteredTransactions = transactions.filter((transaction) => {
+    const matchesFilter =
+      selectedFilter === "All"
+        ? true
+        : transaction.type.toLowerCase() ===
+          selectedFilter.toLowerCase();
 
-  const totalExpenses = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
+    const matchesSearch = transaction.title
+      .toLowerCase()
+      .includes(search.toLowerCase());
+
+    return matchesFilter && matchesSearch;
+  });
 
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 120 }}
+      >
         <Text style={styles.title}>Transactions</Text>
 
-        <View style={styles.summaryRow}>
-          <View style={styles.summaryCard}>
-            <Ionicons
-              name="arrow-down-circle-outline"
-              size={24}
-              color="#2E7D32"
-            />
-            <Text style={styles.summaryAmount}>
-              GHS {totalIncome.toLocaleString()}
-            </Text>
-            <Text style={styles.summaryLabel}>Income</Text>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <Ionicons
-              name="arrow-up-circle-outline"
-              size={24}
-              color="#C44736"
-            />
-            <Text style={styles.summaryAmount}>
-              GHS {totalExpenses.toLocaleString()}
-            </Text>
-            <Text style={styles.summaryLabel}>Expenses</Text>
-          </View>
+        {/* Filters */}
+        <View style={styles.filterContainer}>
+          {["All", "Income", "Expense"].map((item) => (
+            <TouchableOpacity
+              key={item}
+              style={[
+                styles.filterButton,
+                selectedFilter === item &&
+                  styles.selectedFilter,
+              ]}
+              onPress={() => setSelectedFilter(item)}
+            >
+              <Text
+                style={[
+                  styles.filterText,
+                  selectedFilter === item &&
+                    styles.selectedFilterText,
+                ]}
+              >
+                {item}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
-        <Text style={styles.sectionTitle}>Recent Transactions</Text>
+        {/* Search */}
+        <View style={styles.searchContainer}>
+          <Ionicons
+            name="search-outline"
+            size={20}
+            color="#9CA3AF"
+          />
 
-        {transactions.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text>No transactions yet</Text>
-          </View>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search transactions..."
+            placeholderTextColor="#9CA3AF"
+            value={search}
+            onChangeText={setSearch}
+          />
+        </View>
+
+        {/* Transactions */}
+        {filteredTransactions.length === 0 ? (
+          <Text style={styles.emptyText}>
+            No transactions found.
+          </Text>
         ) : (
-          transactions.map((transaction) => (
-            <View key={transaction.id} style={styles.transactionCard}>
-              <View style={styles.row}>
-                <Ionicons
-                  name={
-                    transaction.type === "income"
-                      ? "arrow-down-circle"
-                      : "arrow-up-circle"
-                  }
-                  size={26}
-                  color={transaction.type === "income" ? "#2E7D32" : "#C44736"}
-                />
+          filteredTransactions.map((transaction) => (
+            <TouchableOpacity
+              key={transaction.id}
+              style={styles.transactionItem}
+              onPress={() =>
+                router.push(
+                  `/edit-transaction?id=${transaction.id}`
+                )
+              }
+            >
+              <View>
+                <Text style={styles.transactionTitle}>
+                  {transaction.title}
+                </Text>
 
-                <View style={styles.details}>
-                  <Text style={styles.transactionTitle}>
-                    {transaction.title}
-                  </Text>
-
-                  <Text style={styles.category}>{transaction.category}</Text>
-                </View>
-
-                <Text
-                  style={{
-                    fontWeight: "bold",
-                    color:
-                      transaction.type === "income" ? "#2E7D32" : "#C44736",
-                  }}
-                >
-                  GHS {transaction.amount}
+                <Text style={styles.transactionCategory}>
+                  {transaction.type} • {transaction.category}
                 </Text>
               </View>
 
-              <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={styles.editButton}
-                  onPress={() =>
-                    router.push(`/edit-transaction?id=${transaction.id}`)
-                  }
+              <View style={{ alignItems: "flex-end" }}>
+                <Text
+                  style={[
+                    styles.amount,
+                    {
+                      color:
+                        transaction.type === "income"
+                          ? "#22C55E"
+                          : "#C44736",
+                    },
+                  ]}
                 >
-                  <Ionicons name="create-outline" size={18} color="#333" />
-                  <Text style={[styles.buttonText, { color: "#333" }]}>
-                    Edit
-                  </Text>
-                </TouchableOpacity>
+                  {transaction.type === "income" ? "+" : "-"}
+                  GH¢ {transaction.amount}
+                </Text>
 
-                <TouchableOpacity
-                  style={styles.deleteButton}
-                  onPress={() => deleteTransaction(transaction.id)}
-                >
-                  <Ionicons name="trash-outline" size={18} color="#C44736" />
-                  <Text style={[styles.buttonText, { color: "#C44736" }]}>
-                    Delete
-                  </Text>
-                </TouchableOpacity>
+                <Text style={styles.date}>
+                  {transaction.date
+                    ? new Date(
+                        transaction.date
+                      ).toLocaleDateString(
+                        "en-US",
+                        {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                        }
+                      )
+                    : "No Date"}
+                </Text>
               </View>
-            </View>
+            </TouchableOpacity>
           ))
         )}
       </ScrollView>
 
+      {/* Floating Button */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => router.push("/add-transaction")}
       >
-        <Ionicons name="add" size={32} color="#FFFFFF" />
+        <Ionicons
+          name="add"
+          size={32}
+          color="#FFFFFF"
+        />
       </TouchableOpacity>
     </View>
   );
@@ -132,109 +161,103 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    padding: 20,
-    paddingTop: 50,
+    paddingHorizontal: 20,
+    paddingTop: 55,
   },
 
   title: {
-    fontSize: 30,
-    fontWeight: "bold",
-    marginBottom: 20,
+    fontSize: 32,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 18,
   },
 
-  summaryRow: {
+  filterContainer: {
+    flexDirection: "row",
+    marginBottom: 18,
+  },
+
+  filterButton: {
+    backgroundColor: "#F3F4F6",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 8,
+  },
+
+  selectedFilter: {
+    backgroundColor: "#C44736",
+  },
+
+  filterText: {
+    color: "#111827",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+
+  selectedFilterText: {
+    color: "#FFFFFF",
+  },
+
+  searchContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderRadius: 30,
+    paddingHorizontal: 16,
+    marginBottom: 24,
+  },
+
+  searchInput: {
+    flex: 1,
+    paddingVertical: 14,
+    marginLeft: 8,
+    fontFamily: "Inter_400Regular",
+
+    ...(require("react-native").Platform.OS === "web"
+      ? { outlineWidth: 0 }
+      : {}),
+  },
+
+  transactionItem: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
-  },
-
-  summaryCard: {
-    width: "48%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 18,
     alignItems: "center",
-  },
-
-  summaryAmount: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginTop: 8,
-  },
-
-  summaryLabel: {
-    color: "#666",
-    marginTop: 4,
-  },
-
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "600",
-    marginBottom: 12,
-  },
-
-  emptyCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 20,
-  },
-
-  transactionCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-  },
-
-  row: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  details: {
-    flex: 1,
-    marginLeft: 12,
+    marginBottom: 22,
   },
 
   transactionTitle: {
-    fontWeight: "bold",
-    fontSize: 16,
+    fontSize: 17,
+    color: "#111827",
+    fontFamily: "Inter_600SemiBold",
   },
 
-  category: {
-    color: "#666",
-    marginTop: 2,
+  transactionCategory: {
+    color: "#9CA3AF",
+    marginTop: 4,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
   },
 
-  buttonRow: {
-    flexDirection: "row",
-    marginTop: 12,
-    gap: 10,
+  amount: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
   },
 
-  editButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F3F4F6",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
+  date: {
+    color: "#9CA3AF",
+    fontSize: 12,
+    marginTop: 4,
+    fontFamily: "Inter_400Regular",
   },
 
-  deleteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#FCE8E6",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-  },
-
-  buttonText: {
-    marginLeft: 6,
-    fontWeight: "600",
+  emptyText: {
+    textAlign: "center",
+    color: "#9CA3AF",
+    marginTop: 50,
+    fontFamily: "Inter_400Regular",
   },
 
   fab: {
