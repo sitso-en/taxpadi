@@ -20,8 +20,7 @@ export const ENDPOINTS = {
     LIST: "/api/v1/penalties",
     BY_TAX_TYPE: (taxType: string) => `/api/v1/penalties/${taxType}`,
     RESOLVE: "/api/v1/penalties/resolve",
-    GET: (id: string) => `/api/v1/tax/penalties/${id}`,
-    DISPUTE: (id: string) => `/api/v1/tax/penalties/${id}/dispute`,
+    GET: (id: string) => `/api/v1/penalties/${id}`,
   },
   NOTIFICATIONS: {
     LIST: "/api/v1/notifications",
@@ -107,7 +106,7 @@ export const ENDPOINTS = {
   VAT: {
     STATUS: "/api/v1/tax/vat/status",
     REGISTER: "/api/v1/tax/vat/register",
-    RECORDS: "/api/v1/tax/vat/records",
+    RECORDS: "/api/v1/tax/vat/history",
     RECORD_BY_PERIOD: (month: string, year: string) =>
       `/api/v1/tax/vat/records/${month}/${year}`,
   },
@@ -133,7 +132,7 @@ export const ENDPOINTS = {
     LIST: "/api/v1/certificates",
     GET: (id: string) => `/api/v1/certificates/${id}`,
     DOWNLOAD: (id: string) => `/api/v1/certificates/${id}/download`,
-    REQUEST: "/api/v1/compliance/certificates/request",
+    REQUEST: "/api/v1/certificates/request",
   },
   SAVINGS_VAULT: {
     GET: "/api/v1/vault",
@@ -169,4 +168,3 @@ export const ENDPOINTS = {
     CONVERTED: (id: string) => `/api/v1/referrals/${id}/converted`,
   },
 };
-
