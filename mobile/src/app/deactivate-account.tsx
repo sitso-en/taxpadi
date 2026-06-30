@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
+import axios from "axios";
 import React, { useState } from "react";
 import ConfirmModal from "@/components/ConfirmModal";
 import {
@@ -57,6 +58,14 @@ export default function DeactivateAccountScreen() {
       showToast("Account deactivated. You have been logged out.", "success");
       resetToLogin();
     } catch (error: any) {
+      // A wrong password belongs under the password field, not a generic toast.
+      if (axios.isAxiosError(error)) {
+        const low = ((error.response?.data?.message ?? "") as string).toLowerCase();
+        if (low.includes("password is incorrect") || low.includes("invalid password")) {
+          setPasswordError("Password is incorrect.");
+          return;
+        }
+      }
       showToast(getUserFriendlyError(error), "error");
     } finally {
       setDeactivating(false);
