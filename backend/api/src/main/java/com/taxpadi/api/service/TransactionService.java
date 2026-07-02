@@ -447,7 +447,8 @@ public class TransactionService {
             null);
 
         int deletedYear = t.getTransactionDate().getYear();
-        transactionRepository.delete(t);
+        t.setIsActive(false);
+        transactionRepository.save(t);
         updateIncomeTaxCalculationForYear(user, deletedYear);
     }
 

@@ -6,6 +6,7 @@ import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.TaxReturnService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -40,7 +41,7 @@ public class TaxReturnController {
     @PostMapping("/generate")
     public ResponseEntity<ApiResponse<GenerateReturnResponse>> generate(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody GenerateReturnRequest request,
+            @Valid @RequestBody GenerateReturnRequest request,
             HttpServletRequest httpRequest) {
         User user = userDetails.getUser();
         return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(true,
@@ -84,7 +85,7 @@ public class TaxReturnController {
     public ResponseEntity<ApiResponse<AmendReturnResponse>> amend(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody AmendReturnRequest request,
+            @Valid @RequestBody AmendReturnRequest request,
             HttpServletRequest httpRequest) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,

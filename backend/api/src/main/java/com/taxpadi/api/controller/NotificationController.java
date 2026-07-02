@@ -11,6 +11,7 @@ import com.taxpadi.api.dto.notification.UnregisterFcmRequest;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.NotificationService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -30,7 +31,7 @@ public class NotificationController {
     @PostMapping("/register")
     public ResponseEntity<ApiResponse<Void>> register(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody RegisterFcmRequest request) {
+            @Valid @RequestBody RegisterFcmRequest request) {
         User user = userDetails.getUser();
         notificationService.registerFcmToken(user, request.getFcmToken(), request.getDeviceInfo(), request.getPlatform());
         return ResponseEntity.ok(new ApiResponse<>(true, null, "Device registered for notifications."));
@@ -39,7 +40,7 @@ public class NotificationController {
     @DeleteMapping("/register")
     public ResponseEntity<ApiResponse<Void>> unregister(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody UnregisterFcmRequest request) {
+            @Valid @RequestBody UnregisterFcmRequest request) {
         User user = userDetails.getUser();
         notificationService.unregisterFcmToken(user, request.getFcmToken());
         return ResponseEntity.ok(new ApiResponse<>(true, null, "Device unregistered from notifications."));
@@ -121,7 +122,7 @@ public class NotificationController {
     @PutMapping("/preferences")
     public ResponseEntity<ApiResponse<NotificationPreferencesResponse>> updatePreferences(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody NotificationPreferences prefs) {
+            @Valid @RequestBody NotificationPreferences prefs) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             notificationService.updatePreferences(user, prefs),

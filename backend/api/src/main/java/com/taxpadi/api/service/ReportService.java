@@ -138,11 +138,11 @@ public class ReportService {
             switch (format) {
                 case "pdf" -> {
                     byte[] bytes = buildPdf(user, dateFrom, dateTo, transactions, taxReturns);
-                    response.setFileUrl(cloudinaryService.uploadPdf(bytes, publicId + ".pdf"));
+                    response.setFileUrl(cloudinaryService.uploadPdf(bytes, publicId + ".pdf", "taxpadi-report-data.pdf"));
                 }
                 case "excel" -> {
                     byte[] bytes = buildExcel(transactions, taxReturns);
-                    response.setFileUrl(cloudinaryService.uploadPdf(bytes, publicId + ".xlsx"));
+                    response.setFileUrl(cloudinaryService.uploadPdf(bytes, publicId + ".xlsx", "taxpadi-report-data.xlsx"));
                 }
                 default -> {
                     Map<String, Object> data = buildJsonMap(user, dateFrom, dateTo, transactions, taxReturns);

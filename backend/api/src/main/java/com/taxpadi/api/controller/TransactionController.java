@@ -23,6 +23,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
+import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -66,7 +67,7 @@ public class TransactionController {
     @PostMapping
     public ResponseEntity<ApiResponse<CreateTransactionResponse>> createTransaction(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody CreateTransactionRequest body) {
+            @Valid @RequestBody CreateTransactionRequest body) {
         User user = userDetails.getUser();
         return ResponseEntity.status(201).body(new ApiResponse<>(true,
             transactionService.createTransaction(user, body),
@@ -87,7 +88,7 @@ public class TransactionController {
     public ResponseEntity<ApiResponse<UpdateTransactionResponse>> updateTransaction(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody UpdateTransactionRequest body) {
+            @Valid @RequestBody UpdateTransactionRequest body) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             transactionService.updateTransaction(user, id, body),

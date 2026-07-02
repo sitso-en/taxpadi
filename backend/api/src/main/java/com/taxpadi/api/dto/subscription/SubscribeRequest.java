@@ -1,10 +1,13 @@
 package com.taxpadi.api.dto.subscription;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
 
 public class SubscribeRequest {
+    @NotBlank(message = "Plan is required")
     private String plan;
 
+    @NotBlank(message = "Payment method is required")
     @JsonProperty("payment_method")
     private String paymentMethod;
 

@@ -10,12 +10,12 @@ public class SubscriptionFeaturesDto {
     private boolean referralOffers;
 
     public SubscriptionFeaturesDto(boolean paid) {
-        this.vatManagement = paid;
+        this.vatManagement = true;       // free for all users
+        this.invoiceGenerator = true;    // free for all users
+        this.advancedReports = true;     // all reports are basic/free
         this.payeManagement = paid;
         this.autoFiling = paid;
         this.taxSavingsVault = paid;
-        this.advancedReports = paid;
-        this.invoiceGenerator = paid;
         this.referralOffers = paid;
     }
 

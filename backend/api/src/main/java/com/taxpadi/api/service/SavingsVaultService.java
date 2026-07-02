@@ -24,7 +24,9 @@ import com.taxpadi.api.dto.vault.VaultTarget;
 import com.taxpadi.api.dto.vault.VaultTransactionDto;
 import com.taxpadi.api.dto.vault.VaultTransactionsResponse;
 import com.taxpadi.api.dto.vault.VaultTxnSummary;
+import com.taxpadi.api.constant.SubscriptionStatus;
 import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.exception.ForbiddenException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.NotificationType;
 import com.taxpadi.api.model.SavingsVault;
@@ -32,6 +34,7 @@ import com.taxpadi.api.model.Transaction;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.model.VaultTransaction;
 import com.taxpadi.api.repository.SavingsVaultRepository;
+import com.taxpadi.api.repository.SubscriptionRepository;
 import com.taxpadi.api.repository.TransactionRepository;
 import com.taxpadi.api.repository.VaultTransactionRepository;
 
@@ -42,25 +45,36 @@ public class SavingsVaultService {
     private final VaultTransactionRepository txnRepo;
     private final TransactionRepository transactionRepo;
     private final NotificationService notificationService;
+    private final SubscriptionRepository subscriptionRepository;
 
     public SavingsVaultService(SavingsVaultRepository vaultRepo,
                                 VaultTransactionRepository txnRepo,
                                 TransactionRepository transactionRepo,
-                                NotificationService notificationService) {
+                                NotificationService notificationService,
+                                SubscriptionRepository subscriptionRepository) {
         this.vaultRepo = vaultRepo;
         this.txnRepo = txnRepo;
         this.transactionRepo = transactionRepo;
         this.notificationService = notificationService;
+        this.subscriptionRepository = subscriptionRepository;
+    }
+
+    private void requirePaidSubscription(User user) {
+        if (!subscriptionRepository.existsByUserAndStatus(user, SubscriptionStatus.ACTIVE)) {
+            throw new ForbiddenException("The Tax Savings Vault requires an active TaxPadi subscription.");
+        }
     }
 
     @Transactional
     public VaultDto getVault(User user) {
+        requirePaidSubscription(user);
         SavingsVault vault = requireVault(user);
         return toVaultDto(vault);
     }
 
     @Transactional
     public LinkMomoResponse linkMomo(User user, LinkMomoRequest request) {
+        requirePaidSubscription(user);
         SavingsVault vault = requireVault(user);
         vault.setLinkedMomoNumber(request.getMomoNumber());
         vault.setLinkedMomoProvider(request.getMomoProvider());
@@ -77,6 +91,7 @@ public class SavingsVaultService {
 
     @Transactional
     public ContributeResponse contribute(User user, ContributeRequest request) {
+        requirePaidSubscription(user);
         SavingsVault vault = requireVault(user);
         if (vault.getLinkedMomoNumber() == null) {
             throw new BadRequestException("Please link a MoMo number to your vault before contributing.");
@@ -105,6 +120,7 @@ public class SavingsVaultService {
     }
 
     public VaultTransactionsResponse getTransactions(User user, int page, int limit) {
+        requirePaidSubscription(user);
         SavingsVault vault = requireVault(user);
         Page<VaultTransaction> pageResult = txnRepo.findByVaultOrderByCreatedAtDesc(
                 vault, PageRequest.of(page - 1, limit));
@@ -129,6 +145,7 @@ public class SavingsVaultService {
     }
 
     public VaultSuggestionDto getSuggestion(User user) {
+        requirePaidSubscription(user);
         SavingsVault vault = requireVault(user);
         Transaction latest = transactionRepo
                 .findTopByUserAndTypeOrderByTransactionDateDesc(user, "income")
