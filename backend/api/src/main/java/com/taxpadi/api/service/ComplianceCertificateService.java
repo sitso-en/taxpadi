@@ -77,7 +77,7 @@ public class ComplianceCertificateService {
         if (pdfUrl == null) {
             byte[] pdf = buildCertificatePdf(c, user);
             String publicId = "certificates/" + user.getUserId() + "/" + c.getCertificateNumber();
-            pdfUrl = cloudinaryService.uploadPdf(pdf, publicId);
+            pdfUrl = cloudinaryService.uploadPdf(pdf, publicId, "taxpadi-compliance-certificate-" + c.getCertificateNumber() + ".pdf");
             c.setDownloadUrl(pdfUrl);
             repo.save(c);
         }

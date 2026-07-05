@@ -9,6 +9,8 @@ import com.taxpadi.api.dto.subscription.SubscriptionStatusDto;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.SubscriptionService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -44,10 +46,10 @@ public class SubscriptionController {
     @PostMapping("/subscribe")
     public ResponseEntity<ApiResponse<SubscribeResponse>> subscribe(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody SubscribeRequest request) {
+            @Valid @RequestBody SubscribeRequest request) {
         User user = userDetails.getUser();
         SubscribeResponse data = subscriptionService.subscribe(user, request);
-        return ResponseEntity.ok(new ApiResponse<>(true, data,
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(true, data,
                 "Subscription payment initiated. Please approve the payment on your phone."));
     }
 

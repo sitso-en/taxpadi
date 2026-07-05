@@ -5,6 +5,7 @@ import com.taxpadi.api.dto.paye.*;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.PayeService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -37,7 +38,7 @@ public class PayeController {
     @PostMapping("/employees")
     public ResponseEntity<ApiResponse<AddEmployeeResponse>> addEmployee(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody CreateEmployeeRequest request) {
+            @Valid @RequestBody CreateEmployeeRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(true,
             payeService.addEmployee(user, request),
@@ -58,7 +59,7 @@ public class PayeController {
     public ResponseEntity<ApiResponse<UpdateEmployeeResponse>> updateEmployee(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody UpdateEmployeeRequest request) {
+            @Valid @RequestBody UpdateEmployeeRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             payeService.updateEmployee(user, id, request),
@@ -69,7 +70,7 @@ public class PayeController {
     public ResponseEntity<ApiResponse<DeactivateEmployeeResponse>> deactivateEmployee(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody DeactivateEmployeeRequest request) {
+            @Valid @RequestBody DeactivateEmployeeRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             payeService.deactivateEmployee(user, id, request),

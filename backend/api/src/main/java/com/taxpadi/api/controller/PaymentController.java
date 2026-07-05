@@ -12,6 +12,8 @@ import com.taxpadi.api.dto.payment.PaymentStatusDto;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.PaymentService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -44,10 +46,10 @@ public class PaymentController {
     @PostMapping("/initiate")
     public ResponseEntity<ApiResponse<InitiatePaymentResponse>> initiate(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody InitiatePaymentRequest request) {
+            @Valid @RequestBody InitiatePaymentRequest request) {
         User user = userDetails.getUser();
         InitiatePaymentResponse data = paymentService.initiate(user, request);
-        return ResponseEntity.ok(new ApiResponse<>(true, data,
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(true, data,
                 "Payment initiated. Please approve the prompt on your phone."));
     }
 
@@ -64,7 +66,7 @@ public class PaymentController {
     public ResponseEntity<ApiResponse<ConfirmPaymentResponse>> confirm(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody ConfirmPaymentRequest request) {
+            @Valid @RequestBody ConfirmPaymentRequest request) {
         User user = userDetails.getUser();
         ConfirmPaymentResponse data = paymentService.confirmPayment(id, user, request);
         return ResponseEntity.ok(new ApiResponse<>(true, data,

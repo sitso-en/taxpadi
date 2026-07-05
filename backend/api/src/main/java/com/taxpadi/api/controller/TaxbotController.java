@@ -7,6 +7,7 @@ import com.taxpadi.api.dto.taxbot.TaxbotHistoryResponse;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.TaxbotService;
+import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -24,7 +25,7 @@ public class TaxbotController {
     @PostMapping("/ask")
     public ResponseEntity<ApiResponse<TaxbotAskResponse>> ask(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody TaxbotAskRequest request) {
+            @Valid @RequestBody TaxbotAskRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             taxbotService.ask(user, request.getQuestion()),

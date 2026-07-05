@@ -19,6 +19,7 @@ import com.taxpadi.api.service.PaystackService.PaystackInitResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -54,6 +55,7 @@ public class SubscriptionService {
         this.userRepository = userRepository;
     }
 
+    @Cacheable("subscription-plans")
     public List<Map<String, Object>> getPlans() {
         return List.of(
             Map.of(

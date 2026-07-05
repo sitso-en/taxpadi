@@ -56,6 +56,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
@@ -119,9 +120,9 @@ public class PaymentService {
                 .collect(Collectors.toList());
 
         PaymentSummary summary = new PaymentSummary();
-        summary.setTotalPaid(paymentRepository.sumByUserAndStatus(user, PaymentStatus.SUCCESSFUL));
-        summary.setTotalPending(paymentRepository.sumByUserAndStatus(user, PaymentStatus.PENDING));
-        summary.setTotalFailed(paymentRepository.sumByUserAndStatus(user, PaymentStatus.FAILED));
+        summary.setTotalPaid(Optional.ofNullable(paymentRepository.sumByUserAndStatus(user, PaymentStatus.SUCCESSFUL)).orElse(BigDecimal.ZERO));
+        summary.setTotalPending(Optional.ofNullable(paymentRepository.sumByUserAndStatus(user, PaymentStatus.PENDING)).orElse(BigDecimal.ZERO));
+        summary.setTotalFailed(Optional.ofNullable(paymentRepository.sumByUserAndStatus(user, PaymentStatus.FAILED)).orElse(BigDecimal.ZERO));
 
         PaymentListResponse response = new PaymentListResponse();
         response.setPayments(items);

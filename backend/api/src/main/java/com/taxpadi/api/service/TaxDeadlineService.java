@@ -9,6 +9,8 @@ import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.TaxDeadline;
 import com.taxpadi.api.repository.TaxDeadlineRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,7 @@ public class TaxDeadlineService {
         this.repo = repo;
     }
 
+    @Cacheable(value = "tax-deadlines", key = "'all:' + #page + ':' + #limit")
     public DeadlineListResponse getAll(int page, int limit) {
         List<TaxDeadline> all = repo.findByIsActiveTrue();
         all.sort((a, b) -> a.getDueDate().compareTo(b.getDueDate()));
@@ -41,6 +44,7 @@ public class TaxDeadlineService {
         return new DeadlineListResponse(dtos, new PaginationInfo(total, page, limit, totalPages));
     }
 
+    @Cacheable(value = "tax-deadlines", key = "'upcoming:' + #days")
     public UpcomingDeadlinesResponse getUpcoming(int days) {
         if (days < 1 || days > 365) {
             throw new BadRequestException("Days parameter must be between 1 and 365.");
@@ -53,6 +57,7 @@ public class TaxDeadlineService {
     }
 
     @Transactional
+    @CacheEvict(value = "tax-deadlines", allEntries = true)
     public CompleteDeadlineResponse complete(UUID deadlineId) {
         TaxDeadline d = repo.findById(deadlineId)
                 .orElseThrow(() -> new NotFoundException("No deadline found with this ID."));

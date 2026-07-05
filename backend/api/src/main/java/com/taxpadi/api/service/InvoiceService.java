@@ -5,6 +5,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
@@ -100,10 +101,10 @@ public class InvoiceService {
 
     public InvoiceStatsResponse getStats(User user) {
         LocalDate today = LocalDate.now();
-        BigDecimal totalPaid = invoiceRepository.sumTotalAmountByUserAndStatus(user, "paid");
-        BigDecimal totalOutstanding = invoiceRepository.sumTotalAmountByUserAndStatus(user, InvoiceStatus.UNPAID);
+        BigDecimal totalPaid = Optional.ofNullable(invoiceRepository.sumTotalAmountByUserAndStatus(user, "paid")).orElse(BigDecimal.ZERO);
+        BigDecimal totalOutstanding = Optional.ofNullable(invoiceRepository.sumTotalAmountByUserAndStatus(user, InvoiceStatus.UNPAID)).orElse(BigDecimal.ZERO);
         BigDecimal totalInvoiced = totalPaid.add(totalOutstanding);
-        BigDecimal totalOverdue = invoiceRepository.sumOverdueByUser(user, today);
+        BigDecimal totalOverdue = Optional.ofNullable(invoiceRepository.sumOverdueByUser(user, today)).orElse(BigDecimal.ZERO);
 
         long countPaid = invoiceRepository.countByUserAndStatus(user, "paid");
         long countUnpaid = invoiceRepository.countByUserAndStatus(user, InvoiceStatus.UNPAID);
@@ -399,7 +400,7 @@ public class InvoiceService {
 
     private String generateAndUploadPdf(Invoice invoice) {
         byte[] pdfBytes = pdfService.generateInvoicePdf(invoice);
-        return cloudinaryService.uploadPdf(pdfBytes, "invoices/" + invoice.getInvoiceRef());
+        return cloudinaryService.uploadPdf(pdfBytes, "invoices/" + invoice.getInvoiceRef(), "taxpadi-invoice-" + invoice.getInvoiceRef() + ".pdf");
     }
 
     private byte[] fetchPdfBytes(Invoice invoice) {
