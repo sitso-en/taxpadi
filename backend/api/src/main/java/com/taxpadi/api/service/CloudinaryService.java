@@ -28,7 +28,7 @@ public class CloudinaryService {
         ));
     }
 
-    public String uploadPdf(byte[] pdfBytes, String publicId) {
+    public String uploadPdf(byte[] pdfBytes, String publicId, String downloadFilename) {
         try {
             Map<?, ?> result = cloudinary.uploader().upload(
                 pdfBytes,
@@ -39,8 +39,7 @@ public class CloudinaryService {
                 )
             );
             String url = (String) result.get("secure_url");
-            // Insert fl_attachment so browsers download instead of rendering inline
-            String downloadUrl = url.replace("/upload/", "/upload/fl_attachment/");
+            String downloadUrl = url.replace("/upload/", "/upload/fl_attachment:" + downloadFilename + "/");
             log.info("Cloudinary upload result download_url={}", downloadUrl);
             return downloadUrl;
         } catch (Exception e) {

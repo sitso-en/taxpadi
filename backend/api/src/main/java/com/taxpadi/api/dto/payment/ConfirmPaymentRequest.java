@@ -1,8 +1,10 @@
 package com.taxpadi.api.dto.payment;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import jakarta.validation.constraints.NotBlank;
 
 public class ConfirmPaymentRequest {
+    @NotBlank(message = "Payment reference is required")
     @JsonProperty("payment_reference")
     private String paymentReference;
 

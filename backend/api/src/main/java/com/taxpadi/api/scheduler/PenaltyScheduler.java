@@ -51,7 +51,7 @@ public class PenaltyScheduler {
         LocalDate today = LocalDate.now();
         log.info("PenaltyScheduler: checking overdue deadlines for {}", today);
 
-        List<UserTaxProfile> profiles = profileRepo.findAll();
+        List<UserTaxProfile> profiles = profileRepo.findByUser_IsActiveTrue();
 
         deadlineRepo.findByIsActiveTrue().stream()
             .filter(d -> d.getDueDate() != null && d.getDueDate().isBefore(today))

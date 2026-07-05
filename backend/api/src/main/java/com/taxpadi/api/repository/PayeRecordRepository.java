@@ -6,9 +6,12 @@ import com.taxpadi.api.model.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface PayeRecordRepository extends JpaRepository<PayeRecord, UUID> {
@@ -32,4 +35,7 @@ public interface PayeRecordRepository extends JpaRepository<PayeRecord, UUID> {
     Optional<PayeRecord> findByPayeIdAndUser(UUID payeId, User user);
 
     boolean existsByEmployeeAndMonthAndYear(Employee employee, Integer month, Integer year);
+
+    @Query("SELECT r.employee.employeeId FROM PayeRecord r WHERE r.user = :user AND r.month = :month AND r.year = :year")
+    Set<UUID> findEmployeeIdsWithRecords(@Param("user") User user, @Param("month") int month, @Param("year") int year);
 }

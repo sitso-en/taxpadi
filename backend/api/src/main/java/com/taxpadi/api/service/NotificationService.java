@@ -182,6 +182,11 @@ public class NotificationService {
         }
     }
 
+    @Transactional
+    public void sendBroadcast(String title, String body, NotificationType type, String actionUrl) {
+        notificationRepository.broadcastToAllActiveUsers(title, body, type.name(), actionUrl);
+    }
+
     private String preferenceKey(NotificationType type) {
         return switch (type) {
             case DEADLINE -> "deadline_reminders";

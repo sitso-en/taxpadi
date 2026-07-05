@@ -10,6 +10,7 @@ import java.util.UUID;
 public class ExportResponse {
 
     private UUID exportId;
+    private String status;
     private String format;
     private LocalDate periodStart;
     private LocalDate periodEnd;
@@ -21,6 +22,9 @@ public class ExportResponse {
 
     public UUID getExportId() { return exportId; }
     public void setExportId(UUID exportId) { this.exportId = exportId; }
+
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
     public String getFormat() { return format; }
     public void setFormat(String format) { this.format = format; }

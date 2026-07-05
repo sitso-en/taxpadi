@@ -6,6 +6,8 @@ import com.taxpadi.api.dto.tax.*;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.TaxRateConfig;
 import com.taxpadi.api.repository.TaxRateConfigRepository;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,6 +26,7 @@ public class TaxRateService {
         this.taxRateConfigRepository = taxRateConfigRepository;
     }
 
+    @Cacheable("tax-brackets")
     public TaxBracketsResponse getBrackets() {
         TaxRateConfig config = latestConfig();
 
@@ -35,6 +38,7 @@ public class TaxRateService {
         return response;
     }
 
+    @Cacheable("tax-rates")
     public TaxRatesResponse getRates() {
         TaxRateConfig config = latestConfig();
 
@@ -66,6 +70,7 @@ public class TaxRateService {
     }
 
     @Transactional
+    @CacheEvict(value = {"tax-rates", "tax-brackets"}, allEntries = true)
     public AdminUpdateTaxRatesResponse updateRates(AdminUpdateTaxRatesRequest request, UUID updatedBy) {
         TaxRateConfig config = taxRateConfigRepository.findByTaxYear(request.getTaxYear())
                 .orElseGet(TaxRateConfig::new);

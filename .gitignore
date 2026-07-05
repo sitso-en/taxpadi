@@ -1,3 +1,9 @@
+# HTTP request files
+requests.http
+
+# Maven build output
+target/
+
 # Compiled class file
 *.class
 
@@ -41,8 +47,6 @@ mobile/*.mobileprovision
 *.env
 !.env.example
 
-# Application properties (contains secrets)
-backend/api/src/main/resources/application.properties
 
 # IDE files
 .vscode/

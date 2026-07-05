@@ -1,13 +1,21 @@
 package com.taxpadi.api.dto.invoice;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 
 public class CreateInvoiceRequest {
 
+    @NotBlank(message = "Client name is required")
     private String clientName;
+
     private String clientEmail;
     private String clientPhone;
     private String description;
+
+    @NotNull(message = "Subtotal is required")
+    @DecimalMin(value = "0.01", message = "Subtotal must be greater than zero")
     private BigDecimal subtotal;
     private String dueDate;
 

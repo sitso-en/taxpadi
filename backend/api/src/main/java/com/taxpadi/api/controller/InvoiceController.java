@@ -6,6 +6,7 @@ import com.taxpadi.api.model.Invoice;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.InvoiceService;
+import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -47,9 +48,9 @@ public class InvoiceController {
     @PostMapping
     public ResponseEntity<ApiResponse<CreateInvoiceResponse>> create(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody CreateInvoiceRequest request) {
+            @Valid @RequestBody CreateInvoiceRequest request) {
         User user = userDetails.getUser();
-        return ResponseEntity.ok(new ApiResponse<>(true,
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(true,
             invoiceService.create(user, request),
             "Invoice created successfully."));
     }
@@ -68,7 +69,7 @@ public class InvoiceController {
     public ResponseEntity<ApiResponse<UpdateInvoiceResponse>> update(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody UpdateInvoiceRequest request) {
+            @Valid @RequestBody UpdateInvoiceRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             invoiceService.update(user, id, request),
@@ -123,7 +124,7 @@ public class InvoiceController {
     public ResponseEntity<ApiResponse<SendInvoiceResponse>> send(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody SendInvoiceRequest request) {
+            @Valid @RequestBody SendInvoiceRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             invoiceService.send(user, id, request.getChannel()),

@@ -223,8 +223,8 @@ public class AdminService {
         return new AdminAuditLogResponse(logs, pagination);
     }
 
-    public AdminPartnersResponse getPartners() {
-        List<AdminPartnerItem> items = partnerRepository.findAll().stream().map(p -> {
+    public AdminPartnersResponse getPartners(int page, int limit) {
+        List<AdminPartnerItem> items = partnerRepository.findAll(PageRequest.of(page - 1, limit)).stream().map(p -> {
             AdminPartnerItem item = new AdminPartnerItem();
             item.setPartnerId(p.getPartnerId());
             item.setName(p.getName());
@@ -263,19 +263,18 @@ public class AdminService {
         response.setCreatedAt(partner.getCreatedAt());
 
         String offerLabel = "LOAN".equalsIgnoreCase(partner.getOfferType()) ? "loan" : "insurance";
-        userRepository.findAll().forEach(user -> notificationService.send(user,
+        notificationService.sendBroadcast(
             "New " + partner.getName() + " Offer Available",
             "A new " + offerLabel + " offer from " + partner.getName() + " is now available for you. Check it out.",
             NotificationType.REFERRAL,
-            "/referrals"));
+            "/referrals");
 
         return response;
     }
 
     @Transactional
     public void broadcastSystemUpdate(String title, String body) {
-        userRepository.findAll().forEach(user ->
-            notificationService.send(user, title, body, NotificationType.SYSTEM, null));
+        notificationService.sendBroadcast(title, body, NotificationType.SYSTEM, null);
     }
 
     @Transactional
@@ -301,17 +300,12 @@ public class AdminService {
             throw new BadRequestException("This partner is already inactive.");
         }
 
-        long offersExpired = referralOfferRepository.findAll().stream()
-                .filter(o -> o.getStatus() == ReferralStatus.ACTIVE
-                        && o.getPartnerName().equalsIgnoreCase(partner.getName()))
-                .peek(o -> {
-                    o.setStatus(ReferralStatus.EXPIRED);
-                    referralOfferRepository.save(o);
-                }).count();
+        int offersExpired = referralOfferRepository.expireAllByPartnerName(
+                partner.getName(), ReferralStatus.ACTIVE, ReferralStatus.EXPIRED);
 
         partner.setIsActive(false);
         partnerRepository.save(partner);
-        return new DeletePartnerResponse(partner.getPartnerId(), false, (int) offersExpired);
+        return new DeletePartnerResponse(partner.getPartnerId(), false, offersExpired);
     }
 
     private String generateApiKey() {
