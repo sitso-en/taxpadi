@@ -1,3 +1,9 @@
+# HTTP request files
+requests.http
+
+# Maven build output
+target/
+
 # Compiled class file
 *.class
 
