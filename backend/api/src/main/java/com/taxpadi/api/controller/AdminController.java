@@ -109,9 +109,11 @@ public class AdminController {
     }
 
     @GetMapping("/partners")
-    public ResponseEntity<ApiResponse<AdminPartnersResponse>> getPartners() {
+    public ResponseEntity<ApiResponse<AdminPartnersResponse>> getPartners(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit) {
         return ResponseEntity.ok(new ApiResponse<>(true,
-                adminService.getPartners(),
+                adminService.getPartners(page, limit),
                 "Partners retrieved successfully."));
     }
 

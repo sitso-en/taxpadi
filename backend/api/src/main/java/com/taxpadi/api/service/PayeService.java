@@ -402,10 +402,11 @@ public class PayeService {
     @Transactional
     public void generateMonthlyRecords(User user, int month, int year) {
         List<Employee> activeEmployees = employeeRepository.findAllByUserAndIsActive(user, true);
+        java.util.Set<UUID> existingIds = payeRecordRepository.findEmployeeIdsWithRecords(user, month, year);
+
+        List<PayeRecord> newRecords = new ArrayList<>();
         for (Employee emp : activeEmployees) {
-            if (payeRecordRepository.existsByEmployeeAndMonthAndYear(emp, month, year)) {
-                continue;
-            }
+            if (existingIds.contains(emp.getEmployeeId())) continue;
             BigDecimal taxableSalary = computeTaxableSalary(emp);
             BigDecimal payeDeducted = taxEngine.calculatePaye(taxableSalary);
 
@@ -418,7 +419,10 @@ public class PayeService {
             record.setTaxableSalary(taxableSalary);
             record.setPayeDeducted(payeDeducted);
             record.setRemitted(false);
-            payeRecordRepository.save(record);
+            newRecords.add(record);
+        }
+        if (!newRecords.isEmpty()) {
+            payeRecordRepository.saveAll(newRecords);
         }
     }
 

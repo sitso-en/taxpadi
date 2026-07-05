@@ -203,16 +203,9 @@ public class SavingsVaultService {
         dto.setLinkedMomoProvider(v.getLinkedMomoProvider());
         dto.setMomoLinked(v.getLinkedMomoNumber() != null);
 
-        // Compute totals from transaction history (confirmed only)
-        List<VaultTransaction> allTxns = txnRepo.findByVault(v);
-        BigDecimal totalIn = allTxns.stream()
-                .filter(t -> "DEPOSIT".equals(t.getType()) && "SUCCESSFUL".equals(t.getStatus()))
-                .map(VaultTransaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        BigDecimal totalOut = allTxns.stream()
-                .filter(t -> "WITHDRAWAL".equals(t.getType()) && "SUCCESSFUL".equals(t.getStatus()))
-                .map(VaultTransaction::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
-        dto.setTotalContributed(totalIn);
-        dto.setTotalWithdrawn(totalOut);
+        // Compute totals via aggregation queries (avoids loading all transactions into memory)
+        dto.setTotalContributed(txnRepo.sumByVaultAndType(v, "DEPOSIT"));
+        dto.setTotalWithdrawn(txnRepo.sumByVaultAndType(v, "WITHDRAWAL"));
 
         if (v.getTargetAmount().compareTo(BigDecimal.ZERO) > 0) {
             double pct = v.getBalance().divide(v.getTargetAmount(), 4, RoundingMode.HALF_UP)
