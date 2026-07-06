@@ -38,7 +38,7 @@ type InvoiceContextType = {
     client_name: string;
     client_email?: string;
     client_phone?: string;
-    description: string;
+    description?: string;
     subtotal: number;
     due_date?: string;
   }) => Promise<any>;
@@ -111,7 +111,7 @@ export function InvoiceProvider({ children }: { children: React.ReactNode }) {
     client_name: string;
     client_email?: string;
     client_phone?: string;
-    description: string;
+    description?: string;
     subtotal: number;
     due_date?: string;
   }) => {
