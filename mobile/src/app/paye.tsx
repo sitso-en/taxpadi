@@ -117,6 +117,12 @@ export default function PAYEScreen() {
   };
 
   useEffect(() => {
+    // Effects registered before the isPro early-return still run for free users —
+    // skip the gated PAYE calls entirely when not subscribed
+    if (!isPro) {
+      setLoading(false);
+      return;
+    }
     const init = async () => {
       try {
         await Promise.all([loadRecords(), loadEmployees()]);
@@ -126,7 +132,7 @@ export default function PAYEScreen() {
       }
     };
     init();
-  }, []);
+  }, [isPro]);
 
   if (!isPro) return (
     <SubscriptionGate
