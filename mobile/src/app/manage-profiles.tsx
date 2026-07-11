@@ -64,7 +64,18 @@ export default function ManageProfilesScreen() {
   const load = useCallback(async () => {
     try {
       const res = await getProfiles();
-      setProfiles(res.data?.profiles ?? res.profiles ?? []);
+      const raw: any[] = res.data?.profiles ?? res.profiles ?? [];
+      // API serializes snake_case — map to the local Profile shape
+      setProfiles(
+        raw.map((p) => ({
+          profileId: p.profile_id,
+          label: p.label,
+          taxpayerCategory: p.taxpayer_category,
+          tin: p.tin ?? null,
+          activeProfile: p.active_profile ?? false,
+          createdAt: p.created_at,
+        }))
+      );
     } catch {
       showToast("Failed to load profiles.", "error");
     } finally {
@@ -148,13 +159,11 @@ export default function ManageProfilesScreen() {
     }
     setCreating(true);
     try {
-      const res = await createProfile({
+      await createProfile({
         label: label.trim(),
         taxpayerCategory: category,
         tin: tin.trim() || undefined,
       });
-      const created = res.data ?? res;
-      setProfiles((prev) => [...prev, created]);
       setShowCreate(false);
       setLabel("");
       setTin("");
