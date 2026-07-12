@@ -36,6 +36,7 @@ import com.taxpadi.api.dto.auth.VerifyResetOtpResponse;
 import com.taxpadi.api.exception.ConflictException;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.util.PhoneUtil;
 import com.taxpadi.api.model.DeviceToken;
 import com.taxpadi.api.model.OtpPurpose;
 import com.taxpadi.api.model.OtpVerification;
@@ -98,7 +99,7 @@ public class AuthService {
 
     @Transactional
     public RegisterResponse register(RegisterRequest request){
-        String phone = request.getPhone();
+        String phone = PhoneUtil.normalize(request.getPhone());
         String email = request.getEmail();
         log.info("Registration attempt for phone={}", phone);
 
@@ -161,7 +162,7 @@ public class AuthService {
     }
 
     public VerifyOtpResponse verifyOtp(VerifyOtpRequest request) {
-        String phone = request.getPhone();
+        String phone = PhoneUtil.normalize(request.getPhone());
         OtpPurpose purpose = request.getPurpose();
         log.info("OTP verification attempt for phone={}, purpose={}", phone, purpose);
 
@@ -200,7 +201,7 @@ public class AuthService {
 
     @Transactional
     public ResendOtpResponse resendOtp(ResendOtpRequest request) {
-        String phone = request.getPhone();
+        String phone = PhoneUtil.normalize(request.getPhone());
         OtpPurpose purpose = request.getPurpose();
         log.info("Resend OTP request for phone={}, purpose={}", phone, purpose);
 
@@ -233,7 +234,7 @@ public class AuthService {
     }
 
     public LoginResponse login(LoginRequest request, String ipAddress) {
-        String phone = request.getPhone();
+        String phone = PhoneUtil.normalize(request.getPhone());
         log.info("Login attempt for phone={}", phone);
 
         User user = userRepository.findByPhone(phone)
@@ -403,6 +404,7 @@ public class AuthService {
 
     @Transactional
     public void forgotPassword(String phone){
+        phone = PhoneUtil.normalize(phone);
         OtpPurpose purpose = OtpPurpose.PASSWORD_RESET;
 
         Optional<User> userOpt = userRepository.findByPhone(phone);
@@ -434,6 +436,7 @@ public class AuthService {
     }
 
     public VerifyResetOtpResponse verifyResetOtp(String phone, String otpCode){
+        phone = PhoneUtil.normalize(phone);
         OtpPurpose purpose = OtpPurpose.PASSWORD_RESET;
 
         log.info("OTP verification attempt for phone={}, purpose={}", phone, purpose);
