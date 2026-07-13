@@ -17,38 +17,26 @@ import { useCertificates } from "../../context/CertificateContext";
 
 export default function MoreScreen() {
   const { user } = useUser();
-
-  const { unreadCount } =
-    useNotifications();
-
-  const { deadlines } =
-    useDeadlines();
-
-  const { totalSaved } =
-    useSavings();
-
-  const { availableOffers } =
-    useReferrals();
-
-  const { validCertificates } =
-    useCertificates();
+  const { unreadCount } = useNotifications();
+  const { deadlines } = useDeadlines();
+  const { totalSaved } = useSavings();
+  const { availableOffers } = useReferrals();
+  const { validCertificates } = useCertificates();
 
   // Count future deadlines only
-  const upcomingDeadlines =
-    deadlines.filter(
-      (deadline) =>
-        new Date(deadline.dueDate) >=
-        new Date()
-    ).length;
+  const upcomingDeadlines = deadlines.filter(
+    (deadline) => new Date(deadline.dueDate) >= new Date()
+  ).length;
 
   // User initials
-  const initials =
-    user.fullName
-      ?.split(" ")
-      .map((name) => name[0])
-      .join("")
-      .slice(0, 2)
-      .toUpperCase() || "U";
+  const initials = user?.label
+    ? user.label
+        .split(" ")
+        .map((name: string) => name[0])
+        .join("")
+        .substring(0, 2)
+        .toUpperCase()
+    : "U";
 
   const menuItems = [
     {
@@ -56,101 +44,76 @@ export default function MoreScreen() {
       subtitle:
         totalSaved === 0
           ? "No savings yet"
-          : `GH¢ ${totalSaved.toFixed(
-              2
-            )} saved`,
+          : `GH¢ ${totalSaved.toFixed(2)} saved`,
       icon: "wallet-outline",
       route: "/savings-vault",
       color: "#34A853",
     },
-
     {
       title: "Deadlines & Penalties",
       subtitle:
         upcomingDeadlines === 0
           ? "No upcoming deadlines"
           : `${upcomingDeadlines} upcoming deadline${
-              upcomingDeadlines > 1
-                ? "s"
-                : ""
+              upcomingDeadlines > 1 ? "s" : ""
             }`,
       icon: "calendar-outline",
       route: "/deadlines",
       color: "#EA4335",
     },
-
     {
-      title:
-        "Compliance Certificate",
+      title: "Compliance Certificate",
       subtitle:
         validCertificates === 0
           ? "No certificates available"
           : `${validCertificates} certificate${
-              validCertificates > 1
-                ? "s"
-                : ""
+              validCertificates > 1 ? "s" : ""
             } available`,
-      icon:
-        "shield-checkmark-outline",
-      route:
-        "/compliance-certificate",
+      icon: "shield-checkmark-outline",
+      route: "/compliance-certificate",
       color: "#F4B400",
     },
-
     {
       title: "Invoices",
-      subtitle:
-        "Create and manage invoices",
+      subtitle: "Create and manage invoices",
       icon: "receipt-outline",
       route: "/invoices",
       color: "#C44736",
     },
-
     {
       title: "Reports & Export",
-      subtitle:
-        "Download as PDF or CSV",
+      subtitle: "Download as PDF or CSV",
       icon: "bar-chart-outline",
       route: "/reports",
       color: "#34A853",
     },
-
     {
       title: "Referral Offers",
       subtitle:
         availableOffers === 0
           ? "No available offers"
           : `${availableOffers} available offer${
-              availableOffers > 1
-                ? "s"
-                : ""
+              availableOffers > 1 ? "s" : ""
             }`,
       icon: "gift-outline",
       route: "/referral-offers",
       color: "#FF6F00",
     },
-
     {
       title: "Notifications",
       subtitle:
         unreadCount === 0
           ? "No unread notifications"
           : `${unreadCount} unread notification${
-              unreadCount > 1
-                ? "s"
-                : ""
+              unreadCount > 1 ? "s" : ""
             }`,
-      icon:
-        "notifications-outline",
-      route:
-        "/notification-preferences",
+      icon: "notifications-outline",
+      route: "/notification-preferences",
       color: "#F4B400",
     },
-
     {
       title: "Profile & Settings",
-      subtitle:
-        "Manage your account",
+      subtitle: "Profile, plan and preferences",
       icon: "settings-outline",
       route: "/settings",
       color: "#6B7280",
@@ -160,128 +123,81 @@ export default function MoreScreen() {
   return (
     <ScrollView
       style={styles.container}
-      showsVerticalScrollIndicator={
-        false
-      }
+      showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         paddingBottom: 120,
       }}
     >
-      <Text style={styles.title}>
-        More
-      </Text>
+      <Text style={styles.title}>More</Text>
 
       {/* Profile Card */}
-
       <TouchableOpacity
         style={styles.profileCard}
-        onPress={() =>
-          router.push("/settings")
-        }
+        onPress={() => router.push("/settings")}
       >
         <View style={styles.avatar}>
-          <Text
-            style={styles.avatarText}
-          >
-            {initials}
-          </Text>
+          <Text style={styles.avatarText}>{initials}</Text>
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text
-            style={styles.profileName}
-          >
-            {user.fullName || "User"}
+          <Text style={styles.profileName}>{user?.label ?? "Default Profile"}</Text>
+          <Text style={styles.profilePhone}>
+            TIN: {user?.tin ?? "Not Available"}
           </Text>
-
-          <Text
-            style={styles.profilePhone}
-          >
-            {user.phoneNumber ||
-              "No phone number"}
+          <Text style={styles.profileEmail}>
+            {user?.taxpayer_category ?? "Taxpayer"}
           </Text>
         </View>
 
-        <View style={styles.proBadge}>
-          <Text style={styles.proText}>
-            {user.plan}
+        <View
+          style={[
+            styles.proBadge,
+            { backgroundColor: user?.active_profile ? "#F4B400" : "#FFFFFF" },
+          ]}
+        >
+          <Text
+            style={[
+              styles.proText,
+              { color: user?.active_profile ? "#FFFFFF" : "#C44736" },
+            ]}
+          >
+            {user?.active_profile ? "ACTIVE" : "INACTIVE"}
           </Text>
         </View>
       </TouchableOpacity>
 
       {/* Menu Items */}
-
       {menuItems.map((item) => (
         <TouchableOpacity
           key={item.title}
           style={styles.menuItem}
-          onPress={() =>
-            router.push(item.route as any)
-          }
+          onPress={() => router.push(item.route as any)}
         >
           <View
             style={[
               styles.iconContainer,
-              {
-                backgroundColor:
-                  item.color + "20",
-              },
+              { backgroundColor: item.color + "20" },
             ]}
           >
-            <Ionicons
-              name={item.icon as any}
-              size={18}
-              color={item.color}
-            />
+            <Ionicons name={item.icon as any} size={18} color={item.color} />
           </View>
 
-          <View
-            style={styles.textContainer}
-          >
-            <Text
-              style={styles.menuTitle}
-            >
-              {item.title}
-            </Text>
-
-            <Text
-              style={
-                styles.menuSubtitle
-              }
-            >
-              {item.subtitle}
-            </Text>
+          <View style={styles.textContainer}>
+            <Text style={styles.menuTitle}>{item.title}</Text>
+            <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
           </View>
 
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color="#9CA3AF"
-          />
+          <Ionicons name="chevron-forward" size={20} color="#9CA3AF" />
         </TouchableOpacity>
       ))}
 
       {/* Logout */}
-
       <TouchableOpacity
         style={styles.logoutButton}
-        onPress={() =>
-          router.push(
-            "/logout-confirmation"
-          )
-        }
+        onPress={() => router.push("/logout-confirmation")}
       >
-        <Ionicons
-          name="log-out-outline"
-          size={22}
-          color="#C44736"
-        />
-
-        <Text
-          style={styles.logoutText}
-        >
-          Logout
-        </Text>
+        <Ionicons name="log-out-outline" size={22} color="#C44736" />
+        <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
     </ScrollView>
   );
@@ -340,15 +256,20 @@ const styles = StyleSheet.create({
     fontSize: 13,
   },
 
+  profileEmail: {
+    color: "#FDECEC",
+    marginTop: 2,
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+  },
+
   proBadge: {
-    backgroundColor: "#FFFFFF",
     borderRadius: 20,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
 
   proText: {
-    color: "#C44736",
     fontFamily: "Inter_700Bold",
     fontSize: 11,
   },
@@ -388,6 +309,9 @@ const styles = StyleSheet.create({
   },
 
   logoutButton: {
+    backgroundColor: "#FFF5F3",
+    borderRadius: 14,
+    paddingVertical: 16,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",

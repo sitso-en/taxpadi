@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -11,6 +13,11 @@ import {
   View,
 } from "react-native";
 import { Dropdown } from "react-native-element-dropdown";
+
+import { login } from "@/services/auth.service";
+import { getDeviceInfo } from "@/utils/device";
+import { getDeviceToken } from "@/services/notifications.service";
+import { registerNotificationToken } from "@/services/notification.service";
 
 const countryCodes = [
   { label: "🇬🇭 +233", value: "+233" },
@@ -26,9 +33,92 @@ export default function LoginScreen() {
   const [countryCode, setCountryCode] = useState("+233");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = () => {
-    router.replace("/dashboard");
+  const handleLogin = async () => {
+    if (loading) return;
+
+    const cleanedPhone = phoneNumber.replace(/\s/g, "");
+
+    if (!cleanedPhone) {
+      Alert.alert("Validation", "Enter your phone number.");
+      return;
+    }
+
+    if (cleanedPhone.length !== 9) {
+      Alert.alert("Validation", "Enter a valid Ghana phone number.");
+      return;
+    }
+
+    if (!password.trim()) {
+      Alert.alert("Validation", "Enter your password.");
+      return;
+    }
+
+    try {
+      console.log("Before login");
+
+      setLoading(true);
+
+      const fullPhone = `0${cleanedPhone}`;
+
+      console.log("Calling login...");
+
+      const response = await login(
+        fullPhone,
+        password,
+        getDeviceInfo()
+      );
+
+      console.log("LOGIN RESPONSE:", response);
+
+      if (!response.success) {
+        Alert.alert("Login Failed", response.message);
+        return;
+      }
+
+      if (response.data.requires_otp) {
+        Alert.alert(
+          "OTP Required",
+          "Please verify the OTP sent to your phone."
+        );
+
+        router.push({
+          pathname: "/otp-verification",
+          params: {
+            phone: fullPhone,
+            purpose: "LOGIN",
+          },
+        });
+
+        return;
+      }
+
+      const device = await getDeviceToken();
+
+      if (device) {
+        try {
+          await registerNotificationToken({
+            fcm_token: device.token,
+            platform: device.platform,
+          });
+        } catch (error) {
+          console.log("Notification registration failed:", error);
+        }
+      }
+
+      router.replace("/(tabs)/dashboard");
+    } catch (error: any) {
+      console.log(error);
+
+      Alert.alert(
+        "Login Failed",
+        error?.response?.data?.message ??
+          "Unable to connect to the server."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -36,7 +126,6 @@ export default function LoginScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Logo */}
       <View style={styles.logoCircle}>
         <Text style={styles.logoLetter}>T</Text>
       </View>
@@ -47,7 +136,6 @@ export default function LoginScreen() {
         Log in to your TaxPadi account
       </Text>
 
-      {/* Phone Number */}
       <Text style={styles.label}>PHONE NUMBER</Text>
 
       <View style={styles.phoneContainer}>
@@ -85,7 +173,6 @@ export default function LoginScreen() {
         />
       </View>
 
-      {/* Password */}
       <Text style={styles.label}>PASSWORD</Text>
 
       <View style={styles.passwordContainer}>
@@ -113,22 +200,35 @@ export default function LoginScreen() {
         <Text style={styles.link}>Forgot password?</Text>
       </TouchableOpacity>
 
-      {/* Login Button */}
-      <TouchableOpacity style={styles.button} onPress={handleLogin}>
-        <Text style={styles.buttonText}>Log In</Text>
+      <TouchableOpacity
+        style={[
+          styles.button,
+          loading && { opacity: 0.7 },
+        ]}
+        onPress={handleLogin}
+        disabled={loading}
+      >
+        <Text style={styles.buttonText}>
+          {loading ? "Logging In..." : "Log In"}
+        </Text>
       </TouchableOpacity>
 
-      {/* Divider */}
       <View style={styles.dividerContainer}>
         <View style={styles.divider} />
         <Text style={styles.orText}>or</Text>
         <View style={styles.divider} />
       </View>
 
-      {/* OTP Button */}
       <TouchableOpacity
         style={styles.secondaryButton}
-        onPress={() => router.push("/otp-verification")}
+        onPress={() =>
+          router.push({
+            pathname: "/otp-verification",
+            params: {
+              purpose: "LOGIN",
+            },
+          })
+        }
       >
         <Text style={styles.secondaryButtonText}>
           Continue with OTP

@@ -13,6 +13,10 @@ export type User = {
   region: string;
   category: string;
   plan: "FREE" | "PRO";
+  label: string;
+  tin: string;
+  taxpayer_category: string;
+  active_profile: boolean;
 };
 
 type UserContextType = {
@@ -39,6 +43,10 @@ const defaultUser: User = {
   region: "",
   category: "",
   plan: "FREE",
+  label: "",
+  tin: "",
+  taxpayer_category: "",
+  active_profile: false,
 };
 
 export function UserProvider({

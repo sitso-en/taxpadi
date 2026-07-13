@@ -1,9 +1,15 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import * as ImagePicker from "expo-image-picker";
 import { Audio } from "expo-av";
+import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
+import { Dropdown } from "react-native-element-dropdown";
+import {
+  uploadVoiceTransaction,
+  scanReceiptTransaction,
+  createTransaction,
+} from "@/services/transaction.service";
 
 import {
   Platform,
@@ -18,9 +24,18 @@ import {
 
 import { useTransactions } from "../../context/TransactionContext";
 
+const categories = [
+  { label: "Sales", value: "Sales" },
+  { label: "Transport", value: "Transport" },
+  { label: "Utilities", value: "Utilities" },
+  { label: "Food", value: "Food" },
+  { label: "Salary", value: "Salary" },
+  { label: "Rent", value: "Rent" },
+  { label: "Other", value: "Other" },
+];
+
 export default function AddTransactionScreen() {
   const [showVoiceHelp, setShowVoiceHelp] = useState(false);
-  const { addTransaction } = useTransactions();
 
   const [type, setType] = useState<"income" | "expense">("income");
   const [amount, setAmount] = useState("");
@@ -30,23 +45,62 @@ export default function AddTransactionScreen() {
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
+
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  const [audioUri, setAudioUri] = useState<string | null>(null);
   const [isRecording, setIsRecording] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
 
-  const handleSave = () => {
-    if (!amount) return;
+  const [loading, setLoading] = useState(false);
 
-    addTransaction({
-      id: Date.now(),
-      title: description || "Transaction",
-      amount: Number(amount),
-      type,
-      category: category || "Other",
-      isDeductible,
-      date: date.toISOString(),
-    });
+  const handleSave = async () => {
+    if (loading) return;
 
-    router.replace("/(tabs)/transactions");
+    if (!amount.trim()) {
+      alert("Enter an amount.");
+      return;
+    }
+
+    if (Number(amount) <= 0) {
+      alert("Amount must be greater than zero.");
+      return;
+    }
+
+    if (!category) {
+      alert("Select a category.");
+      return;
+    }
+
+    if (!description.trim()) {
+      alert("Enter a description.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      await createTransaction({
+        type,
+        amount: Number(amount),
+        category,
+        transaction_date: date.toISOString().split("T")[0],
+        tax_deductible: isDeductible,
+        withholding_applicable: false,
+        description,
+      });
+
+      router.replace("/(tabs)/transactions");
+
+      alert("Transaction added successfully.");
+      router.replace("/(tabs)/transactions");
+    } catch (error: any) {
+      alert(
+        error?.response?.data?.message ??
+        "Failed to save transaction."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
@@ -59,15 +113,36 @@ export default function AddTransactionScreen() {
   const scanReceipt = async () => {
     try {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
+
       if (!permission.granted) return;
 
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         quality: 1,
+        base64: true,
       });
 
-      if (!result.canceled) {
-        setReceiptUri(result.assets[0].uri);
+      if (result.canceled) return;
+
+      setReceiptUri(result.assets[0].uri);
+
+      if (result.assets[0].base64) {
+        const response = await scanReceiptTransaction(
+          result.assets[0].base64,
+          type
+        );
+
+        const data = response.data;
+
+        setAmount(String(data.amount ?? ""));
+        setCategory(data.category ?? "");
+        setDescription(data.description ?? "");
+
+        if (data.transaction_date) {
+          setDate(new Date(data.transaction_date));
+        }
+
+        alert("Receipt scanned successfully.");
       }
     } catch (error) {
       console.log(error);
@@ -77,7 +152,13 @@ export default function AddTransactionScreen() {
   const toggleRecording = async () => {
     try {
       if (!isRecording) {
-        await Audio.requestPermissionsAsync();
+        const permission = await Audio.requestPermissionsAsync();
+
+        if (!permission.granted) {
+          alert("Microphone permission denied.");
+          return;
+        }
+
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
@@ -91,12 +172,71 @@ export default function AddTransactionScreen() {
         setIsRecording(true);
       } else {
         await recording?.stopAndUnloadAsync();
+
+        const uri = recording?.getURI();
+
+        if (uri) {
+          setAudioUri(uri);
+
+          try {
+            const response =
+              await uploadVoiceTransaction(uri);
+
+            alert("Voice transaction processed.");
+
+            const data = response.data;
+
+            setType(
+              data.type === "expense"
+                ? "expense"
+                : "income"
+            );
+
+            setAmount(String(data.amount ?? ""));
+
+            setCategory(data.category ?? "");
+
+            setDescription(
+              data.description ?? ""
+            );
+
+            setIsDeductible(
+              data.tax_deductible ?? false
+            );
+
+            if (data.transaction_date) {
+              setDate(
+                new Date(data.transaction_date)
+              );
+            }
+          } catch (error) {
+            console.log(error);
+            alert("Voice upload failed.");
+          }
+        }
+
         setRecording(null);
         setIsRecording(false);
       }
     } catch (error) {
       console.log(error);
     }
+  };
+
+  const playRecording = async () => {
+    if (!audioUri) return;
+
+    if (sound) {
+      await sound.unloadAsync();
+    }
+
+    const { sound: playback } = await Audio.Sound.createAsync({
+      uri: audioUri,
+    });
+
+    setSound(playback);
+
+    await playback.playAsync();
   };
 
   return (
@@ -112,7 +252,13 @@ export default function AddTransactionScreen() {
         >
           <Ionicons name="arrow-back" size={24} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.title}>Log Transaction</Text>
+
+        <View style={{ marginLeft: 10 }}>
+          <Text style={styles.title}>Log Transaction</Text>
+          <Text style={styles.subtitle}>
+            Record your income or expenses quickly.
+          </Text>
+        </View>
       </View>
 
       {/* Type Toggle */}
@@ -168,12 +314,14 @@ export default function AddTransactionScreen() {
 
       {/* Category */}
       <Text style={styles.label}>CATEGORY</Text>
-      <TextInput
+      <Dropdown
         style={styles.input}
-        placeholder="Select category..."
-        placeholderTextColor="#9CA3AF"
+        data={categories}
+        labelField="label"
+        valueField="value"
+        placeholder="Select Category"
         value={category}
-        onChangeText={setCategory}
+        onChange={(item) => setCategory(item.value)}
       />
 
       {/* Description */}
@@ -235,6 +383,8 @@ export default function AddTransactionScreen() {
 
         {/* Voice Log */}
         <View style={styles.attachButton}>
+
+          {/* How to record? link */}
           <TouchableOpacity
             style={styles.helpContainer}
             onPress={() => setShowVoiceHelp(true)}
@@ -242,11 +392,12 @@ export default function AddTransactionScreen() {
             <Text style={styles.helpText}>How to record?</Text>
             <Ionicons
               name="information-circle-outline"
-              size={18}
+              size={16}
               color="#C44736"
             />
           </TouchableOpacity>
 
+          {/* Mic button */}
           <TouchableOpacity
             style={styles.voiceButton}
             onPress={toggleRecording}
@@ -254,19 +405,50 @@ export default function AddTransactionScreen() {
             <Ionicons
               name={isRecording ? "stop-circle-outline" : "mic-outline"}
               size={24}
-              color="#111827"
+              color={isRecording ? "#C44736" : "#111827"}
             />
-            <Text style={styles.attachText}>
-              {isRecording ? "Stop Recording" : "Voice Log"}
+            <Text
+              style={[
+                styles.attachText,
+                { color: isRecording ? "#C44736" : "#111827" },
+              ]}
+            >
+              {isRecording
+                ? "Stop Recording"
+                : audioUri
+                ? "Voice Added ✓"
+                : "Voice Log"}
             </Text>
           </TouchableOpacity>
+
         </View>
 
       </View>
 
+      {/* Play Recording Button */}
+      {audioUri && !isRecording && (
+        <TouchableOpacity
+          style={styles.playButton}
+          onPress={playRecording}
+        >
+          <Ionicons
+            name="play-circle-outline"
+            size={22}
+            color="#C44736"
+          />
+          <Text style={styles.playText}>Play Recording</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Save */}
-      <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-        <Text style={styles.saveButtonText}>Save Transaction</Text>
+      <TouchableOpacity
+        style={styles.saveButton}
+        onPress={handleSave}
+        disabled={loading}
+      >
+        <Text style={styles.saveButtonText}>
+          {loading ? "Saving..." : "Save Transaction"}
+        </Text>
       </TouchableOpacity>
 
       {/* Voice Help Popup */}
@@ -281,7 +463,7 @@ export default function AddTransactionScreen() {
               • Say the amount clearly in cedis{"\n\n"}
               • Keep recordings under 15 seconds{"\n\n"}
               • Speak clearly at a normal pace{"\n\n"}
-              Good example:{"\n"}
+              • Good example:{"\n"}
               "I spent 500 cedis on groceries today"
             </Text>
             <TouchableOpacity
@@ -306,6 +488,7 @@ const styles = StyleSheet.create({
     paddingTop: 55,
   },
   header: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 28,
@@ -314,13 +497,18 @@ const styles = StyleSheet.create({
     fontSize: 30,
     fontFamily: "Inter_700Bold",
     color: "#111827",
-    marginLeft: 10,
+  },
+  subtitle: {
+    color: "#6B7280",
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
   },
   toggleContainer: {
     flexDirection: "row",
     backgroundColor: "#F3F4F6",
-    borderRadius: 30,
-    padding: 4,
+    borderRadius: 32,
+    padding: 5,
     marginBottom: 24,
   },
   toggleButton: {
@@ -354,13 +542,13 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   currency: {
-    fontSize: 28,
+    fontSize: 32,
     color: "#C44736",
     marginRight: 12,
   },
   amountInput: {
     flex: 1,
-    fontSize: 36,
+    fontSize: 40,
     fontFamily: "Inter_700Bold",
     ...(Platform.OS === "web" ? { outlineWidth: 0 } : {}),
   },
@@ -399,24 +587,48 @@ const styles = StyleSheet.create({
   attachContainer: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 30,
+    marginBottom: 16,
   },
   attachButton: {
     width: "48%",
     backgroundColor: "#F3F4F6",
     borderRadius: 12,
-    paddingVertical: 16,
+    paddingVertical: 20,
+    minHeight: 120,
+    justifyContent: "center",
     alignItems: "center",
   },
   attachText: {
     marginTop: 6,
     color: "#111827",
   },
+  playButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#FCE8E6",
+    borderRadius: 12,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  playText: {
+    marginLeft: 8,
+    color: "#C44736",
+    fontFamily: "Inter_600SemiBold",
+  },
   saveButton: {
     backgroundColor: "#C44736",
-    borderRadius: 12,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 5,
   },
   saveButtonText: {
     color: "#FFFFFF",
@@ -471,12 +683,12 @@ const styles = StyleSheet.create({
   },
   helpText: {
     color: "#6B7280",
-    fontSize: 12,
+    fontSize: 11,
     marginRight: 4,
     fontFamily: "Inter_500Medium",
   },
   voiceButton: {
     alignItems: "center",
-    marginTop: 14,
+    marginTop: 12,
   },
 });

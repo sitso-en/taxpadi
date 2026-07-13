@@ -1,7 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
-import { useUser } from "../context/UserContext";
+import { useUser } from "@/context/UserContext";
 import {
   ScrollView,
   StyleSheet,
@@ -13,10 +13,10 @@ import {
 export default function SettingsScreen() {
   const { user } = useUser();
 
-  const initials = user.fullName
-    ? user.fullName
+  const initials = user?.label
+    ? user.label
         .split(" ")
-        .map((n) => n[0])
+        .map((n: string) => n[0])
         .join("")
         .substring(0, 2)
         .toUpperCase()
@@ -34,34 +34,33 @@ export default function SettingsScreen() {
           onPress={() => router.push("/more")}
           style={styles.backButton}
         >
-          <Ionicons
-            name="arrow-back"
-            size={24}
-            color="#C44736"
-          />
+          <Ionicons name="arrow-back" size={24} color="#C44736" />
         </TouchableOpacity>
 
-        {/* Screen Title */}
-        <Text style={styles.title}>Profile</Text>
+        {/* Screen Title & Subtitle */}
+        <View style={styles.header}>
+          <Text style={styles.title}>Profile</Text>
+          <Text style={styles.subtitle}>
+            Manage your account, preferences and subscription.
+          </Text>
+        </View>
 
         {/* Profile Card */}
         <View style={styles.profileCard}>
           <View style={styles.profileInfo}>
             <View style={styles.avatar}>
-              <Text style={styles.avatarText}>
-                {initials}
-              </Text>
+              <Text style={styles.avatarText}>{initials}</Text>
             </View>
 
             <View>
               <Text style={styles.name}>
-                {user.fullName || "User"}
+                {user?.label || "Default Profile"}
               </Text>
               <Text style={styles.phone}>
-                {user.phoneNumber || "+233 XX XXX XXXX"}
+                TIN: {user?.tin || "Not Available"}
               </Text>
               <Text style={styles.email}>
-                {user.email || "No email"}
+                {user?.taxpayer_category || "Taxpayer"}
               </Text>
             </View>
           </View>
@@ -70,15 +69,12 @@ export default function SettingsScreen() {
             style={[
               styles.proBadge,
               {
-                backgroundColor:
-                  user.plan === "PRO"
-                    ? "#C44736"
-                    : "#6B7280",
+                backgroundColor: user?.active_profile ? "#34A853" : "#6B7280",
               },
             ]}
           >
             <Text style={styles.proText}>
-              {user.plan}
+              {user?.active_profile ? "ACTIVE" : "INACTIVE"}
             </Text>
           </View>
         </View>
@@ -91,20 +87,10 @@ export default function SettingsScreen() {
           onPress={() => router.push("/alter-profile")}
         >
           <View style={styles.row}>
-            <Ionicons
-              name="person-outline"
-              size={22}
-              color="#222"
-            />
-            <Text style={styles.itemText}>
-              Edit Profile
-            </Text>
+            <Ionicons name="person-outline" size={22} color="#222" />
+            <Text style={styles.itemText}>Edit Profile</Text>
           </View>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color="#999"
-          />
+          <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -112,13 +98,41 @@ export default function SettingsScreen() {
           onPress={() => router.push("/active-sessions")}
         >
           <View style={styles.row}>
+            <Ionicons name="phone-portrait-outline" size={22} color="#222" />
+            <Text style={styles.itemText}>Active Sessions</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#999" />
+        </TouchableOpacity>
+
+        {/* PREFERENCES */}
+        <Text style={styles.sectionTitle}>PREFERENCES</Text>
+
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => router.push("/notification-preferences")}
+        >
+          <View style={styles.row}>
+            <Ionicons name="notifications-outline" size={22} color="#222" />
+            <Text style={styles.itemText}>Notifications</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#999" />
+        </TouchableOpacity>
+
+        {/* TAX MODULES */}
+        <Text style={styles.sectionTitle}>TAX MODULES</Text>
+
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => router.push("/taxpayer-profile")}
+        >
+          <View style={styles.row}>
             <Ionicons
-              name="phone-portrait-outline"
+              name="person-circle-outline"
               size={22}
               color="#222"
             />
             <Text style={styles.itemText}>
-              Active Sessions
+              Taxpayer Profile
             </Text>
           </View>
           <Ionicons
@@ -128,25 +142,60 @@ export default function SettingsScreen() {
           />
         </TouchableOpacity>
 
-        {/* PREFERENCES */}
-        <Text style={styles.sectionTitle}>
-          PREFERENCES
-        </Text>
-
         <TouchableOpacity
           style={styles.item}
-          onPress={() =>
-            router.push("/notification-preferences")
-          }
+          onPress={() => router.push("/paye")}
         >
           <View style={styles.row}>
             <Ionicons
-              name="notifications-outline"
+              name="cash-outline"
               size={22}
               color="#222"
             />
             <Text style={styles.itemText}>
-              Notifications
+              PAYE
+            </Text>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color="#999"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => router.push("/vat")}
+        >
+          <View style={styles.row}>
+            <Ionicons
+              name="calculator-outline"
+              size={22}
+              color="#222"
+            />
+            <Text style={styles.itemText}>
+              VAT
+            </Text>
+          </View>
+          <Ionicons
+            name="chevron-forward"
+            size={20}
+            color="#999"
+          />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => router.push("/withholding-tax")}
+        >
+          <View style={styles.row}>
+            <Ionicons
+              name="document-text-outline"
+              size={22}
+              color="#222"
+            />
+            <Text style={styles.itemText}>
+              Withholding Tax
             </Text>
           </View>
           <Ionicons
@@ -157,43 +206,36 @@ export default function SettingsScreen() {
         </TouchableOpacity>
 
         {/* SUBSCRIPTION */}
-        <Text style={styles.sectionTitle}>
-          SUBSCRIPTION
-        </Text>
+        <Text style={styles.sectionTitle}>SUBSCRIPTION</Text>
 
         <TouchableOpacity
           style={styles.item}
-          onPress={() => router.push("/subscription")}
+          onPress={() => router.push("/current-plan")}
         >
           <View style={styles.row}>
-            <Ionicons
-              name="card-outline"
-              size={22}
-              color="#222"
-            />
-            <Text style={styles.itemText}>
-              Current Plan
-            </Text>
+            <Ionicons name="card-outline" size={22} color="#222" />
+            <Text style={styles.itemText}>Current Plan</Text>
           </View>
-          <Ionicons
-            name="chevron-forward"
-            size={20}
-            color="#999"
-          />
+          <Ionicons name="chevron-forward" size={20} color="#999" />
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.item}
+          onPress={() => router.push("/manage-plan")}
+        >
+          <View style={styles.row}>
+            <Ionicons name="swap-horizontal-outline" size={22} color="#222" />
+            <Text style={styles.itemText}>Manage Plan</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color="#999" />
         </TouchableOpacity>
 
         {/* LOGOUT */}
         <TouchableOpacity
           style={styles.logoutButton}
-          onPress={() =>
-            router.push("/logout-confirmation")
-          }
+          onPress={() => router.push("/logout-confirmation")}
         >
-          <Ionicons
-            name="log-out-outline"
-            size={22}
-            color="#C44736"
-          />
+          <Ionicons name="log-out-outline" size={22} color="#C44736" />
           <Text style={styles.logoutText}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
@@ -211,20 +253,38 @@ const styles = StyleSheet.create({
   backButton: {
     marginBottom: 15,
   },
+  header: {
+    marginBottom: 28,
+  },
   title: {
     fontSize: 32,
     color: "#111827",
     fontFamily: "Inter_700Bold",
-    marginBottom: 24,
+  },
+  subtitle: {
+    color: "#6B7280",
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    marginTop: 4,
   },
   profileCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 20,
+    padding: 22,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 28,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
   profileInfo: {
     flexDirection: "row",
@@ -278,12 +338,22 @@ const styles = StyleSheet.create({
   },
   item: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 18,
     marginBottom: 12,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
   row: {
     flexDirection: "row",

@@ -1,69 +1,69 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useEffect } from "react";
-
-import React, { createContext, useContext, useState } from "react";
-import { Payment } from "../data/payments";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  getPayments,
+  initiatePayment,
+  getPaymentStatus,
+  getPaymentCertificate,
+} from "@/services/payment.service";
 
 type PaymentContextType = {
-  payments: Payment[];
-  addPayment: (payment: Payment) => void;
-  deletePayment: (id: number) => void;
-  editPayment: (payment: Payment) => void;
+  payments: any[];
+  loading: boolean;
+  refreshPayments: () => Promise<void>;
+  createPayment: (data: any) => Promise<any>;
+  checkPaymentStatus: (id: string) => Promise<any>;
+  getCertificate: (id: string) => Promise<any>;
 };
 
 const PaymentContext = createContext<PaymentContextType | undefined>(undefined);
 
 export function PaymentProvider({ children }: { children: React.ReactNode }) {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const [payments, setPayments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const refreshPayments = async () => {
+    setLoading(true);
+
+    try {
+      const response = await getPayments();
+
+      setPayments(
+        response.data?.payments ?? response.payments ?? []
+      );
+    } catch (error) {
+      console.error("Failed to load payments", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadPayments = async () => {
-      try {
-        const stored = await AsyncStorage.getItem("payments");
-
-        if (stored) {
-          setPayments(JSON.parse(stored));
-        }
-
-        setLoaded(true);
-      } catch (error) {
-        console.error("Failed to load payments", error);
-        setLoaded(true);
-      }
-    };
-
-    loadPayments();
+    refreshPayments();
   }, []);
 
-  useEffect(() => {
-    if (!loaded) return;
-
-    AsyncStorage.setItem("payments", JSON.stringify(payments));
-  }, [payments, loaded]);
-
-  const addPayment = (payment: Payment) => {
-    setPayments((prev) => [...prev, payment]);
-  };
-  const deletePayment = (id: number) => {
-    setPayments((prev) => prev.filter((payment) => payment.id !== id));
+  const createPayment = async (data: any) => {
+    const response = await initiatePayment(data);
+    await refreshPayments();
+    return response;
   };
 
-  const editPayment = (updatedPayment: Payment) => {
-    setPayments((prev) =>
-      prev.map((payment) =>
-        payment.id === updatedPayment.id ? updatedPayment : payment,
-      ),
-    );
+  const checkPaymentStatus = async (id: string) => {
+    return await getPaymentStatus(id);
+  };
+
+  const getCertificate = async (id: string) => {
+    return await getPaymentCertificate(id);
   };
 
   return (
     <PaymentContext.Provider
       value={{
         payments,
-        addPayment,
-        deletePayment,
-        editPayment,
+        loading,
+        refreshPayments,
+        createPayment,
+        checkPaymentStatus,
+        getCertificate,
       }}
     >
       {children}

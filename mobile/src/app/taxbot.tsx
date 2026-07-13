@@ -1,7 +1,8 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,9 +11,10 @@ import {
   View,
 } from "react-native";
 
-import { useInvoices } from "../context/InvoiceContext";
-import { useDeadlines } from "../context/DeadlineContext";
-import { useNotifications } from "../context/NotificationContext";
+import {
+  askTaxBot,
+  getConversationHistory,
+} from "@/services/taxbot.service";
 
 type ChatMessage = {
   sender: "user" | "bot";
@@ -21,199 +23,119 @@ type ChatMessage = {
 
 export default function TaxBotScreen() {
   const [message, setMessage] = useState("");
-  const [showSuggestions, setShowSuggestions] =
-    useState(true);
-
-  const { invoices } = useInvoices();
-  const { deadlines } = useDeadlines();
-  const { unreadCount } =
-    useNotifications();
+  const [showSuggestions, setShowSuggestions] = useState(true);
+  const [chat, setChat] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
 
-  const [chat, setChat] = useState<
-    ChatMessage[]
-  >([
-    {
-      sender: "bot",
-      text:
-        "Hello 👋 I'm TaxBot. How can I help you today?",
-    },
-  ]);
+  useEffect(() => {
+    const loadHistory = async () => {
+      try {
+        const response = await getConversationHistory();
 
-  const sendMessage = () => {
+        if (
+          response.success &&
+          response.data.conversations.length > 0
+        ) {
+          const messages: ChatMessage[] = [];
+
+          response.data.conversations.forEach((conversation) => {
+            messages.push({
+              sender: "user",
+              text: conversation.question,
+            });
+
+            messages.push({
+              sender: "bot",
+              text: conversation.answer,
+            });
+          });
+
+          setChat(messages);
+        } else {
+          setChat([
+            {
+              sender: "bot",
+              text: "Hello 👋 I'm TaxBot. How can I help you today?",
+            },
+          ]);
+        }
+      } catch {
+        setChat([
+          {
+            sender: "bot",
+            text: "Hello 👋 I'm TaxBot. How can I help you today?",
+          },
+        ]);
+      }
+    };
+
+    loadHistory();
+  }, []);
+
+  const sendMessage = async () => {
+    if (loading) return;
+
     if (!message.trim()) return;
+
+    setLoading(true);
 
     setShowSuggestions(false);
 
-    const text = message.toLowerCase();
+    const userText = message;
 
-    const userMessage: ChatMessage = {
-      sender: "user",
-      text: message,
-    };
-
-    let botReply =
-      "I can assist you with VAT, PAYE, invoices, deadlines, notifications and compliance.";
-
-    if (text.includes("vat")) {
-      botReply =
-        "VAT returns are normally filed monthly. Keep proper records before filing.";
-    }
-
-    else if (text.includes("paye")) {
-      botReply =
-        "PAYE stands for Pay As You Earn. It is deducted from employee salaries.";
-    }
-
-    else if (
-      text.includes("deadline") ||
-      text.includes("deadlines")
-    ) {
-      const upcomingDeadlines =
-        deadlines.filter(
-          (deadline) =>
-            new Date(
-              deadline.dueDate
-            ) >= new Date()
-        );
-
-      botReply =
-        upcomingDeadlines.length === 0
-          ? "You currently have no upcoming tax deadlines."
-          : `You currently have ${upcomingDeadlines.length} upcoming tax deadline${
-              upcomingDeadlines.length >
-              1
-                ? "s"
-                : ""
-            }.`;
-    }
-
-    else if (
-      text.includes("invoice") &&
-      text.includes("how many")
-    ) {
-      botReply =
-        invoices.length === 0
-          ? "You currently have no invoices."
-          : `You currently have ${invoices.length} invoice${
-              invoices.length > 1
-                ? "s"
-                : ""
-            }.`;
-    }
-
-    else if (text.includes("unpaid")) {
-      const unpaidInvoices =
-        invoices.filter(
-          (invoice) =>
-            invoice.status !== "Paid"
-        );
-
-      botReply =
-        unpaidInvoices.length === 0
-          ? "Great! You have no unpaid invoices."
-          : `You currently have ${unpaidInvoices.length} unpaid invoice${
-              unpaidInvoices.length > 1
-                ? "s"
-                : ""
-            }.`;
-    }
-
-    else if (
-      text.includes("total") &&
-      text.includes("invoice")
-    ) {
-      const totalAmount =
-        invoices.reduce(
-          (sum, invoice) =>
-            sum + invoice.amount,
-          0
-        );
-
-      botReply = `The total value of your invoices is GH¢ ${totalAmount.toFixed(
-        2
-      )}.`;
-    }
-
-    else if (
-      text.includes("notification")
-    ) {
-      botReply =
-        unreadCount === 0
-          ? "You have no unread notifications."
-          : `You currently have ${unreadCount} unread notification${
-              unreadCount > 1
-                ? "s"
-                : ""
-            }.`;
-    }
-
-    else if (
-      text.includes("next") &&
-      text.includes("deadline")
-    ) {
-      const upcoming = deadlines
-        .filter(
-          (deadline) =>
-            new Date(
-              deadline.dueDate
-            ) >= new Date()
-        )
-        .sort(
-          (a, b) =>
-            new Date(
-              a.dueDate
-            ).getTime() -
-            new Date(
-              b.dueDate
-            ).getTime()
-        );
-
-      if (upcoming.length > 0) {
-        botReply = `Your next deadline is ${upcoming[0].title} due on ${new Date(
-          upcoming[0].dueDate
-        ).toLocaleDateString()}.`;
-      } else {
-        botReply =
-          "You currently have no upcoming deadlines.";
-      }
-    }
-
-    setChat((prev) => [
-      ...prev,
-      userMessage,
+    setChat((previous) => [
+      ...previous,
       {
-        sender: "bot",
-        text: botReply,
+        sender: "user",
+        text: userText,
       },
     ]);
 
     setMessage("");
 
-    setTimeout(() => {
-      scrollRef.current?.scrollToEnd({
-        animated: true,
-      });
-    }, 100);
+    try {
+      const response = await askTaxBot(userText);
+
+      if (response.success) {
+        setChat((previous) => [
+          ...previous,
+          {
+            sender: "bot",
+            text: response.data.answer,
+          },
+        ]);
+      }
+    } catch (error: any) {
+      setChat((previous) => [
+        ...previous,
+        {
+          sender: "bot",
+          text:
+            error?.response?.data?.message ??
+            "Sorry, I'm unable to answer right now.",
+        },
+      ]);
+    } finally {
+      setLoading(false);
+
+      setTimeout(() => {
+        scrollRef.current?.scrollToEnd({
+          animated: true,
+        });
+      }, 200);
+    }
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-        >
-          <Ionicons
-            name="chevron-back"
-            size={28}
-            color="#111827"
-          />
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={28} color="#111827" />
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>
-          TaxBot
-        </Text>
+        <Text style={styles.headerTitle}>TaxBot</Text>
 
         <View style={{ width: 28 }} />
       </View>
@@ -227,23 +149,18 @@ export default function TaxBotScreen() {
           />
         </View>
 
-        <Text style={styles.heroTitle}>
-          Your AI Tax Assistant
-        </Text>
+        <Text style={styles.heroTitle}>Your AI Tax Assistant</Text>
 
         <Text style={styles.heroText}>
-          Ask questions about VAT,
-          PAYE, invoices, compliance
-          and deadlines.
+          Ask questions about VAT, PAYE, invoices, compliance and
+          deadlines.
         </Text>
       </View>
 
       <ScrollView
         ref={scrollRef}
         style={styles.chatArea}
-        showsVerticalScrollIndicator={
-          false
-        }
+        showsVerticalScrollIndicator={false}
         contentContainerStyle={{
           paddingBottom: 20,
         }}
@@ -269,8 +186,7 @@ export default function TaxBotScreen() {
               <Text
                 style={[
                   styles.messageText,
-                  item.sender ===
-                    "user" && {
+                  item.sender === "user" && {
                     color: "#FFFFFF",
                   },
                 ]}
@@ -285,65 +201,60 @@ export default function TaxBotScreen() {
       {showSuggestions && (
         <ScrollView
           horizontal
-          showsHorizontalScrollIndicator={
-            false
-          }
+          showsHorizontalScrollIndicator={false}
           style={styles.quickActions}
         >
           <TouchableOpacity
             style={styles.quickButton}
             onPress={() => {
-              setMessage(
-                "What is VAT?"
-              );
-              setShowSuggestions(
-                false
-              );
+              setMessage("What is VAT?");
+              setShowSuggestions(false);
             }}
           >
-            <Text
-              style={styles.quickText}
-            >
-              What is VAT?
-            </Text>
+            <Text style={styles.quickText}>What is VAT?</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.quickButton}
             onPress={() => {
-              setMessage(
-                "How many invoices do I have?"
-              );
-              setShowSuggestions(
-                false
-              );
+              setMessage("How many invoices do I have?");
+              setShowSuggestions(false);
             }}
           >
-            <Text
-              style={styles.quickText}
-            >
-              My invoices
-            </Text>
+            <Text style={styles.quickText}>My invoices</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.quickButton}
             onPress={() => {
-              setMessage(
-                "Tax deadlines"
-              );
-              setShowSuggestions(
-                false
-              );
+              setMessage("Tax deadlines");
+              setShowSuggestions(false);
             }}
           >
-            <Text
-              style={styles.quickText}
-            >
-              Deadlines
-            </Text>
+            <Text style={styles.quickText}>Deadlines</Text>
           </TouchableOpacity>
         </ScrollView>
+      )}
+
+      {loading && (
+        <View
+          style={{
+            flexDirection: "row",
+            alignItems: "center",
+            marginBottom: 12,
+          }}
+        >
+          <ActivityIndicator size="small" color="#C44736" />
+
+          <Text
+            style={{
+              marginLeft: 10,
+              color: "#6B7280",
+            }}
+          >
+            TaxBot is thinking...
+          </Text>
+        </View>
       )}
 
       <View style={styles.inputRow}>
@@ -353,17 +264,16 @@ export default function TaxBotScreen() {
           placeholderTextColor="#9CA3AF"
           value={message}
           onChangeText={setMessage}
-          onSubmitEditing={
-            sendMessage
-          }
+          onSubmitEditing={sendMessage}
         />
 
         <TouchableOpacity
           style={styles.sendButton}
           onPress={sendMessage}
+          disabled={loading}
         >
           <Ionicons
-            name="send"
+            name={loading ? "hourglass-outline" : "send"}
             size={20}
             color="#FFFFFF"
           />
@@ -383,8 +293,7 @@ const styles = StyleSheet.create({
 
   header: {
     flexDirection: "row",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 20,
   },
@@ -461,8 +370,7 @@ const styles = StyleSheet.create({
 
   messageText: {
     color: "#111827",
-    fontFamily:
-      "Inter_400Regular",
+    fontFamily: "Inter_400Regular",
     flexShrink: 1,
   },
 
@@ -480,8 +388,7 @@ const styles = StyleSheet.create({
 
   quickText: {
     color: "#111827",
-    fontFamily:
-      "Inter_500Medium",
+    fontFamily: "Inter_500Medium",
   },
 
   inputRow: {
@@ -496,8 +403,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    fontFamily:
-      "Inter_400Regular",
+    fontFamily: "Inter_400Regular",
   },
 
   sendButton: {
@@ -505,10 +411,8 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 14,
     backgroundColor: "#C44736",
-    justifyContent:
-      "center",
+    justifyContent: "center",
     alignItems: "center",
     marginLeft: 10,
   },
 });
-

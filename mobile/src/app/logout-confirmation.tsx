@@ -1,11 +1,18 @@
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
 export default function LogoutConfirmationScreen() {
   return (
     <View style={styles.container}>
+      <View style={styles.iconCircle}>
+        <Ionicons name="log-out-outline" size={42} color="#C44736" />
+      </View>
+
+      <Text style={styles.title}>Log Out</Text>
+
       <Text style={styles.message}>
-        Are you sure you want to log out of your account?
+        Are you sure you want to log out of your TaxPadi account?
       </Text>
 
       <TouchableOpacity
@@ -17,10 +24,7 @@ export default function LogoutConfirmationScreen() {
 
       <TouchableOpacity
         style={styles.cancelButton}
-        onPress={() => {
-          console.log("CANCEL PRESSED");
-          router.push("/more");
-        }}
+        onPress={() => router.back()}
       >
         <Text style={styles.cancelButtonText}>Cancel</Text>
       </TouchableOpacity>
@@ -37,56 +41,69 @@ const styles = StyleSheet.create({
     padding: 24,
   },
 
+  iconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#FCE8E6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#110503",
-    marginBottom: 20,
-  },
-
-  message: {
-    fontSize: 16,
-    textAlign: "center",
-    color: "#1F1F1F",
-    marginBottom: 30,
-  },
-
-  logoutButton: {
-    width: "80%",
-    backgroundColor: "#C44736",
-    padding: 15,
-    borderRadius: 10,
-    alignItems: "center",
-  },
-
-  logoutButtonText: {
-    color: "#FFFFFF",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-
-  cancelButton: {
-    width: "80%",
-    marginTop: 15,
-    padding: 15,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#EBEBEB",
-    alignItems: "center",
-  },
-
-  cancelButtonText: {
-    color: "#110503",
-    fontWeight: "600",
-  },
-  backButton: {
+    fontSize: 34,
+    color: "#111827",
+    fontFamily: "Inter_700Bold",
     marginTop: 20,
     marginBottom: 10,
   },
 
-  backText: {
-    color: "#C44736",
-    fontSize: 24,
-    fontWeight: "bold",
+  message: {
+    fontSize: 15,
+    textAlign: "center",
+    color: "#6B7280",
+    fontFamily: "Inter_400Regular",
+    lineHeight: 22,
+    marginBottom: 34,
+  },
+
+  logoutButton: {
+    width: "100%",
+    backgroundColor: "#C44736",
+    paddingVertical: 18,
+    borderRadius: 16,
+    alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 5,
+  },
+
+  logoutButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+  },
+
+  cancelButton: {
+    width: "100%",
+    marginTop: 16,
+    paddingVertical: 18,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+  },
+
+  cancelButtonText: {
+    color: "#111827",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
   },
 });

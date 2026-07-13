@@ -18,8 +18,6 @@ import { SavingsProvider } from "../context/SavingsContext";
 import { ReferralProvider } from "../context/ReferralContext";
 import { CertificateProvider } from "../context/CertificateContext";
 import { TaxReturnsProvider } from "../context/TaxReturnsContext";
-import { LanguageProvider }
-from "../context/LanguageContext";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -45,30 +43,24 @@ export default function RootLayout() {
                     <SavingsProvider>
                       <CertificateProvider>
                         <TaxReturnsProvider>
-                          <LanguageProvider>
-                      <Stack
-                        screenOptions={{
-                          headerShown: false,
-                        }}
-                      >
-                        <Stack.Screen name="index" />
-                        <Stack.Screen name="login" />
-                        <Stack.Screen name="register" />
-                        <Stack.Screen
-                          name="forgot-password"
-                        />
-                        <Stack.Screen
-                          name="otp-verification"
-                        />
-                        <Stack.Screen
-                          name="tax-returns"
-                        />
-                        <Stack.Screen
-                          name="(tabs)"
-                        />
-                      </Stack>
-                      </LanguageProvider>
-                      </TaxReturnsProvider>
+                          <Stack
+                            screenOptions={{
+                              headerShown: false,
+                            }}
+                          >
+                            <Stack.Screen name="index" />
+                            <Stack.Screen name="login" />
+                            <Stack.Screen name="register" />
+                            <Stack.Screen name="forgot-password" />
+                            <Stack.Screen name="otp-verification" />
+                            <Stack.Screen name="tax-returns" />
+                            <Stack.Screen name="receipt" />
+                            <Stack.Screen name="payment-certificate" />
+                            <Stack.Screen name="current-plan" />
+                            <Stack.Screen name="manage-plan" />
+                            <Stack.Screen name="(tabs)" />
+                          </Stack>
+                        </TaxReturnsProvider>
                       </CertificateProvider>
                     </SavingsProvider>
                   </ReferralProvider>

@@ -69,7 +69,6 @@ export default function ActiveSessionsScreen() {
     useState(false);
 
   // Load sessions
-
   useEffect(() => {
     const loadSessions =
       async () => {
@@ -85,9 +84,7 @@ export default function ActiveSessionsScreen() {
 
             const hasCurrent =
               parsed.some(
-                (
-                  session: Session
-                ) =>
+                (session: Session) =>
                   session.current
               );
 
@@ -180,7 +177,6 @@ export default function ActiveSessionsScreen() {
   }, []);
 
   // Save sessions
-
   useEffect(() => {
     if (!loaded) return;
 
@@ -325,8 +321,7 @@ export default function ActiveSessionsScreen() {
       </View>
 
       <Text style={styles.subtitle}>
-        Manage devices currently
-        signed into your account.
+        Manage devices currently signed into your account.
       </Text>
 
       {sessions.length > 1 && (
@@ -342,28 +337,16 @@ export default function ActiveSessionsScreen() {
             color="#FFFFFF"
           />
 
-          <Text
-            style={
-              styles.logoutAllText
-            }
-          >
-            Log Out All Other
-            Devices
+          <Text style={styles.logoutAllText}>
+            Log Out All Other Devices
           </Text>
         </TouchableOpacity>
       )}
 
       {sessions.length === 1 && (
-        <View
-          style={styles.infoBanner}
-        >
-          <Text
-            style={
-              styles.infoBannerText
-            }
-          >
-            No other active devices
-            found.
+        <View style={styles.infoBanner}>
+          <Text style={styles.infoBannerText}>
+            No other active devices found.
           </Text>
         </View>
       )}
@@ -389,21 +372,13 @@ export default function ActiveSessionsScreen() {
               }
             />
 
-            <Text
-              style={
-                styles.deviceName
-              }
-            >
+            <Text style={styles.deviceName}>
               {session.deviceName}
             </Text>
           </View>
 
           {session.current && (
-            <Text
-              style={
-                styles.currentBadge
-              }
-            >
+            <Text style={styles.currentBadge}>
               Current Session
             </Text>
           )}
@@ -439,11 +414,7 @@ export default function ActiveSessionsScreen() {
                 color="#C44736"
               />
 
-              <Text
-                style={
-                  styles.logoutText
-                }
-              >
+              <Text style={styles.logoutText}>
                 Log Out Device
               </Text>
             </TouchableOpacity>
@@ -471,30 +442,37 @@ const styles =
     },
 
     title: {
-      fontSize: 30,
+      fontSize: 34,
       color: "#111827",
-      fontFamily:
-        "Inter_700Bold",
+      fontFamily: "Inter_700Bold",
       marginLeft: 10,
     },
 
     subtitle: {
       color: "#6B7280",
-      marginBottom: 20,
-      fontFamily:
-        "Inter_400Regular",
+      fontSize: 15,
+      fontFamily: "Inter_400Regular",
+      marginTop: -4,
+      marginBottom: 26,
     },
 
     logoutAll: {
-      backgroundColor:
-        "#C44736",
-      paddingVertical: 14,
-      borderRadius: 12,
-      marginBottom: 20,
+      backgroundColor: "#C44736",
+      paddingVertical: 18,
+      borderRadius: 16,
+      marginBottom: 22,
       flexDirection: "row",
-      justifyContent:
-        "center",
+      justifyContent: "center",
       alignItems: "center",
+
+      shadowColor: "#000",
+      shadowOpacity: 0.12,
+      shadowRadius: 10,
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
+      elevation: 5,
     },
 
     logoutAllText: {
@@ -505,11 +483,12 @@ const styles =
     },
 
     infoBanner: {
-      backgroundColor:
-        "#FFFFFF",
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 20,
+      backgroundColor: "#FFFFFF",
+      borderRadius: 16,
+      padding: 18,
+      marginBottom: 22,
+      borderWidth: 1,
+      borderColor: "#ECECEC",
     },
 
     infoBannerText: {
@@ -520,11 +499,22 @@ const styles =
     },
 
     card: {
-      backgroundColor:
-        "#FFFFFF",
-      borderRadius: 16,
-      padding: 18,
+      backgroundColor: "#FFFFFF",
+      borderRadius: 18,
+      padding: 20,
       marginBottom: 16,
+
+      borderWidth: 1,
+      borderColor: "#ECECEC",
+
+      shadowColor: "#000",
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+      elevation: 2,
     },
 
     currentCard: {
@@ -547,10 +537,16 @@ const styles =
     },
 
     currentBadge: {
+      alignSelf: "flex-start",
+      marginTop: 12,
+      backgroundColor: "#FCE8E6",
       color: "#C44736",
-      marginTop: 10,
-      fontFamily:
-        "Inter_600SemiBold",
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 20,
+      overflow: "hidden",
+      fontSize: 12,
+      fontFamily: "Inter_600SemiBold",
     },
 
     info: {

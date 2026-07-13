@@ -1,4 +1,3 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, {
   createContext,
   useContext,
@@ -7,7 +6,7 @@ import React, {
   useState,
 } from "react";
 
-export type Saving = {
+type Saving = {
   id: number;
   amount: number;
   date: string;
@@ -16,127 +15,72 @@ export type Saving = {
 type SavingsContextType = {
   savings: Saving[];
   totalSaved: number;
-
-  addSaving: (amount: number) => void;
-
-  deleteSaving: (id: number) => void;
+  loading: boolean;
+  refreshSavings: () => Promise<void>;
+  addSaving: (amount: number) => Promise<void>;
+  deleteSaving: (id: number) => Promise<void>;
 };
 
 const SavingsContext =
-  createContext<SavingsContextType>(
-    {} as SavingsContextType
-  );
+  createContext({} as SavingsContextType);
 
 export function SavingsProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [savings, setSavings] =
-    useState<Saving[]>([]);
+  const [savings, setSavings] = useState<Saving[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const [loaded, setLoaded] =
-    useState(false);
+  const refreshSavings = async () => {
+    setLoading(false);
 
-  // Load savings
+    // TODO: Replace when Savings endpoints exist
+    setSavings([]);
+
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const loadSavings = async () => {
-      try {
-        const stored =
-          await AsyncStorage.getItem(
-            "savings"
-          );
-
-        if (stored) {
-          setSavings(JSON.parse(stored));
-        }
-
-        setLoaded(true);
-      } catch (error) {
-        console.log(
-          "Failed to load savings",
-          error
-        );
-
-        setLoaded(true);
-      }
-    };
-
-    loadSavings();
+    refreshSavings();
   }, []);
 
-  // Save savings
+  const addSaving = async (amount: number) => {
+    // TODO: Call backend when endpoint is available
 
-  useEffect(() => {
-    if (!loaded) return;
+    const saving: Saving = {
+      id: Date.now(),
+      amount,
+      date: new Date().toISOString(),
+    };
 
-    AsyncStorage.setItem(
-      "savings",
-      JSON.stringify(savings)
+    setSavings((prev) => [...prev, saving]);
+  };
+
+  const deleteSaving = async (id: number) => {
+    // TODO: Call backend when endpoint is available
+
+    setSavings((prev) =>
+      prev.filter((item) => item.id !== id)
     );
-  }, [savings, loaded]);
-
-  // Total saved
+  };
 
   const totalSaved = useMemo(
     () =>
       savings.reduce(
-        (sum, saving) =>
-          sum + saving.amount,
+        (sum, item) => sum + item.amount,
         0
       ),
     [savings]
   );
 
-  // Add saving
-
-  const addSaving = (
-    amount: number
-  ) => {
-    setSavings((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        amount,
-        date:
-          new Date().toISOString(),
-      },
-    ]);
-  };
-
-  // Delete saving
-
-  const deleteSaving = (
-  id: number
-) => {
-  console.log("Deleting ID:", id);
-
-  setSavings((prev) => {
-    console.log(
-      "Savings before:",
-      prev
-    );
-
-    const updated = prev.filter(
-      (saving) =>
-        Number(saving.id) !==
-        Number(id)
-    );
-
-    console.log(
-      "Savings after:",
-      updated
-    );
-
-    return updated;
-  });
-};
   return (
     <SavingsContext.Provider
       value={{
         savings,
         totalSaved,
+        loading,
+        refreshSavings,
         addSaving,
         deleteSaving,
       }}
@@ -147,7 +91,5 @@ export function SavingsProvider({
 }
 
 export function useSavings() {
-  return useContext(
-    SavingsContext
-  );
+  return useContext(SavingsContext);
 }

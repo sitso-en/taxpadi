@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,9 +12,14 @@ import {
   View,
 } from "react-native";
 import { useTransactions } from "../../context/TransactionContext";
+import Card from "../../components/Card";
 
 export default function TransactionsScreen() {
-  const { transactions } = useTransactions();
+  const {
+    transactions,
+    loading,
+    deleteTransaction,
+  } = useTransactions();
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [search, setSearch] = useState("");
 
@@ -20,15 +27,37 @@ export default function TransactionsScreen() {
     const matchesFilter =
       selectedFilter === "All"
         ? true
-        : transaction.type.toLowerCase() ===
+        : transaction.type?.toLowerCase() ===
           selectedFilter.toLowerCase();
 
-    const matchesSearch = transaction.title
+    const transactionTitle = transaction.title ?? "";
+
+    const matchesSearch = transactionTitle
       .toLowerCase()
       .includes(search.toLowerCase());
 
     return matchesFilter && matchesSearch;
   });
+
+  const handleDelete = async (id: number) => {
+    Alert.alert(
+      "Delete Transaction",
+      "Are you sure?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            await deleteTransaction(id.toString());
+          },
+        },
+      ]
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -37,6 +66,13 @@ export default function TransactionsScreen() {
         contentContainerStyle={{ paddingBottom: 120 }}
       >
         <Text style={styles.title}>Transactions</Text>
+        <Text style={styles.subtitle}>
+          Track your income and expenses in one place.
+        </Text>
+        <Text style={styles.transactionCount}>
+          {filteredTransactions.length} transaction
+          {filteredTransactions.length !== 1 ? "s" : ""}
+        </Text>
 
         {/* Filters */}
         <View style={styles.filterContainer}>
@@ -80,65 +116,105 @@ export default function TransactionsScreen() {
           />
         </View>
 
-        {/* Transactions */}
-        {filteredTransactions.length === 0 ? (
-          <Text style={styles.emptyText}>
-            No transactions found.
-          </Text>
+        {/* Transactions list layout */}
+        {loading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator
+              size="large"
+              color="#C44736"
+            />
+          </View>
+        ) : filteredTransactions.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons
+              name="wallet-outline"
+              size={60}
+              color="#D1D5DB"
+            />
+            <Text style={styles.emptyTitle}>No Transactions</Text>
+            <Text style={styles.emptyText}>
+              Start by adding your first transaction.
+            </Text>
+          </View>
         ) : (
-          filteredTransactions.map((transaction) => (
-            <TouchableOpacity
-              key={transaction.id}
-              style={styles.transactionItem}
-              onPress={() =>
-                router.push(
-                  `/edit-transaction?id=${transaction.id}`
-                )
-              }
-            >
-              <View>
-                <Text style={styles.transactionTitle}>
-                  {transaction.title}
-                </Text>
-
-                <Text style={styles.transactionCategory}>
-                  {transaction.type} • {transaction.category}
-                </Text>
-              </View>
-
-              <View style={{ alignItems: "flex-end" }}>
-                <Text
-                  style={[
-                    styles.amount,
-                    {
-                      color:
-                        transaction.type === "income"
-                          ? "#22C55E"
-                          : "#C44736",
-                    },
-                  ]}
+         filteredTransactions
+  .filter(Boolean)
+  .map((transaction) => {
+            const currentId = transaction.id;
+            return (
+              <Card key={currentId} style={styles.transactionCard}>
+                <TouchableOpacity
+                  style={styles.transactionItem}
+                  onPress={() =>
+                    router.push(
+                      `/edit-transaction?id=${currentId}`
+                    )
+                  }
+                  onLongPress={() => handleDelete(currentId)}
                 >
-                  {transaction.type === "income" ? "+" : "-"}
-                  GH¢ {transaction.amount}
-                </Text>
+                  <View>
+                    <Text style={styles.transactionTitle}>
+                      {transaction.title}
+                    </Text>
 
-                <Text style={styles.date}>
-                  {transaction.date
-                    ? new Date(
-                        transaction.date
-                      ).toLocaleDateString(
-                        "en-US",
+                    <View
+                      style={[
+                        styles.typeBadge,
+                        transaction.type === "income"
+                          ? styles.incomeBadge
+                          : styles.expenseBadge,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.typeBadgeText,
+                          transaction.type === "income"
+                            ? styles.incomeBadgeText
+                            : styles.expenseBadgeText,
+                        ]}
+                      >
+                        {transaction.type}
+                      </Text>
+                    </View>
+
+                    <Text style={styles.transactionCategory}>
+                      {transaction.category}
+                    </Text>
+                  </View>
+
+                  <View style={{ alignItems: "flex-end" }}>
+                    <Text
+                      style={[
+                        styles.amount,
                         {
-                          month: "short",
-                          day: "numeric",
-                          year: "numeric",
-                        }
-                      )
-                    : "No Date"}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          ))
+                          color:
+                            transaction.type === "income"
+                              ? "#22C55E"
+                              : "#C44736",
+                        },
+                      ]}
+                    >
+                      {transaction.type === "income" ? "+ " : "- "}
+                      GH¢ {Number(transaction.amount).toFixed(2)}
+                    </Text>
+
+                    <Text style={styles.date}>
+                      {transaction.date
+                        ? new Date(transaction.date).toLocaleDateString(
+                            "en-US",
+                            {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            }
+                          )
+                        : "No Date"}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              </Card>
+            );
+          })
         )}
       </ScrollView>
 
@@ -166,10 +242,25 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 32,
+    fontSize: 34,
     fontFamily: "Inter_700Bold",
     color: "#111827",
-    marginBottom: 18,
+    marginBottom: 6,
+  },
+
+  subtitle: {
+    color: "#6B7280",
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    marginBottom: 28,
+  },
+
+  transactionCount: {
+    color: "#9CA3AF",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    marginTop: -18,
+    marginBottom: 22,
   },
 
   filterContainer: {
@@ -179,9 +270,9 @@ const styles = StyleSheet.create({
 
   filterButton: {
     backgroundColor: "#F3F4F6",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 11,
+    borderRadius: 24,
     marginRight: 8,
   },
 
@@ -203,16 +294,23 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderRadius: 30,
-    paddingHorizontal: 16,
+    borderRadius: 18,
+    paddingHorizontal: 18,
+    height: 56,
     marginBottom: 24,
+
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
 
   searchInput: {
     flex: 1,
-    paddingVertical: 14,
     marginLeft: 8,
     fontFamily: "Inter_400Regular",
 
@@ -221,17 +319,50 @@ const styles = StyleSheet.create({
       : {}),
   },
 
+  transactionCard: {
+    marginBottom: 16,
+  },
+
   transactionItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 22,
   },
 
   transactionTitle: {
     fontSize: 17,
     color: "#111827",
     fontFamily: "Inter_600SemiBold",
+  },
+
+  typeBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginTop: 8,
+  },
+
+  incomeBadge: {
+    backgroundColor: "#DCFCE7",
+  },
+
+  expenseBadge: {
+    backgroundColor: "#FEE2E2",
+  },
+
+  typeBadgeText: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    textTransform: "capitalize",
+  },
+
+  incomeBadgeText: {
+    color: "#15803D",
+  },
+
+  expenseBadgeText: {
+    color: "#B91C1C",
   },
 
   transactionCategory: {
@@ -253,10 +384,22 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
 
+  emptyState: {
+    alignItems: "center",
+    marginTop: 60,
+  },
+
+  emptyTitle: {
+    fontSize: 18,
+    color: "#111827",
+    fontFamily: "Inter_600SemiBold",
+    marginTop: 16,
+  },
+
   emptyText: {
     textAlign: "center",
     color: "#9CA3AF",
-    marginTop: 50,
+    marginTop: 6,
     fontFamily: "Inter_400Regular",
   },
 
@@ -264,12 +407,20 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 25,
     bottom: 25,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: "#C44736",
     justifyContent: "center",
     alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
     elevation: 6,
   },
 });

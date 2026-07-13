@@ -123,6 +123,9 @@ export default function InvoicesScreen() {
           <Text style={styles.title}>
             Invoices
           </Text>
+          <Text style={styles.subtitle}>
+            Create, monitor and manage customer invoices.
+          </Text>
         </View>
 
         {/* Summary */}
@@ -367,7 +370,7 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    marginBottom: 20,
+    marginBottom: 28,
   },
 
   title: {
@@ -375,6 +378,13 @@ const styles = StyleSheet.create({
     fontFamily:
       "Inter_700Bold",
     color: "#111827",
+  },
+
+  subtitle: {
+    color: "#6B7280",
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    marginTop: 4,
   },
 
   summaryRow: {
@@ -387,8 +397,9 @@ const styles = StyleSheet.create({
   summaryCard: {
     width: "31%",
     backgroundColor: "#C44736",
-    borderRadius: 14,
-    padding: 12,
+    borderRadius: 18,
+    paddingVertical: 18,
+    paddingHorizontal: 14,
   },
 
   summaryLabel: {
@@ -447,12 +458,21 @@ const styles = StyleSheet.create({
 
   invoiceItem: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 18,
-    marginBottom: 12,
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 16,
     flexDirection: "row",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
 
   leftSection: {
@@ -507,12 +527,20 @@ const styles = StyleSheet.create({
     position: "absolute",
     right: 24,
     bottom: 24,
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+    width: 68,
+    height: 68,
+    borderRadius: 34,
     backgroundColor: "#C44736",
     justifyContent: "center",
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 5,
+    },
+    elevation: 6,
   },
 
   fabText: {
@@ -520,4 +548,3 @@ const styles = StyleSheet.create({
     fontSize: 30,
   },
 });
-

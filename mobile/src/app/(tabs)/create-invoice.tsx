@@ -128,14 +128,14 @@ export default function CreateInvoiceScreen() {
     }
 
     addInvoice({
-  id: Date.now(),
-  customerName,
-  invoiceNumber,
-  amount: total,
-  issueDate: issueDate.toLocaleDateString(),
-  dueDate: dueDate.toLocaleDateString(),
-  status,
-});
+      id: Date.now(),
+      customerName,
+      invoiceNumber,
+      amount: total,
+      issueDate: issueDate.toLocaleDateString(),
+      dueDate: dueDate.toLocaleDateString(),
+      status,
+    });
     setFeedbackText(
       status === "Draft"
         ? "Invoice saved as draft."
@@ -213,9 +213,12 @@ export default function CreateInvoiceScreen() {
           />
         </TouchableOpacity>
 
-        <Text style={styles.title}>
-          New Invoice
-        </Text>
+        <View style={{ marginLeft: 10 }}>
+          <Text style={styles.title}>New Invoice</Text>
+          <Text style={styles.subtitle}>
+            Create and send professional invoices.
+          </Text>
+        </View>
       </View>
 
       {/* Customer */}
@@ -458,7 +461,13 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: "#111827",
-    marginLeft: 10,
+  },
+
+  subtitle: {
+    color: "#6B7280",
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    marginTop: 2,
   },
 
   label: {
@@ -503,9 +512,19 @@ const styles = StyleSheet.create({
 
   itemCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 14,
-    padding: 16,
-    marginBottom: 12,
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
 
   itemTitle: {
@@ -520,11 +539,13 @@ const styles = StyleSheet.create({
   },
 
   addItemButton: {
-    backgroundColor: "#FDECEC",
-    borderRadius: 12,
-    paddingVertical: 14,
+    backgroundColor: "#FFF5F3",
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: "center",
     marginBottom: 25,
+    borderWidth: 1,
+    borderColor: "#F3C5BE",
   },
 
   addItemText: {
@@ -533,7 +554,12 @@ const styles = StyleSheet.create({
   },
 
   totalSection: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 20,
     marginBottom: 30,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
   },
 
   totalRow: {
@@ -585,9 +611,17 @@ const styles = StyleSheet.create({
   sendButton: {
     width: "47%",
     backgroundColor: "#C44736",
-    borderRadius: 12,
+    borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 3,
+    },
+    elevation: 4,
   },
 
   sendButtonText: {
@@ -617,4 +651,3 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
   },
 });
-

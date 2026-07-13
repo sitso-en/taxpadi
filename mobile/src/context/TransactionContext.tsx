@@ -1,141 +1,81 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { createContext, useContext, useEffect, useState } from "react";
-import { Transaction } from "../data/transactions";
+import {
+  getTransactions,
+  createTransaction,
+  updateTransaction,
+  deleteTransaction as deleteTransactionApi,
+} from "@/services/transaction.service";
 
 type TransactionContextType = {
-  transactions: Transaction[];
-  addTransaction: (transaction: Transaction) => void;
-  deleteTransaction: (id: number) => void;
-  editTransaction: (transaction: Transaction) => void;
+  transactions: any[];
+  loading: boolean;
+  refreshTransactions: () => Promise<void>;
+  addTransaction: (data: any) => Promise<void>;
+  editTransaction: (id: string, data: any) => Promise<void>;
+  deleteTransaction: (id: string) => Promise<void>;
 };
 
 const TransactionContext = createContext<
   TransactionContextType | undefined
 >(undefined);
-
 export function TransactionProvider({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const [transactions, setTransactions] =
-    useState<Transaction[]>([
-      {
-        id: 1,
-        title: "Sales Revenue",
-        amount: 2500,
-        type: "income",
-        category: "Sales",
-        isDeductible: false,
-        date: new Date().toISOString(),
-      },
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
 
-      {
-        id: 2,
-        title: "Office Supplies",
-        amount: 400,
-        type: "expense",
-        category: "Office Supplies",
-        isDeductible: true,
-        date: new Date().toISOString(),
-      },
+  const refreshTransactions = async () => {
+    setLoading(true);
 
-      {
-        id: 3,
-        title: "Internet Bill",
-        amount: 120,
-        type: "expense",
-        category: "Utilities",
-        isDeductible: true,
-        date: new Date().toISOString(),
-      },
+    try {
+      const response = await getTransactions();
 
-      {
-        id: 4,
-        title: "Consulting Revenue",
-        amount: 1000,
-        type: "income",
-        category: "Consulting",
-        isDeductible: false,
-        date: new Date().toISOString(),
-      },
-    ]);
+      setTransactions(
+        response.data?.transactions ?? response.transactions ?? []
+      );
+    } catch (error: any) {
+      console.log(error);
 
-  const [loaded, setLoaded] = useState(false);
+console.log(error.response?.status);
+
+console.log(error.response?.data);
+
+console.error("Failed to load transactions", error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadTransactions = async () => {
-      try {
-        const stored =
-          await AsyncStorage.getItem(
-            "transactions"
-          );
-
-        if (stored) {
-          setTransactions(JSON.parse(stored));
-        }
-
-        setLoaded(true);
-      } catch (error) {
-        console.error(
-          "Failed to load transactions",
-          error
-        );
-
-        setLoaded(true);
-      }
-    };
-
-    loadTransactions();
+    refreshTransactions();
   }, []);
 
-  useEffect(() => {
-    if (!loaded) return;
-
-    AsyncStorage.setItem(
-      "transactions",
-      JSON.stringify(transactions)
-    );
-  }, [transactions, loaded]);
-
-  const addTransaction = (
-    transaction: Transaction
-  ) => {
-    setTransactions((prev) => [
-      ...prev,
-      transaction,
-    ]);
+  const addTransaction = async (data: any) => {
+    await createTransaction(data);
+    await refreshTransactions();
   };
 
-  const deleteTransaction = (id: number) => {
-    setTransactions((prev) =>
-      prev.filter(
-        (transaction) =>
-          transaction.id !== id
-      )
-    );
+  const editTransaction = async (id: string, data: any) => {
+    await updateTransaction(id, data);
+    await refreshTransactions();
   };
 
-  const editTransaction = (
-    updatedTransaction: Transaction
-  ) => {
-    setTransactions((prev) =>
-      prev.map((transaction) =>
-        transaction.id ===
-        updatedTransaction.id
-          ? updatedTransaction
-          : transaction
-      )
-    );
+  const deleteTransaction = async (id: string) => {
+    await deleteTransactionApi(id);
+    await refreshTransactions();
   };
 
   return (
     <TransactionContext.Provider
       value={{
         transactions,
+        loading,
+        refreshTransactions,
         addTransaction,
-        deleteTransaction,
         editTransaction,
+        deleteTransaction,
       }}
     >
       {children}

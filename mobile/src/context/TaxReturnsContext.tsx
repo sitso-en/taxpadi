@@ -13,9 +13,9 @@ export type FilingStep = {
 };
 
 export type TaxReturn = {
-  id: number;
-  taxYear: string;
-  filedDate: string;
+  return_id: number;
+  tax_year: string;
+  submitted_at: string;
   status: "Filed" | "Pending";
 };
 
@@ -222,9 +222,9 @@ export function TaxReturnsProvider({
 
     setPreviousReturns((prev) => [
       {
-        id: Date.now(),
-        taxYear,
-        filedDate:
+        return_id: Date.now(),
+        tax_year: taxYear,
+        submitted_at:
           now.toISOString(),
         status: "Filed",
       },

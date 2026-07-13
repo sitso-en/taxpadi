@@ -69,7 +69,7 @@ export default function FloatingTaxBot() {
 const styles = StyleSheet.create({
   container: {
     position: "absolute",
-    bottom: 95,
+    bottom: 35,
     right: 20,
     zIndex: 9999,
   },

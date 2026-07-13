@@ -1,0 +1,66 @@
+export const ENDPOINTS = {
+  AUTH: {
+    LOGIN: "/api/v1/auth/login",
+    REGISTER: "/api/v1/auth/register",
+    VERIFY_OTP: "/api/v1/auth/verify-otp",
+    RESEND_OTP: "/api/v1/auth/resend-otp",
+    FORGOT_PASSWORD: "/api/v1/auth/forgot-password",
+    VERIFY_RESET_OTP: "/api/v1/auth/verify-reset-otp",
+    RESET_PASSWORD: "/api/v1/auth/reset-password",
+    REFRESH: "/api/v1/auth/refresh",
+    LOGOUT: "/api/v1/auth/logout",
+    BIOMETRIC_REGISTER: "/api/v1/auth/biometric/register",
+    BIOMETRIC_LOGIN: "/api/v1/auth/biometric/login",
+  },
+  TAXBOT: {
+  CHAT: "/api/v1/taxbot/chat",
+  CONVERSATIONS: "/api/v1/taxbot/conversations",
+},
+PENALTY: {
+  GET: "/api/v1/penalties",
+  RESOLVE: "/api/v1/penalties/resolve",
+},
+NOTIFICATIONS: {
+  LIST: "/api/v1/notifications",
+  UNREAD_COUNT: "/api/v1/notifications/unread-count",
+  GET: (id: string) => `/api/v1/notifications/${id}`,
+  MARK_READ: (id: string) => `/api/v1/notifications/${id}/read`,
+  MARK_ALL_READ: "/api/v1/notifications/read-all",
+  DELETE: (id: string) => `/api/v1/notifications/${id}`,
+  DELETE_ALL: "/api/v1/notifications",
+  REGISTER: "/api/v1/notifications/register",
+},
+PROFILE: {
+  LIST: "/api/v1/profiles",
+},
+TAX_RETURNS: {
+  LIST: "/api/v1/tax/returns",
+  GENERATE: "/api/v1/tax/returns/generate",
+  DETAILS: (id: string) => `/api/v1/tax/returns/${id}`,
+  PREVIEW: (id: string) => `/api/v1/tax/returns/${id}/preview`,
+  SUBMIT: (id: string) => `/api/v1/tax/returns/${id}/submit`,
+  AMEND: (id: string) => `/api/v1/tax/returns/${id}/amend`,
+},
+TRANSACTIONS: {
+  LIST: "/api/v1/transactions",
+  CREATE: "/api/v1/transactions",
+  GET: (id: string) => `/api/v1/transactions/${id}`,
+  UPDATE: (id: string) => `/api/v1/transactions/${id}`,
+  DELETE: (id: string) => `/api/v1/transactions/${id}`,
+
+  VOICE: "/api/v1/transactions/voice",
+  SCAN: "/api/v1/transactions/scan",
+  IMPORT: "/api/v1/transactions/import",
+  IMPORT_VALIDATE: "/api/v1/transactions/import/validate",
+  IMPORT_HISTORY: "/api/v1/transactions/import/history",
+},
+PAYMENTS: {
+  LIST: "/api/v1/payments",
+  INITIATE: "/api/v1/payments/initiate",
+
+  GET: (id: string) => `/api/v1/payments/${id}`,
+  STATUS: (id: string) => `/api/v1/payments/${id}/status`,
+  CONFIRM: (id: string) => `/api/v1/payments/${id}/confirm`,
+  CERTIFICATE: (id: string) => `/api/v1/payments/${id}/certificate`,
+},
+};

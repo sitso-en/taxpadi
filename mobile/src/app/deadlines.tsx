@@ -1,3 +1,4 @@
+import React from "react";
 import { usePayments } from "../context/PaymentContext";
 import { useTransactions } from "../context/TransactionContext";
 import { useDeadlines } from "../context/DeadlineContext";
@@ -15,115 +16,53 @@ import {
   View,
 } from "react-native";
 
+import Card from "../components/Card";
+
 export default function DeadlinesScreen() {
-  const { transactions } =
-    useTransactions();
-
-  const { payments } =
-    usePayments();
-
-  const {
-    deadlines,
-    toggleDeadline,
-  } = useDeadlines();
-
-  const { addNotification } =
-    useNotifications();
+  const { transactions } = useTransactions();
+  const { payments } = usePayments();
+  const { deadlines, toggleDeadline } = useDeadlines();
+  
 
   // Financial calculations
+  const totalIncome = transactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.amount, 0);
 
-  const totalIncome =
-    transactions
-      .filter(
-        (t) => t.type === "income"
-      )
-      .reduce(
-        (sum, t) => sum + t.amount,
-        0
-      );
-
-  const totalPayments =
-    payments.reduce(
-      (sum, payment) =>
-        sum + payment.amount,
-      0
-    );
-
-  const payeDue =
-    totalIncome * 0.055;
+  const payeDue = totalIncome * 0.055;
 
   // Overdue deadlines
+  const overdueDeadlines = deadlines.filter(
+    (deadline) =>
+      !deadline.completed && new Date(deadline.dueDate) < new Date()
+  );
 
-  const overdueDeadlines =
-    deadlines.filter(
-      (deadline) =>
-        !deadline.completed &&
-        new Date(deadline.dueDate) <
-          new Date()
-    );
+  const lateFee = overdueDeadlines.length > 0 ? payeDue * 0.2 : 0;
 
-  const lateFee =
-    overdueDeadlines.length > 0
-      ? payeDue * 0.2
-      : 0;
-
-  const totalPenalty =
-    overdueDeadlines.length > 0
-      ? payeDue + lateFee
-      : 0;
+  const totalPenalty = overdueDeadlines.length > 0 ? payeDue + lateFee : 0;
 
   // Days left
-
-  const calculateDaysLeft = (
-    date: string
-  ) => {
+  const calculateDaysLeft = (date: string) => {
     const today = new Date();
-
-    const difference =
-      new Date(date).getTime() -
-      today.getTime();
-
-    return Math.ceil(
-      difference /
-        (1000 * 60 * 60 * 24)
-    );
+    const difference = new Date(date).getTime() - today.getTime();
+    return Math.ceil(difference / (1000 * 60 * 60 * 24));
   };
 
   // Week strip
+  const dates = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - 3 + index);
 
-  const dates = Array.from(
-    { length: 7 },
-    (_, index) => {
-      const date = new Date();
-
-      date.setDate(
-        date.getDate() - 3 + index
-      );
-
-      return {
-        day: date
-          .getDate()
-          .toString(),
-
-        week:
-          date
-            .toLocaleDateString(
-              "en-US",
-              {
-                weekday: "short",
-              }
-            )
-            .toUpperCase(),
-
-        active:
-          date.toDateString() ===
-          new Date().toDateString(),
-      };
-    }
-  );
+    return {
+      day: date.getDate().toString(),
+      week: date
+        .toLocaleDateString("en-US", { weekday: "short" })
+        .toUpperCase(),
+      active: date.toDateString() === new Date().toDateString(),
+    };
+  });
 
   // Complete deadline
-
   const handleDeadlinePress = (
     id: number,
     title: string,
@@ -131,97 +70,70 @@ export default function DeadlinesScreen() {
   ) => {
     toggleDeadline(id);
 
-    addNotification(
-      completed
-        ? "Deadline Reopened"
-        : "Deadline Completed",
-
-      completed
-        ? `${title} has been reopened.`
-        : `${title} marked as completed.`
-    );
+  
   };
 
   // Penalty payment
-
-  const handlePayPenalty =
-    () => {
-      if (totalPenalty <= 0) {
-        Alert.alert(
-          "No Penalties",
-          "You currently have no penalties to pay."
-        );
-
-        return;
-      }
-
+  const handlePayPenalty = () => {
+    if (totalPenalty <= 0) {
       Alert.alert(
-        "Redirecting",
-        "You will be redirected to the Payments screen."
+        "No Penalties",
+        "You currently have no penalties to pay."
       );
+      return;
+    }
 
-      router.push("/payments");
-    };
+    Alert.alert(
+      "Redirecting",
+      "You will be redirected to the Payments screen."
+    );
+
+    router.push("/payments");
+  };
 
   return (
     <ScrollView
       style={styles.container}
-      showsVerticalScrollIndicator={
-        false
-      }
+      showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         paddingBottom: 40,
       }}
     >
       {/* Header */}
-
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => {
-            if (
-              router.canGoBack()
-            ) {
+            if (router.canGoBack()) {
               router.back();
             } else {
-              router.replace(
-                "/dashboard"
-              );
+              router.replace("/dashboard");
             }
           }}
         >
-          <Ionicons
-            name="chevron-back"
-            size={26}
-            color="#111827"
-          />
+          <Ionicons name="chevron-back" size={26} color="#111827" />
         </TouchableOpacity>
 
-        <Text style={styles.title}>
-          Deadlines
-        </Text>
+        <Text style={styles.title}>Deadlines</Text>
       </View>
 
-      {/* Week Strip */}
+      <Text style={styles.subtitle}>
+        Keep track of filing deadlines and avoid penalties.
+      </Text>
 
-      <View
-        style={styles.dateContainer}
-      >
+      {/* Week Strip */}
+      <View style={styles.dateContainer}>
         {dates.map((item) => (
           <View
             key={`${item.day}${item.week}`}
             style={[
               styles.dateCard,
-
-              item.active &&
-                styles.activeDateCard,
+              item.active && styles.activeDateCard,
             ]}
           >
             <Text
               style={[
                 styles.dateNumber,
-
-                item.active &&
-                  styles.activeDateText,
+                item.active && styles.activeDateText,
               ]}
             >
               {item.day}
@@ -230,9 +142,7 @@ export default function DeadlinesScreen() {
             <Text
               style={[
                 styles.dateWeek,
-
-                item.active &&
-                  styles.activeDateText,
+                item.active && styles.activeDateText,
               ]}
             >
               {item.week}
@@ -241,221 +151,118 @@ export default function DeadlinesScreen() {
         ))}
       </View>
 
-      <Text
-        style={styles.sectionTitle}
-      >
-        UPCOMING DEADLINES
-      </Text>
+      <Text style={styles.sectionTitle}>UPCOMING DEADLINES</Text>
 
       {deadlines.length === 0 ? (
-        <View style={styles.card}>
-          <Text>
-            No deadlines available.
+        <Card style={styles.emptyStateCard}>
+          <Ionicons
+            name="calendar-outline"
+            size={48}
+            color="#9CA3AF"
+            style={{ marginBottom: 12 }}
+          />
+          <Text style={styles.emptyStateTitle}>No Deadlines</Text>
+          <Text style={styles.emptyStateSubtitle}>
+            You're all caught up.
           </Text>
-        </View>
+        </Card>
       ) : (
         deadlines.map((item) => {
-          const daysLeft =
-            calculateDaysLeft(
-              item.dueDate
-            );
+          const daysLeft = calculateDaysLeft(item.dueDate);
 
           return (
-            <TouchableOpacity
-              key={item.id}
-              activeOpacity={0.9}
-              style={styles.card}
-              onPress={() =>
-                handleDeadlinePress(
-                  item.id,
-                  item.title,
-                  item.completed
-                )
-              }
-            >
-              <View>
-                <Text
-                  style={
-                    styles.cardTitle
-                  }
-                >
-                  {item.title}
-                </Text>
+            <Card key={item.id} style={styles.card}>
+              <TouchableOpacity
+                activeOpacity={0.9}
+                onPress={() =>
+                  handleDeadlinePress(item.id, item.title, item.completed)
+                }
+                style={styles.cardContent}
+              >
+                <View style={styles.leftSection}>
+                  <View style={styles.calendarIcon}>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={22}
+                      color="#C44736"
+                    />
+                  </View>
 
-                <Text
-                  style={
-                    styles.subText
-                  }
-                >
-                  {item.authority}
-                </Text>
+                  <View>
+                    <Text style={styles.cardTitle}>{item.title}</Text>
+                    <Text style={styles.subText}>{item.authority}</Text>
+                    <Text style={styles.dateText}>
+                      {new Date(item.dueDate).toLocaleDateString()}
+                    </Text>
+                  </View>
+                </View>
 
-                <Text
-                  style={
-                    styles.dateText
-                  }
-                >
-                  {new Date(
-                    item.dueDate
-                  ).toLocaleDateString()}
-                </Text>
-              </View>
-
-              {item.completed ? (
-                <View
-                  style={
-                    styles.greenBadge
-                  }
-                >
-                  <Text
-                    style={
-                      styles.badgeText
-                    }
-                  >
-                    Completed
-                  </Text>
-                </View>
-              ) : daysLeft >=
-                0 ? (
-                <View
-                  style={
-                    styles.greenBadge
-                  }
-                >
-                  <Text
-                    style={
-                      styles.badgeText
-                    }
-                  >
-                    {daysLeft} days
-                  </Text>
-                </View>
-              ) : (
-                <View
-                  style={
-                    styles.redBadge
-                  }
-                >
-                  <Text
-                    style={
-                      styles.redBadgeText
-                    }
-                  >
-                    Overdue
-                  </Text>
-                </View>
-              )}
-            </TouchableOpacity>
+                {item.completed ? (
+                  <View style={styles.greenBadge}>
+                    <Text style={styles.badgeText}>✓ Completed</Text>
+                  </View>
+                ) : daysLeft >= 0 ? (
+                  <View style={styles.greenBadge}>
+                    <Text style={styles.badgeText}>Upcoming</Text>
+                    <Text style={[styles.badgeText, { fontSize: 10, textAlign: 'center' }]}>
+                      {daysLeft} days left
+                    </Text>
+                  </View>
+                ) : (
+                  <View style={styles.redBadge}>
+                    <Text style={styles.redBadgeText}>⚠ Overdue</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </Card>
           );
         })
       )}
 
-      <Text
-        style={styles.sectionTitle}
-      >
-        OUTSTANDING PENALTIES
-      </Text>
+      <Text style={styles.sectionTitle}>OUTSTANDING PENALTIES</Text>
 
       {totalPenalty > 0 ? (
         <>
-          <View
-            style={
-              styles.penaltyCard
-            }
-          >
-            <Text
-              style={
-                styles.penaltyTitle
-              }
-            >
-              ⚠ Late Filing
-              Penalty
-            </Text>
+          <View style={styles.penaltyCard}>
+            <View style={styles.penaltyHeaderRow}>
+              <Ionicons
+                name="warning-outline"
+                size={20}
+                color="#C44736"
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.penaltyTitle}>Late Filing Penalty</Text>
+            </View>
 
-            <Text
-              style={
-                styles.penaltyInfo
-              }
-            >
-              Original:
-              GH¢{" "}
-              {payeDue.toFixed(
-                2
-              )}
+            <Text style={styles.penaltyInfo}>
+              Original: GH¢ {payeDue.toFixed(2)}
               {"\n"}
-              Late Fee:
-              GH¢{" "}
-              {lateFee.toFixed(
-                2
-              )}
+              Late Fee: GH¢ {lateFee.toFixed(2)}
             </Text>
 
-            <View
-              style={
-                styles.penaltyRow
-              }
-            >
-              <Text
-                style={
-                  styles.totalLabel
-                }
-              >
-                Total Due
-              </Text>
-
-              <Text
-                style={
-                  styles.totalAmount
-                }
-              >
-                GH¢{" "}
-                {totalPenalty.toFixed(
-                  2
-                )}
+            <View style={styles.penaltyRow}>
+              <Text style={styles.totalLabel}>Total Due</Text>
+              <Text style={styles.totalAmount}>
+                GH¢ {totalPenalty.toFixed(2)}
               </Text>
             </View>
           </View>
 
           <TouchableOpacity
-            style={
-              styles.payButton
-            }
-            onPress={
-              handlePayPenalty
-            }
+            style={styles.payButton}
+            onPress={handlePayPenalty}
           >
-            <Text
-              style={
-                styles.payButtonText
-              }
-            >
-              Pay Penalties
-            </Text>
+            <Text style={styles.payButtonText}>Pay Penalties</Text>
           </TouchableOpacity>
         </>
       ) : (
-        <View
-          style={
-            styles.penaltyCard
-          }
-        >
-          <Text
-            style={
-              styles.penaltyInfo
-            }
-          >
-            No outstanding
-            penalties.
-          </Text>
+        <View style={styles.penaltyCard}>
+          <Text style={styles.penaltyInfo}>No outstanding penalties.</Text>
         </View>
       )}
 
-      <Text
-        style={styles.footerText}
-      >
-        Filing on time saves
-        you from penalties and
-        surcharges.
+      <Text style={styles.footerText}>
+        Filing on time saves you from penalties and surcharges.
       </Text>
     </ScrollView>
   );
@@ -464,8 +271,7 @@ export default function DeadlinesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor:
-      "#FAFAFA",
+    backgroundColor: "#FAFAFA",
     paddingHorizontal: 20,
     paddingTop: 55,
   },
@@ -473,20 +279,28 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 28,
   },
 
   title: {
-    fontSize: 30,
-    fontFamily:
-      "Inter_700Bold",
+    fontSize: 34,
+    fontFamily: "Inter_700Bold",
     marginLeft: 10,
+    color: "#111827",
+  },
+
+  subtitle: {
+    color: "#6B7280",
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    marginTop: -16,
+    marginBottom: 28,
   },
 
   dateContainer: {
     flexDirection: "row",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 25,
   },
 
@@ -497,9 +311,10 @@ const styles = StyleSheet.create({
   },
 
   activeDateCard: {
-    backgroundColor:
-      "#C44736",
-    width: 42,
+    backgroundColor: "#C44736",
+    width: 46,
+    height: 58,
+    justifyContent: "center",
   },
 
   dateNumber: {
@@ -519,28 +334,32 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 11,
     color: "#C44736",
-    fontFamily:
-      "Inter_700Bold",
+    fontFamily: "Inter_700Bold",
     marginBottom: 10,
     marginTop: 10,
   },
 
   card: {
-    backgroundColor:
-      "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    flexDirection: "row",
-    justifyContent:
-      "space-between",
-    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 20,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
 
   cardTitle: {
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
     fontSize: 16,
+    color: "#111827",
   },
 
   subText: {
@@ -555,48 +374,53 @@ const styles = StyleSheet.create({
   },
 
   greenBadge: {
-    backgroundColor:
-      "#DFF5E7",
+    backgroundColor: "#DFF5E7",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   badgeText: {
     color: "#34A853",
     fontSize: 12,
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   redBadge: {
-    backgroundColor:
-      "#FCE8E6",
+    backgroundColor: "#FCE8E6",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   redBadgeText: {
     color: "#C44736",
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
     fontSize: 12,
   },
 
   penaltyCard: {
-    backgroundColor:
-      "#FFF4F2",
-    borderRadius: 16,
-    padding: 18,
+    backgroundColor: "#FFF8F6",
+    borderWidth: 1,
+    borderColor: "#F4D7D2",
+    borderRadius: 18,
+    padding: 20,
     marginTop: 10,
+  },
+
+  penaltyHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
   },
 
   penaltyTitle: {
     color: "#C44736",
-    fontFamily:
-      "Inter_600SemiBold",
-    marginBottom: 8,
+    fontFamily: "Inter_600SemiBold",
   },
 
   penaltyInfo: {
@@ -606,42 +430,92 @@ const styles = StyleSheet.create({
 
   penaltyRow: {
     flexDirection: "row",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
   },
 
   totalLabel: {
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   totalAmount: {
     color: "#C44736",
-    fontFamily:
-      "Inter_700Bold",
+    fontFamily: "Inter_700Bold",
     fontSize: 20,
   },
 
   payButton: {
-    backgroundColor:
-      "#C44736",
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: "#C44736",
+    paddingVertical: 20,
+    borderRadius: 16,
     alignItems: "center",
     marginTop: 20,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 5,
   },
 
   payButtonText: {
     color: "#FFFFFF",
-    fontFamily:
-      "Inter_700Bold",
+    fontFamily: "Inter_700Bold",
     fontSize: 16,
   },
 
   footerText: {
     textAlign: "center",
-    color: "#999",
-    marginTop: 14,
+    color: "#6B7280",
+    marginTop: 18,
+    marginBottom: 10,
     fontSize: 12,
+    fontFamily: "Inter_400Regular",
+  },
+
+  cardContent: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+
+  leftSection: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+
+  calendarIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
+    backgroundColor: "#FCE8E6",
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 14,
+  },
+
+  emptyStateCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 18,
+    padding: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+  },
+
+  emptyStateTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    marginBottom: 4,
+  },
+
+  emptyStateSubtitle: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+    textAlign: "center",
   },
 });

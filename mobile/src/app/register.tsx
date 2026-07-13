@@ -1,9 +1,9 @@
-import { useUser } from "../context/UserContext";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Dropdown } from "react-native-element-dropdown";
 import React, { useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -13,6 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Dropdown } from "react-native-element-dropdown";
+
+import { register } from "@/services/auth.service";
 
 const regions = [
   { label: "Greater Accra", value: "Greater Accra" },
@@ -51,22 +54,67 @@ export default function RegisterScreen() {
   const [region, setRegion] = useState("Greater Accra");
   const [category, setCategory] = useState("Individual");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const { setUser } = useUser();
+  const handleRegister = async () => {
+    if (!fullName.trim()) {
+      Alert.alert("Validation", "Enter your full name.");
+      return;
+    }
 
-  const handleRegister = () => {
-    console.log("Registering user:", fullName);
+    if (!phoneNumber.trim()) {
+      Alert.alert("Validation", "Enter your phone number.");
+      return;
+    }
 
-    setUser({
-      fullName,
-      phoneNumber: `${countryCode} ${phoneNumber}`,
-      email,
-      region,
-      category,
-      plan: "FREE",
-    });
+    const cleanedPhone = phoneNumber.replace(/\s/g, "");
 
-    router.push("/otp-verification");
+    if (cleanedPhone.replace(/\D/g, "").length !== 9) {
+      Alert.alert("Validation", "Enter a valid Ghana phone number.");
+      return;
+    }
+
+    if (!password.trim()) {
+      Alert.alert("Validation", "Enter a password.");
+      return;
+    }
+
+    if (password.length < 8) {
+      Alert.alert("Validation", "Password must be at least 8 characters.");
+      return;
+    }
+
+    if (loading) return;
+
+    try {
+      setLoading(true);
+
+      const fullPhone = `0${cleanedPhone}`;
+
+      const response = await register({
+        full_name: fullName,
+        phone: fullPhone,
+        email: email || undefined,
+        password,
+        region,
+        taxpayer_category: category,
+      });
+
+      if (!response.success) {
+        Alert.alert("Registration Failed", response.message);
+        return;
+      }
+
+      router.push("/otp-verification");
+    } catch (error: any) {
+      Alert.alert(
+        "Registration Failed",
+        error?.response?.data?.message ??
+          "Unable to register."
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -230,11 +278,15 @@ export default function RegisterScreen() {
         </View>
 
         <TouchableOpacity
-          style={styles.button}
+          style={[
+            styles.button,
+            loading && { opacity: 0.7 },
+          ]}
+          disabled={loading}
           onPress={handleRegister}
         >
           <Text style={styles.buttonText}>
-            Create Account
+            {loading ? "Creating Account..." : "Create Account"}
           </Text>
         </TouchableOpacity>
 
@@ -378,7 +430,6 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
 
- 
   phoneContainer: {
     flexDirection: "row",
     marginBottom: 8,
@@ -393,20 +444,19 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
 
- phoneInput: {
-  flex: 1,
-  backgroundColor: "#F3F4F6",
-  borderRadius: 12,
-  paddingHorizontal: 16,
-  paddingVertical: 16,
-  minHeight: 56,
-  fontFamily: "Inter_400Regular",
+  phoneInput: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    minHeight: 56,
+    fontFamily: "Inter_400Regular",
 
-  ...(Platform.OS === "web"
-    ? {
-        outlineWidth: 0,
-      }
-    : {}),
-},
+    ...(Platform.OS === "web"
+      ? {
+          outlineWidth: 0,
+        }
+      : {}),
+  },
 });
-
