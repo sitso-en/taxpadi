@@ -62,6 +62,7 @@ export default function SubscriptionScreen() {
   const [paymentMethod, setPaymentMethod] = useState<"momo" | "card">("momo");
   const [momoProvider, setMomoProvider] = useState("MTN");
   const [momoNumber, setMomoNumber] = useState("");
+  const [momoError, setMomoError] = useState("");
 
   const load = useCallback(async () => {
     try {
@@ -86,7 +87,7 @@ export default function SubscriptionScreen() {
       return;
     }
     if (paymentMethod === "momo" && !momoNumber.trim()) {
-      showToast("Please enter your MoMo number.", "error");
+      setMomoError("Enter your MoMo number.");
       return;
     }
     if (actionLoading) return;
@@ -288,13 +289,17 @@ export default function SubscriptionScreen() {
 
                 <Text style={styles.fieldLabel}>MoMo Number</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, momoError ? styles.inputError : null]}
                   placeholder="e.g. 0241234567"
                   placeholderTextColor="#9CA3AF"
                   keyboardType="phone-pad"
                   value={momoNumber}
-                  onChangeText={setMomoNumber}
+                  onChangeText={(t) => {
+                    setMomoNumber(t);
+                    if (momoError) setMomoError("");
+                  }}
                 />
+                {momoError ? <Text style={styles.errorText}>{momoError}</Text> : null}
               </>
             )}
           </View>
@@ -471,6 +476,16 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontFamily: "Inter_400Regular",
     backgroundColor: "#F9FAFB",
+    marginBottom: 8,
+  },
+  inputError: {
+    borderColor: "#EF4444",
+  },
+  errorText: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: -2,
     marginBottom: 8,
   },
 
