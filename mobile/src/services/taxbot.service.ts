@@ -23,3 +23,8 @@ export const getConversationHistory = async (
 
   return response.data;
 };
+
+export const clearConversationHistory = async () => {
+  const response = await client.delete("/api/v1/taxbot/history");
+  return response.data;
+};
