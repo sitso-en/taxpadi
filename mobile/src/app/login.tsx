@@ -15,8 +15,11 @@ import {
 import { Dropdown } from "react-native-element-dropdown";
 
 import { login } from "@/services/auth.service";
+import { useTransactions } from "@/context/TransactionContext";
+import { usePayments } from "@/context/PaymentContext";
+import { useUser, type User } from "@/context/UserContext";
 import { getDeviceInfo } from "@/utils/device";
-import { getDeviceToken } from "@/services/notifications.service";
+// import { getDeviceToken } from "@/services/notifications.service";
 import { registerNotificationToken } from "@/services/notification.service";
 
 const countryCodes = [
@@ -29,11 +32,15 @@ const countryCodes = [
 ];
 
 export default function LoginScreen() {
-  const [phoneNumber, setPhoneNumber] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("551448215");
   const [countryCode, setCountryCode] = useState("+233");
-  const [password, setPassword] = useState("");
+  const [password, setPassword] = useState("Sitsofe@123");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  const { refreshTransactions } = useTransactions();
+  const { refreshPayments } = usePayments();
+  const { setUser } = useUser();
 
   const handleLogin = async () => {
     if (loading) return;
@@ -64,13 +71,9 @@ export default function LoginScreen() {
 
       console.log("Calling login...");
 
-      const response = await login(
-        fullPhone,
-        password,
-        getDeviceInfo()
-      );
+      const response = await login(fullPhone, password, getDeviceInfo());
 
-      console.log("LOGIN RESPONSE:", response);
+      console.log("LOGaIN RESPONSE:", response);
 
       if (!response.success) {
         Alert.alert("Login Failed", response.message);
@@ -80,7 +83,7 @@ export default function LoginScreen() {
       if (response.data.requires_otp) {
         Alert.alert(
           "OTP Required",
-          "Please verify the OTP sent to your phone."
+          "Please verify the OTP sent to your phone.",
         );
 
         router.push({
@@ -94,27 +97,49 @@ export default function LoginScreen() {
         return;
       }
 
-      const device = await getDeviceToken();
+      // const device = await getDeviceToken();
 
-      if (device) {
-        try {
-          await registerNotificationToken({
-            fcm_token: device.token,
-            platform: device.platform,
-          });
-        } catch (error) {
-          console.log("Notification registration failed:", error);
-        }
-      }
+      // if (device) {
+      //   try {
+      //     await registerNotificationToken({
+      //       fcm_token: device.token,
+      //       platform: device.platform,
+      //     });
+      //   } catch (error) {
+      //     console.log("Notification registration failed:", error);
+      //   }
+      // }
 
+      const { full_name, phone, email, ...rest } = response.data.user;
+
+      setUser({
+        ...(rest as Partial<User>),
+        fullName: full_name,
+        phoneNumber: phone,
+        email: email ?? "",
+        region: "",
+        category: "",
+        plan: "FREE",
+        label: "",
+        tin: "",
+        taxpayer_category: "",
+        active_profile: false,
+      });
+
+      console.log("Refreshing authenticated data...");
+
+      await Promise.all([refreshTransactions(), refreshPayments()]);
+
+      console.log("Authenticated data refreshed.");
+
+      console.log("Navigating to dashboard...");
       router.replace("/(tabs)/dashboard");
     } catch (error: any) {
       console.log(error);
 
       Alert.alert(
         "Login Failed",
-        error?.response?.data?.message ??
-          "Unable to connect to the server."
+        error?.response?.data?.message ?? "Unable to connect to the server.",
       );
     } finally {
       setLoading(false);
@@ -132,9 +157,7 @@ export default function LoginScreen() {
 
       <Text style={styles.title}>Welcome Back</Text>
 
-      <Text style={styles.subtitle}>
-        Log in to your TaxPadi account
-      </Text>
+      <Text style={styles.subtitle}>Log in to your TaxPadi account</Text>
 
       <Text style={styles.label}>PHONE NUMBER</Text>
 
@@ -163,8 +186,7 @@ export default function LoginScreen() {
             if (cleaned.length > 2) {
               formatted = cleaned.replace(
                 /(\d{2})(\d{0,3})(\d{0,4})/,
-                (_, p1, p2, p3) =>
-                  [p1, p2, p3].filter(Boolean).join(" ")
+                (_, p1, p2, p3) => [p1, p2, p3].filter(Boolean).join(" "),
               );
             }
 
@@ -185,9 +207,7 @@ export default function LoginScreen() {
           onChangeText={setPassword}
         />
 
-        <TouchableOpacity
-          onPress={() => setShowPassword(!showPassword)}
-        >
+        <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
           <Ionicons
             name={showPassword ? "eye-off-outline" : "eye-outline"}
             size={22}
@@ -201,10 +221,7 @@ export default function LoginScreen() {
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[
-          styles.button,
-          loading && { opacity: 0.7 },
-        ]}
+        style={[styles.button, loading && { opacity: 0.7 }]}
         onPress={handleLogin}
         disabled={loading}
       >
@@ -230,15 +247,11 @@ export default function LoginScreen() {
           })
         }
       >
-        <Text style={styles.secondaryButtonText}>
-          Continue with OTP
-        </Text>
+        <Text style={styles.secondaryButtonText}>Continue with OTP</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.push("/register")}>
-        <Text style={styles.registerText}>
-          New to TaxPadi? Register
-        </Text>
+        <Text style={styles.registerText}>New to TaxPadi? Register</Text>
       </TouchableOpacity>
     </KeyboardAvoidingView>
   );
@@ -248,8 +261,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    paddingHorizontal: 24,
-    paddingTop: 18,
+    paddingHorizontal: 16,
+    paddingTop: 44,
   },
 
   logoCircle: {

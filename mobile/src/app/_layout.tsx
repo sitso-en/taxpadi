@@ -6,6 +6,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from "@expo-google-fonts/inter";
+import { StatusBar } from "expo-status-bar";
 
 import { UserProvider } from "../context/UserContext";
 import { InvoiceProvider } from "../context/InvoiceContext";
@@ -32,44 +33,47 @@ export default function RootLayout() {
   }
 
   return (
-    <UserProvider>
-      <TransactionProvider>
-        <PaymentProvider>
-          <ReturnProvider>
-            <InvoiceProvider>
-              <DeadlineProvider>
-                <NotificationProvider>
-                  <ReferralProvider>
-                    <SavingsProvider>
-                      <CertificateProvider>
-                        <TaxReturnsProvider>
-                          <Stack
-                            screenOptions={{
-                              headerShown: false,
-                            }}
-                          >
-                            <Stack.Screen name="index" />
-                            <Stack.Screen name="login" />
-                            <Stack.Screen name="register" />
-                            <Stack.Screen name="forgot-password" />
-                            <Stack.Screen name="otp-verification" />
-                            <Stack.Screen name="tax-returns" />
-                            <Stack.Screen name="receipt" />
-                            <Stack.Screen name="payment-certificate" />
-                            <Stack.Screen name="current-plan" />
-                            <Stack.Screen name="manage-plan" />
-                            <Stack.Screen name="(tabs)" />
-                          </Stack>
-                        </TaxReturnsProvider>
-                      </CertificateProvider>
-                    </SavingsProvider>
-                  </ReferralProvider>
-                </NotificationProvider>
-              </DeadlineProvider>
-            </InvoiceProvider>
-          </ReturnProvider>
-        </PaymentProvider>
-      </TransactionProvider>
-    </UserProvider>
+    <>
+      <StatusBar style="dark" />
+      <UserProvider>
+        <TransactionProvider>
+          <PaymentProvider>
+            <ReturnProvider>
+              <InvoiceProvider>
+                <DeadlineProvider>
+                  <NotificationProvider>
+                    <ReferralProvider>
+                      <SavingsProvider>
+                        <CertificateProvider>
+                          <TaxReturnsProvider>
+                            <Stack
+                              screenOptions={{
+                                headerShown: false,
+                              }}
+                            >
+                              <Stack.Screen name="index" />
+                              <Stack.Screen name="login" />
+                              <Stack.Screen name="register" />
+                              <Stack.Screen name="forgot-password" />
+                              <Stack.Screen name="otp-verification" />
+                              <Stack.Screen name="tax-returns" />
+                              <Stack.Screen name="receipt" />
+                              <Stack.Screen name="payment-certificate" />
+                              <Stack.Screen name="current-plan" />
+                              <Stack.Screen name="manage-plan" />
+                              <Stack.Screen name="(tabs)" />
+                            </Stack>
+                          </TaxReturnsProvider>
+                        </CertificateProvider>
+                      </SavingsProvider>
+                    </ReferralProvider>
+                  </NotificationProvider>
+                </DeadlineProvider>
+              </InvoiceProvider>
+            </ReturnProvider>
+          </PaymentProvider>
+        </TransactionProvider>
+      </UserProvider>
+    </>
   );
 }

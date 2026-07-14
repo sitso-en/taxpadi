@@ -13,8 +13,8 @@ import {
 export default function SettingsScreen() {
   const { user } = useUser();
 
-  const initials = user?.label
-    ? user.label
+  const initials = user?.fullName
+    ? user.fullName
         .split(" ")
         .map((n: string) => n[0])
         .join("")
@@ -54,7 +54,7 @@ export default function SettingsScreen() {
 
             <View>
               <Text style={styles.name}>
-                {user?.label || "Default Profile"}
+                {user?.fullName || "Default Profile"}
               </Text>
               <Text style={styles.phone}>
                 TIN: {user?.tin || "Not Available"}
@@ -247,34 +247,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    paddingHorizontal: 20,
-    paddingTop: 55,
+    paddingHorizontal: 16,
+    paddingTop: 44,
   },
   backButton: {
-    marginBottom: 15,
+    marginBottom: 10,
   },
   header: {
-    marginBottom: 28,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 32,
+    fontSize: 24,
     color: "#111827",
     fontFamily: "Inter_700Bold",
   },
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    marginTop: 4,
+    marginTop: 2,
   },
   profileCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 22,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: "#ECECEC",
     shadowColor: "#000",
@@ -291,56 +291,58 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   avatar: {
-    width: 65,
-    height: 65,
-    borderRadius: 32.5,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
     backgroundColor: "#C44736",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 15,
+    marginRight: 12,
   },
   avatarText: {
     color: "#FFFFFF",
-    fontSize: 24,
+    fontSize: 20,
     fontFamily: "Inter_700Bold",
   },
   name: {
-    fontSize: 18,
+    fontSize: 16,
     color: "#111827",
     fontFamily: "Inter_700Bold",
   },
   phone: {
     color: "#6B7280",
-    marginTop: 4,
+    marginTop: 2,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
   email: {
     color: "#6B7280",
-    marginTop: 4,
+    marginTop: 2,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
   proBadge: {
     backgroundColor: "#C44736",
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
   proText: {
     color: "#FFFFFF",
-    fontSize: 12,
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
   sectionTitle: {
     color: "#C44736",
-    fontSize: 11,
-    marginBottom: 10,
+    fontSize: 10,
+    marginBottom: 8,
     fontFamily: "Inter_600SemiBold",
   },
   item: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 12,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -360,24 +362,24 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   itemText: {
-    marginLeft: 14,
+    marginLeft: 10,
     color: "#111827",
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Inter_500Medium",
   },
   logoutButton: {
     backgroundColor: "#FCE8E6",
     borderRadius: 14,
-    padding: 16,
+    padding: 14,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 30,
+    marginTop: 20,
   },
   logoutText: {
     color: "#C44736",
     marginLeft: 8,
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
 });

@@ -11,11 +11,13 @@ import { router } from "expo-router";
 
 import {
   ScrollView,
+
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+
 
 export default function HomeScreen() {
   const { user } = useUser();
@@ -77,13 +79,14 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 120 }}
+      contentContainerStyle={{ paddingBottom: 100 }}
       showsVerticalScrollIndicator={false}
     >
+    
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>{greeting}, {firstName} 👋</Text>
+          <Text style={styles.greeting}>{greeting}, {user?.fullName?.split(" ")[0] || "User"}</Text>
           <Text style={styles.date}>{currentDate}</Text>
         </View>
 
@@ -260,8 +263,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    paddingHorizontal: 20,
-    paddingTop: 55,
+    paddingHorizontal: 16,
+    paddingTop: 44,
   },
 
   header: {
@@ -269,13 +272,13 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 20,
   },
 
   notificationContainer: {
     position: "relative",
-    width: 52,
-    height: 52,
+    width: 44,
+    height: 44,
     borderRadius: 26,
     backgroundColor: "#FFFFFF",
     justifyContent: "center",
@@ -310,25 +313,26 @@ const styles = StyleSheet.create({
   },
 
   greeting: {
-    fontSize: 28,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "#111827",
   },
 
   date: {
-    marginTop: 4,
+    marginTop: 2,
+    fontSize: 12,
     color: "#6B7280",
     fontFamily: "Inter_400Regular",
   },
 
   taxCard: {
     backgroundColor: "#C44736",
-    borderRadius: 24,
-    paddingVertical: 34,
-    paddingHorizontal: 24,
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 20,
     shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 14,
@@ -340,28 +344,28 @@ const styles = StyleSheet.create({
   },
 
   taxCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     borderWidth: 4,
     borderColor: "#FFFFFF",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 18,
+    marginRight: 14,
   },
 
   taxLabel: {
     color: "#FDECEC",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontSize: 10,
     letterSpacing: 0.5,
   },
 
   taxAmount: {
     color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 30,
-    marginTop: 4,
+    fontSize: 24,
+    marginTop: 2,
   },
 
   visibilityButton: {
@@ -380,33 +384,33 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 32,
+    marginBottom: 20,
   },
 
   summaryCard: {
     width: "48%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    padding: 20,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
   },
 
   summaryTitle: {
     color: "#6B7280",
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    marginBottom: 8,
+    fontSize: 12,
+    marginBottom: 6,
   },
 
   summaryAmount: {
-    fontSize: 22,
+    fontSize: 18,
     color: "#111827",
     fontFamily: "Inter_700Bold",
   },
 
   summaryCaption: {
-    marginTop: 6,
-    fontSize: 12,
+    marginTop: 4,
+    fontSize: 10,
     color: "#9CA3AF",
     fontFamily: "Inter_400Regular",
   },
@@ -415,37 +419,38 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     justifyContent: "space-between",
-    marginBottom: 32,
+    marginBottom: 20,
   },
 
   quickCard: {
     width: "31%",
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderRadius: 14,
     alignItems: "center",
-    paddingVertical: 20,
-    marginBottom: 14,
+    paddingVertical: 14,
+    marginBottom: 10,
   },
 
   quickTitle: {
-    marginTop: 10,
+    marginTop: 6,
     color: "#111827",
     fontFamily: "Inter_500Medium",
     textAlign: "center",
+    fontSize: 12,
   },
 
   deadlineHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   sectionTitle: {
-    fontSize: 20,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
     color: "#111827",
-    marginBottom: 16,
+    marginBottom: 10,
   },
 
   seeAll: {
@@ -455,9 +460,9 @@ const styles = StyleSheet.create({
 
   deadlineCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 22,
-    marginBottom: 12,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 10,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
@@ -466,19 +471,19 @@ const styles = StyleSheet.create({
   deadlineTitle: {
     fontFamily: "Inter_600SemiBold",
     color: "#111827",
-    fontSize: 16,
+    fontSize: 14,
   },
 
   deadlineAuthority: {
-    marginTop: 4,
-    fontSize: 13,
+    marginTop: 2,
+    fontSize: 12,
     color: "#6B7280",
     fontFamily: "Inter_500Medium",
   },
 
   deadlineDate: {
     marginTop: 2,
-    fontSize: 12,
+    fontSize: 11,
     color: "#9CA3AF",
     fontFamily: "Inter_400Regular",
   },
@@ -486,24 +491,24 @@ const styles = StyleSheet.create({
   daysLeft: {
     backgroundColor: "#FCE8E6",
     color: "#C44736",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
     fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+    fontSize: 12,
     overflow: "hidden",
   },
 
   overdueBadge: {
     backgroundColor: "#C44736",
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 6,
+    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
   },
 
   overdueText: {
     color: "#FFFFFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
+    fontSize: 11,
   },
 });

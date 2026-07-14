@@ -15,11 +15,7 @@ import { useTransactions } from "../../context/TransactionContext";
 import Card from "../../components/Card";
 
 export default function TransactionsScreen() {
-  const {
-    transactions,
-    loading,
-    deleteTransaction,
-  } = useTransactions();
+  const { transactions, loading, deleteTransaction } = useTransactions();
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [search, setSearch] = useState("");
 
@@ -27,8 +23,7 @@ export default function TransactionsScreen() {
     const matchesFilter =
       selectedFilter === "All"
         ? true
-        : transaction.type?.toLowerCase() ===
-          selectedFilter.toLowerCase();
+        : transaction.type?.toLowerCase() === selectedFilter.toLowerCase();
 
     const transactionTitle = transaction.title ?? "";
 
@@ -40,23 +35,19 @@ export default function TransactionsScreen() {
   });
 
   const handleDelete = async (id: number) => {
-    Alert.alert(
-      "Delete Transaction",
-      "Are you sure?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
+    Alert.alert("Delete Transaction", "Are you sure?", [
+      {
+        text: "Cancel",
+        style: "cancel",
+      },
+      {
+        text: "Delete",
+        style: "destructive",
+        onPress: async () => {
+          await deleteTransaction(id.toString());
         },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            await deleteTransaction(id.toString());
-          },
-        },
-      ]
-    );
+      },
+    ]);
   };
 
   return (
@@ -81,16 +72,14 @@ export default function TransactionsScreen() {
               key={item}
               style={[
                 styles.filterButton,
-                selectedFilter === item &&
-                  styles.selectedFilter,
+                selectedFilter === item && styles.selectedFilter,
               ]}
               onPress={() => setSelectedFilter(item)}
             >
               <Text
                 style={[
                   styles.filterText,
-                  selectedFilter === item &&
-                    styles.selectedFilterText,
+                  selectedFilter === item && styles.selectedFilterText,
                 ]}
               >
                 {item}
@@ -101,11 +90,7 @@ export default function TransactionsScreen() {
 
         {/* Search */}
         <View style={styles.searchContainer}>
-          <Ionicons
-            name="search-outline"
-            size={20}
-            color="#9CA3AF"
-          />
+          <Ionicons name="search-outline" size={20} color="#9CA3AF" />
 
           <TextInput
             style={styles.searchInput}
@@ -119,42 +104,32 @@ export default function TransactionsScreen() {
         {/* Transactions list layout */}
         {loading ? (
           <View style={styles.emptyState}>
-            <ActivityIndicator
-              size="large"
-              color="#C44736"
-            />
+            <ActivityIndicator size="large" color="#C44736" />
           </View>
         ) : filteredTransactions.length === 0 ? (
           <View style={styles.emptyState}>
-            <Ionicons
-              name="wallet-outline"
-              size={60}
-              color="#D1D5DB"
-            />
+            <Ionicons name="wallet-outline" size={60} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>No Transactions</Text>
             <Text style={styles.emptyText}>
               Start by adding your first transaction.
             </Text>
           </View>
         ) : (
-         filteredTransactions
-  .filter(Boolean)
-  .map((transaction) => {
-            const currentId = transaction.id;
+          filteredTransactions.filter(Boolean).map((transaction) => {
+            console.log("Rendering transaction:", transaction.transaction_id);
+            const currentId = transaction.transaction_id;
             return (
               <Card key={currentId} style={styles.transactionCard}>
                 <TouchableOpacity
                   style={styles.transactionItem}
                   onPress={() =>
-                    router.push(
-                      `/edit-transaction?id=${currentId}`
-                    )
+                    router.push(`/edit-transaction?id=${currentId}`)
                   }
                   onLongPress={() => handleDelete(currentId)}
                 >
                   <View>
                     <Text style={styles.transactionTitle}>
-                      {transaction.title}
+                      {transaction.description}
                     </Text>
 
                     <View
@@ -200,13 +175,13 @@ export default function TransactionsScreen() {
 
                     <Text style={styles.date}>
                       {transaction.date
-                        ? new Date(transaction.date).toLocaleDateString(
+                        ? new Date(transaction.transaction_date).toLocaleDateString(
                             "en-US",
                             {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
-                            }
+                            },
                           )
                         : "No Date"}
                     </Text>
@@ -223,11 +198,7 @@ export default function TransactionsScreen() {
         style={styles.fab}
         onPress={() => router.push("/add-transaction")}
       >
-        <Ionicons
-          name="add"
-          size={32}
-          color="#FFFFFF"
-        />
+        <Ionicons name="add" size={32} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );
@@ -237,8 +208,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    paddingHorizontal: 20,
-    paddingTop: 55,
+    paddingHorizontal: 16,
+    paddingTop: 44,
   },
 
   title: {
@@ -330,7 +301,8 @@ const styles = StyleSheet.create({
   },
 
   transactionTitle: {
-    fontSize: 17,
+    fontSize: 12,
+    fontWeight: "600",
     color: "#111827",
     fontFamily: "Inter_600SemiBold",
   },

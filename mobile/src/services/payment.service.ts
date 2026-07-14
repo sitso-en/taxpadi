@@ -8,14 +8,28 @@ export const getPayments = async (params?: {
   date_to?: string;
   page?: number;
 }) => {
-  const response = await client.get(
-    ENDPOINTS.PAYMENTS.LIST,
-    {
-      params,
-    }
-  );
+  try {
+    console.log(
+      "GET URL:",
+      client.defaults.baseURL + ENDPOINTS.PAYMENTS.LIST
+    );
 
-  return response.data;
+    const response = await client.get(
+      ENDPOINTS.PAYMENTS.LIST,
+      {
+        params,
+      }
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.log("PAYMENT ERROR:", error.message);
+    console.log("STATUS:", error.response?.status);
+    console.log("DATA:", error.response?.data);
+    console.log("REQUEST URL:", error.config?.url);
+    console.log("METHOD:", error.config?.method);
+    throw error;
+  }
 };
 
 export const getPayment = async (

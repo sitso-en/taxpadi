@@ -8,6 +8,7 @@ import {
 } from "react-native";
 
 export default function WelcomeScreen() {
+  
   return (
     <View style={styles.container}>
       {/* Logo */}

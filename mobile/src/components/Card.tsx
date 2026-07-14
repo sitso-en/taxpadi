@@ -24,22 +24,15 @@ export default function Card({
 const styles = StyleSheet.create({
   card: {
     backgroundColor: "#FFFFFF",
-
-    borderRadius: 18,
-
-    padding: 18,
-
+    borderRadius: 14,
+    padding: 14,
     shadowColor: "#000",
-
-    shadowOpacity: 0.06,
-
-    shadowRadius: 10,
-
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-
-    elevation: 4,
+    elevation: 2,
   },
 });

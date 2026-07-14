@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { Audio } from "expo-av";
+// import { Audio } from "expo-av";
 import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
@@ -23,6 +23,7 @@ import {
 } from "react-native";
 
 import { useTransactions } from "../../context/TransactionContext";
+import transactions from "./transactions";
 
 const categories = [
   { label: "Sales", value: "Sales" },
@@ -35,7 +36,7 @@ const categories = [
 ];
 
 export default function AddTransactionScreen() {
-  const [showVoiceHelp, setShowVoiceHelp] = useState(false);
+  // const [showVoiceHelp, setShowVoiceHelp] = useState(false);
 
   const [type, setType] = useState<"income" | "expense">("income");
   const [amount, setAmount] = useState("");
@@ -45,11 +46,11 @@ export default function AddTransactionScreen() {
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [receiptUri, setReceiptUri] = useState<string | null>(null);
-
-  const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [audioUri, setAudioUri] = useState<string | null>(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const transactions = useTransactions();
+  // const [recording, setRecording] = useState<Audio.Recording | null>(null);
+  // const [audioUri, setAudioUri] = useState<string | null>(null);
+  // const [isRecording, setIsRecording] = useState(false);
+  // const [sound, setSound] = useState<Audio.Sound | null>(null);
 
   const [loading, setLoading] = useState(false);
 
@@ -90,10 +91,11 @@ export default function AddTransactionScreen() {
       });
 
       router.replace("/(tabs)/transactions");
-
+      await transactions.refreshTransactions();
       alert("Transaction added successfully.");
-      router.replace("/(tabs)/transactions");
+    
     } catch (error: any) {
+      console.log(error);
       alert(
         error?.response?.data?.message ??
         "Failed to save transaction."
@@ -149,95 +151,95 @@ export default function AddTransactionScreen() {
     }
   };
 
-  const toggleRecording = async () => {
-    try {
-      if (!isRecording) {
-        const permission = await Audio.requestPermissionsAsync();
+  // const toggleRecording = async () => {
+  //   try {
+  //     if (!isRecording) {
+  //       const permission = await Audio.requestPermissionsAsync();
 
-        if (!permission.granted) {
-          alert("Microphone permission denied.");
-          return;
-        }
+  //       if (!permission.granted) {
+  //         alert("Microphone permission denied.");
+  //         return;
+  //       }
 
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-        });
+  //       await Audio.setAudioModeAsync({
+  //         allowsRecordingIOS: true,
+  //         playsInSilentModeIOS: true,
+  //       });
 
-        const { recording } = await Audio.Recording.createAsync(
-          Audio.RecordingOptionsPresets.HIGH_QUALITY
-        );
+  //       const { recording } = await Audio.Recording.createAsync(
+  //         Audio.RecordingOptionsPresets.HIGH_QUALITY
+  //       );
 
-        setRecording(recording);
-        setIsRecording(true);
-      } else {
-        await recording?.stopAndUnloadAsync();
+  //       setRecording(recording);
+  //       setIsRecording(true);
+  //     } else {
+  //       await recording?.stopAndUnloadAsync();
 
-        const uri = recording?.getURI();
+  //       const uri = recording?.getURI();
 
-        if (uri) {
-          setAudioUri(uri);
+  //       if (uri) {
+  //         setAudioUri(uri);
 
-          try {
-            const response =
-              await uploadVoiceTransaction(uri);
+  //         try {
+  //           const response =
+  //             await uploadVoiceTransaction(uri);
 
-            alert("Voice transaction processed.");
+  //           alert("Voice transaction processed.");
 
-            const data = response.data;
+  //           const data = response.data;
 
-            setType(
-              data.type === "expense"
-                ? "expense"
-                : "income"
-            );
+  //           setType(
+  //             data.type === "expense"
+  //               ? "expense"
+  //               : "income"
+  //           );
 
-            setAmount(String(data.amount ?? ""));
+  //           setAmount(String(data.amount ?? ""));
 
-            setCategory(data.category ?? "");
+  //           setCategory(data.category ?? "");
 
-            setDescription(
-              data.description ?? ""
-            );
+  //           setDescription(
+  //             data.description ?? ""
+  //           );
 
-            setIsDeductible(
-              data.tax_deductible ?? false
-            );
+  //           setIsDeductible(
+  //             data.tax_deductible ?? false
+  //           );
 
-            if (data.transaction_date) {
-              setDate(
-                new Date(data.transaction_date)
-              );
-            }
-          } catch (error) {
-            console.log(error);
-            alert("Voice upload failed.");
-          }
-        }
+  //           if (data.transaction_date) {
+  //             setDate(
+  //               new Date(data.transaction_date)
+  //             );
+  //           }
+  //         } catch (error) {
+  //           console.log(error);
+  //           alert("Voice upload failed.");
+  //         }
+  //       }
 
-        setRecording(null);
-        setIsRecording(false);
-      }
-    } catch (error) {
-      console.log(error);
-    }
-  };
+  //       setRecording(null);
+  //       setIsRecording(false);
+  //     }
+  //   } catch (error) {
+  //     console.log(error);
+  //   }
+  // };
 
-  const playRecording = async () => {
-    if (!audioUri) return;
+  // const playRecording = async () => {
+  //   if (!audioUri) return;
 
-    if (sound) {
-      await sound.unloadAsync();
-    }
+  //   if (sound) {
+  //     await sound.unloadAsync();
+  //   }
 
-    const { sound: playback } = await Audio.Sound.createAsync({
-      uri: audioUri,
-    });
+  //   const { sound: playback } = await Audio.Sound.createAsync({
+  //     uri: audioUri,
+  //   });
 
-    setSound(playback);
+  //   setSound(playback);
 
-    await playback.playAsync();
-  };
+  //   await playback.playAsync();
+  // };
 
   return (
     <ScrollView
@@ -382,10 +384,10 @@ export default function AddTransactionScreen() {
         </TouchableOpacity>
 
         {/* Voice Log */}
-        <View style={styles.attachButton}>
+        {/* <View style={styles.attachButton}>
 
           {/* How to record? link */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.helpContainer}
             onPress={() => setShowVoiceHelp(true)}
           >
@@ -395,10 +397,10 @@ export default function AddTransactionScreen() {
               size={16}
               color="#C44736"
             />
-          </TouchableOpacity>
+          </TouchableOpacity> */}
 
           {/* Mic button */}
-          <TouchableOpacity
+          {/* <TouchableOpacity
             style={styles.voiceButton}
             onPress={toggleRecording}
           >
@@ -421,12 +423,12 @@ export default function AddTransactionScreen() {
             </Text>
           </TouchableOpacity>
 
-        </View>
+        </View> */}
 
       </View>
 
       {/* Play Recording Button */}
-      {audioUri && !isRecording && (
+      {/* {audioUri && !isRecording && (
         <TouchableOpacity
           style={styles.playButton}
           onPress={playRecording}
@@ -438,7 +440,7 @@ export default function AddTransactionScreen() {
           />
           <Text style={styles.playText}>Play Recording</Text>
         </TouchableOpacity>
-      )}
+      )} */}
 
       {/* Save */}
       <TouchableOpacity
@@ -452,7 +454,7 @@ export default function AddTransactionScreen() {
       </TouchableOpacity>
 
       {/* Voice Help Popup */}
-      {showVoiceHelp && (
+      {/* {showVoiceHelp && (
         <View style={styles.modalOverlay}>
           <View style={styles.modalCard}>
             <Ionicons name="mic-outline" size={60} color="#C44736" />
@@ -474,7 +476,7 @@ export default function AddTransactionScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      )}
+      )} */}
 
     </ScrollView>
   );
@@ -484,17 +486,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    paddingHorizontal: 20,
-    paddingTop: 55,
+    paddingHorizontal: 16,
+    paddingTop: 44,
   },
   header: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 30,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: "#111827",
   },

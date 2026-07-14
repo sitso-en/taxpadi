@@ -145,8 +145,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    paddingHorizontal: 24,
-    paddingTop: 60,
+    paddingHorizontal: 16,
+    paddingTop: 44,
   },
   iconCircle: {
     width: 110,

@@ -19,8 +19,8 @@ client.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
 
-    console.log("AUTH HEADER:", config.headers.Authorization);
-
+    console.log("FINAL HEADERS:", config.headers);
+    
     return config;
   },
   (error) => Promise.reject(error)

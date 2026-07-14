@@ -15,9 +15,9 @@ type TransactionContextType = {
   deleteTransaction: (id: string) => Promise<void>;
 };
 
-const TransactionContext = createContext<
-  TransactionContextType | undefined
->(undefined);
+const TransactionContext = createContext<TransactionContextType | undefined>(
+  undefined,
+);
 export function TransactionProvider({
   children,
 }: {
@@ -30,27 +30,30 @@ export function TransactionProvider({
     setLoading(true);
 
     try {
-      const response = await getTransactions();
+      const response = await getTransactions({
+        page: 1,
+        limit: 20,
+      });
 
       setTransactions(
-        response.data?.transactions ?? response.transactions ?? []
+        response.data?.transactions ?? response.transactions ?? [],
       );
     } catch (error: any) {
       console.log(error);
 
-console.log(error.response?.status);
+      console.log(error.response?.status);
 
-console.log(error.response?.data);
+      console.log(error.response?.data);
 
-console.error("Failed to load transactions", error);
+      console.error("Failed to load transactions", error);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    refreshTransactions();
-  }, []);
+  // useEffect(() => {
+  //   refreshTransactions();
+  // }, []);
 
   const addTransaction = async (data: any) => {
     await createTransaction(data);
@@ -84,14 +87,10 @@ console.error("Failed to load transactions", error);
 }
 
 export function useTransactions() {
-  const context = useContext(
-    TransactionContext
-  );
+  const context = useContext(TransactionContext);
 
   if (!context) {
-    throw new Error(
-      "useTransactions must be used inside TransactionProvider"
-    );
+    throw new Error("useTransactions must be used inside TransactionProvider");
   }
 
   return context;

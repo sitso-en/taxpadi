@@ -1,6 +1,6 @@
 import client from "@/api/client";
 import { ENDPOINTS } from "@/api/endpoints";
-import { saveTokens, clearTokens } from "@/utils/storage";
+import { saveTokens, clearTokens, getAccessToken } from "@/utils/storage";
 import { LoginResponse } from "@/types/auth";
 
 export const login = async (
@@ -20,9 +20,6 @@ export const login = async (
       phone,
       password,
       device_info: deviceInfo,
-    },
-    {
-      timeout: 5000,
     }
   );
 
@@ -33,10 +30,16 @@ export const login = async (
     !response.data.data.requires_otp &&
     response.data.data.access_token
   ) {
+
     await saveTokens(
       response.data.data.access_token,
       response.data.data.refresh_token
     );
+
+    console.log("TOKEN SAVED");
+
+    const token = await getAccessToken();
+    console.log("TOKEN AFTER SAVE:", token);
   }
 
   return response.data;

@@ -49,6 +49,28 @@ const defaultUser: User = {
   active_profile: false,
 };
 
+const normalizeStoredUser = (storedUser: Record<string, any> | null | undefined): User => {
+  if (!storedUser) {
+    return defaultUser;
+  }
+
+  const { full_name, fullName, ...rest } = storedUser;
+
+  return {
+    ...(rest as Partial<User>),
+    fullName: fullName ?? full_name ?? defaultUser.fullName,
+    phoneNumber: storedUser.phoneNumber ?? storedUser.phone ?? "",
+    email: storedUser.email ?? "",
+    region: storedUser.region ?? "",
+    category: storedUser.category ?? "",
+    plan: storedUser.plan ?? "FREE",
+    label: storedUser.label ?? "",
+    tin: storedUser.tin ?? "",
+    taxpayer_category: storedUser.taxpayer_category ?? "",
+    active_profile: storedUser.active_profile ?? false,
+  } as User;
+};
+
 export function UserProvider({
   children,
 }: {
@@ -63,28 +85,20 @@ export function UserProvider({
   // Load saved user data
 
   useEffect(() => {
-    const loadUser =
-      async () => {
-        try {
-          const storedUser =
-            await AsyncStorage.getItem(
-              "user"
-            );
+    const loadUser = async () => {
+      try {
+        const storedUser = await AsyncStorage.getItem("user");
 
-          if (storedUser) {
-            setUser(
-              JSON.parse(storedUser)
-            );
-          }
-        } catch (error) {
-          console.log(
-            "Failed to load user:",
-            error
-          );
-        } finally {
-          setLoading(false);
+        if (storedUser) {
+          const parsedUser = JSON.parse(storedUser);
+          setUser(normalizeStoredUser(parsedUser));
         }
-      };
+      } catch (error) {
+        console.log("Failed to load user:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
     loadUser();
   }, []);
@@ -94,20 +108,18 @@ export function UserProvider({
   useEffect(() => {
     if (loading) return;
 
-    const saveUser =
-      async () => {
-        try {
-          await AsyncStorage.setItem(
-            "user",
-            JSON.stringify(user)
-          );
-        } catch (error) {
-          console.log(
-            "Failed to save user:",
-            error
-          );
-        }
-      };
+    const saveUser = async () => {
+      try {
+        const { fullName, ...rest } = user;
+
+        await AsyncStorage.setItem(
+          "user",
+          JSON.stringify({ ...rest, full_name: fullName })
+        );
+      } catch (error) {
+        console.log("Failed to save user:", error);
+      }
+    };
 
     saveUser();
   }, [user, loading]);

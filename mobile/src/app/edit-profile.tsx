@@ -13,8 +13,8 @@ import {
 export default function TaxProfileScreen() {
   const { user } = useUser();
 
-  const initials = user?.label
-    ? user?.label
+  const initials = user?.fullName
+    ? user?.fullName
         .split(" ")
         .map((n: string) => n[0])
         .join("")
@@ -44,7 +44,7 @@ export default function TaxProfileScreen() {
           <Text style={styles.avatarText}>{initials}</Text>
         </View>
 
-        <Text style={styles.name}>{user?.label || "User"}</Text>
+        <Text style={styles.name}>{user?.fullName || "User"}</Text>
 
         <Text style={styles.infoText}>
           {user?.tin || "No TIN available"}
@@ -113,8 +113,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    paddingHorizontal: 20,
-    paddingTop: 55,
+    paddingHorizontal: 16,
+    paddingTop: 44,
   },
 
   header: {

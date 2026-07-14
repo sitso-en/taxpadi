@@ -7,17 +7,28 @@ export const getTransactions = async (params?: {
   page?: number;
   limit?: number;
 }) => {
-  const response = await client.get(
-    ENDPOINTS.TRANSACTIONS.LIST,
-    {
-      params,
-      headers: {
-        Authorization: undefined,
-      },
-    }
-  );
+  try {
+    console.log(
+      "GET URL:",
+      client.defaults.baseURL + ENDPOINTS.TRANSACTIONS.LIST
+    );
 
-  return response.data;
+    const response = await client.get(
+      ENDPOINTS.TRANSACTIONS.LIST,
+      {
+        params,
+      }
+    );
+
+    return response.data;
+  } catch (error: any) {
+    console.log("TRANSACTION ERROR:", error.message);
+    console.log("STATUS:", error.response?.status);
+    console.log("DATA:", error.response?.data);
+    console.log("REQUEST URL:", error.config?.url);
+    console.log("METHOD:", error.config?.method);
+    throw error;
+  }
 };
 
 export const getTransaction = async (id: string) => {

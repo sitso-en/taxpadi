@@ -29,8 +29,8 @@ export default function MoreScreen() {
   ).length;
 
   // User initials
-  const initials = user?.label
-    ? user.label
+  const initials = user?.fullName
+    ? user.fullName
         .split(" ")
         .map((name: string) => name[0])
         .join("")
@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#FAFAFA",
-    paddingHorizontal: 20,
-    paddingTop: 55,
+    paddingHorizontal: 16,
+    paddingTop: 44,
   },
 
   title: {

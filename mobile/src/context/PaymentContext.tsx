@@ -37,9 +37,9 @@ export function PaymentProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  useEffect(() => {
-    refreshPayments();
-  }, []);
+  // useEffect(() => {
+  //   refreshPayments();
+  // }, []);
 
   const createPayment = async (data: any) => {
     const response = await initiatePayment(data);
