@@ -13,11 +13,13 @@ import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.PaymentService;
 import jakarta.validation.Valid;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @RestController
@@ -35,8 +37,8 @@ public class PaymentController {
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @RequestParam(required = false) String status,
             @RequestParam(name = "payment_method", required = false) String paymentMethod,
-            @RequestParam(name = "date_from", required = false) String dateFrom,
-            @RequestParam(name = "date_to", required = false) String dateTo,
+            @RequestParam(name = "date_from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
+            @RequestParam(name = "date_to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
             @RequestParam(defaultValue = "1") int page) {
         User user = userDetails.getUser();
         PaymentListResponse data = paymentService.getPayments(user, status, paymentMethod, dateFrom, dateTo, page);

@@ -95,12 +95,12 @@ public class PaymentService {
 
     @Transactional(readOnly = true)
     public PaymentListResponse getPayments(User user, String status, String method,
-                                           String dateFrom, String dateTo, int page) {
+                                           LocalDate dateFrom, LocalDate dateTo, int page) {
         int limit = 20;
         int pageIndex = Math.max(0, page - 1);
 
-        LocalDateTime from = dateFrom != null ? LocalDate.parse(dateFrom).atStartOfDay() : null;
-        LocalDateTime to = dateTo != null ? LocalDate.parse(dateTo).atTime(23, 59, 59) : null;
+        LocalDateTime from = dateFrom != null ? dateFrom.atStartOfDay() : null;
+        LocalDateTime to = dateTo != null ? dateTo.atTime(23, 59, 59) : null;
 
         Specification<Payment> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
