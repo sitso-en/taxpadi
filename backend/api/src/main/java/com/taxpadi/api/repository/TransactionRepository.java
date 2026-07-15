@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,6 +60,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         Pageable pageable
     );
 
+    List<Transaction> findAllByUserOrderByTransactionDateDesc(User user);
+
     Optional<Transaction> findByTransactionIdAndUser(UUID transactionId, User user);
 
     @Query("SELECT SUM(t.amount) FROM Transaction t WHERE t.user = :user AND t.type = :type AND t.transactionDate >= :from AND t.transactionDate <= :to")
@@ -92,8 +95,33 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         @Param("to") LocalDate to
     );
 
+    @Query("SELECT t FROM Transaction t WHERE t.user = :user AND t.transactionDate >= :from AND t.transactionDate <= :to ORDER BY t.transactionDate DESC")
+    List<Transaction> findAllByUserAndDateRange(
+        @Param("user") User user,
+        @Param("from") LocalDate from,
+        @Param("to") LocalDate to
+    );
+
     @Query("SELECT COUNT(t) FROM Transaction t WHERE t.user = :user AND t.transactionDate >= :from AND t.transactionDate <= :to")
     long countByUserAndDateRange(
+        @Param("user") User user,
+        @Param("from") LocalDate from,
+        @Param("to") LocalDate to
+    );
+
+    @Query("SELECT COUNT(t) FROM Transaction t WHERE t.createdAt >= :from AND t.createdAt <= :to")
+    long countByCreatedAtBetween(
+        @Param("from") LocalDateTime from,
+        @Param("to") LocalDateTime to
+    );
+
+    Optional<Transaction> findTopByUserAndTypeOrderByTransactionDateDesc(User user, String type);
+
+    @Query("SELECT DISTINCT EXTRACT(YEAR FROM t.transactionDate) FROM Transaction t WHERE t.user = :user ORDER BY 1")
+    List<Integer> findDistinctYearsByUser(@Param("user") User user);
+
+    @Query("SELECT SUM(t.withholdingAmount) FROM Transaction t WHERE t.user = :user AND t.withholdingApplicable = true AND t.transactionDate >= :from AND t.transactionDate <= :to")
+    BigDecimal sumWithholdingByUserAndDateRange(
         @Param("user") User user,
         @Param("from") LocalDate from,
         @Param("to") LocalDate to

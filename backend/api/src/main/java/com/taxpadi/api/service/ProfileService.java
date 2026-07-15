@@ -1,14 +1,17 @@
 package com.taxpadi.api.service;
 
 import com.taxpadi.api.dto.profile.*;
+import com.taxpadi.api.constant.SubscriptionStatus;
+import com.taxpadi.api.constant.TaxReturnStatus;
 import com.taxpadi.api.exception.ConflictException;
 import com.taxpadi.api.exception.ForbiddenException;
 import com.taxpadi.api.exception.NotFoundException;
-import com.taxpadi.api.model.SubscriptionTier;
 import com.taxpadi.api.model.TaxProfile;
 import com.taxpadi.api.model.TaxpayerCategory;
 import com.taxpadi.api.model.User;
+import com.taxpadi.api.repository.SubscriptionRepository;
 import com.taxpadi.api.repository.TaxProfileRepository;
+import com.taxpadi.api.repository.TaxReturnRepository;
 import com.taxpadi.api.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,10 +24,15 @@ public class ProfileService {
 
     private final TaxProfileRepository taxProfileRepository;
     private final UserRepository userRepository;
+    private final TaxReturnRepository taxReturnRepository;
+    private final SubscriptionRepository subscriptionRepository;
 
-    public ProfileService(TaxProfileRepository taxProfileRepository, UserRepository userRepository) {
+    public ProfileService(TaxProfileRepository taxProfileRepository, UserRepository userRepository,
+                          TaxReturnRepository taxReturnRepository, SubscriptionRepository subscriptionRepository) {
         this.taxProfileRepository = taxProfileRepository;
         this.userRepository = userRepository;
+        this.taxReturnRepository = taxReturnRepository;
+        this.subscriptionRepository = subscriptionRepository;
     }
 
     public ProfileListResponse getProfiles(User user) {
@@ -34,7 +42,7 @@ public class ProfileService {
                 p.getProfileId(),
                 p.getLabel(),
                 p.getTaxpayerCategory().name().toLowerCase(),
-                p.getTin(),
+                p.getTin() != null ? p.getTin() : user.getTin(),
                 p.getProfileId().equals(user.getActiveProfileId()),
                 p.getCreatedAt()
             )).toList();
@@ -43,7 +51,8 @@ public class ProfileService {
 
     @Transactional
     public CreateProfileResponse createProfile(User user, CreateProfileRequest request) {
-        int maxProfiles = user.getSubscriptionTier() == SubscriptionTier.FREE ? 1 : 5;
+        boolean isPaid = subscriptionRepository.existsByUserAndStatus(user, SubscriptionStatus.ACTIVE);
+        int maxProfiles = isPaid ? 5 : 1;
         if (taxProfileRepository.countByUser(user) >= maxProfiles) {
             throw new ConflictException("You have reached the maximum number of profiles allowed on your plan");
         }
@@ -74,9 +83,14 @@ public class ProfileService {
         TaxProfile profile = taxProfileRepository.findByProfileIdAndUser(profileId, user)
             .orElseThrow(() -> new NotFoundException("No profile found with this ID"));
 
-        // TODO: block tax_year_start change if a return has been filed (check tax_returns in Group 14)
+        if (request.getTaxYearStart() != null) {
+            if (taxReturnRepository.existsByUserAndStatus(user, TaxReturnStatus.SUBMITTED)) {
+                throw new ForbiddenException("Tax year start cannot be changed after a return has been filed");
+            }
+            profile.setTaxYearStart(request.getTaxYearStart());
+        }
         if (request.getLabel() != null) profile.setLabel(request.getLabel());
-        if (request.getTaxYearStart() != null) profile.setTaxYearStart(request.getTaxYearStart());
+        if (request.getTin() != null) profile.setTin(request.getTin());
 
         TaxProfile saved = taxProfileRepository.save(profile);
 
@@ -125,7 +139,7 @@ public class ProfileService {
             profile.getProfileId(),
             profile.getLabel(),
             profile.getTaxpayerCategory().name().toLowerCase(),
-            profile.getTin()
+            profile.getTin() != null ? profile.getTin() : user.getTin()
         );
     }
 }

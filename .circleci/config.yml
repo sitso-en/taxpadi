@@ -1,0 +1,53 @@
+version: 2.1
+
+orbs:
+  maven: circleci/maven@2.0
+
+jobs:
+  build-and-test:
+    docker:
+      - image: cimg/openjdk:21.0
+        environment:
+          SPRING_PROFILES_ACTIVE: test
+      - image: cimg/postgres:15.0
+        environment:
+          POSTGRES_DB: taxpadi_test
+          POSTGRES_USER: taxpadi_user
+          POSTGRES_PASSWORD: taxpadi_password
+    working_directory: ~/project/backend/api
+    steps:
+      - checkout:
+          path: ~/project
+      - restore_cache:
+          keys:
+            - maven-deps-{{ checksum "pom.xml" }}
+            - maven-deps-
+      - run:
+          name: Build and test
+          command: mvn verify -B -Dspring.datasource.url=jdbc:postgresql://localhost:5432/taxpadi_test -Dspring.datasource.username=taxpadi_user -Dspring.datasource.password=taxpadi_password
+      - save_cache:
+          key: maven-deps-{{ checksum "pom.xml" }}
+          paths:
+            - ~/.m2
+      - store_test_results:
+          path: target/surefire-reports
+
+  deploy:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - run:
+          name: Trigger Render deploy
+          command: |
+            curl -X POST "$RENDER_DEPLOY_HOOK_URL"
+
+workflows:
+  build-test-deploy:
+    jobs:
+      - build-and-test
+      - deploy:
+          requires:
+            - build-and-test
+          filters:
+            branches:
+              only: main

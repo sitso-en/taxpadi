@@ -1,12 +1,20 @@
 package com.taxpadi.api.dto.paye;
 
+import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public class CreateEmployeeRequest {
 
+    @NotBlank(message = "Full name is required")
     private String fullName;
+
     private String position;
+
+    @NotNull(message = "Gross salary is required")
+    @DecimalMin(value = "0.00", message = "Gross salary cannot be negative")
     private BigDecimal grossSalary;
     private BigDecimal transportAllowance;
     private BigDecimal housingAllowance;

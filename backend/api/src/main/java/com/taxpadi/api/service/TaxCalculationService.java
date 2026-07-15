@@ -5,7 +5,9 @@ import com.taxpadi.api.dto.tax.*;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.TaxCalculation;
 import com.taxpadi.api.model.User;
+import com.taxpadi.api.repository.PaymentRepository;
 import com.taxpadi.api.repository.TaxCalculationRepository;
+import com.taxpadi.api.repository.TransactionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -28,22 +30,34 @@ public class TaxCalculationService {
     private final Map<String, AtomicInteger> recalcCounts = new ConcurrentHashMap<>();
 
     private final TaxCalculationRepository taxCalculationRepository;
+    private final TransactionRepository transactionRepository;
+    private final PaymentRepository paymentRepository;
     private final GhanaTaxEngine taxEngine;
 
-    public TaxCalculationService(TaxCalculationRepository taxCalculationRepository, GhanaTaxEngine taxEngine) {
+    public TaxCalculationService(TaxCalculationRepository taxCalculationRepository,
+                                  TransactionRepository transactionRepository,
+                                  PaymentRepository paymentRepository,
+                                  GhanaTaxEngine taxEngine) {
         this.taxCalculationRepository = taxCalculationRepository;
+        this.transactionRepository = transactionRepository;
+        this.paymentRepository = paymentRepository;
         this.taxEngine = taxEngine;
     }
 
-    public TaxLiabilityResponse getLiability(User user) {
-        List<TaxCalculation> calculations = taxCalculationRepository.findAllByUser(user);
-        if (calculations.isEmpty()) {
-            throw new NotFoundException("No tax calculations found. Log your first transaction to get started.");
+    public TaxLiabilityResponse getLiability(User user, LocalDate from, LocalDate to) {
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new IllegalArgumentException("from date must be before to date");
         }
 
-        int taxYear = LocalDate.now().getYear();
-        LocalDate periodStart = LocalDate.of(taxYear, 1, 1);
-        LocalDate periodEnd = LocalDate.of(taxYear, 12, 31);
+        List<TaxCalculation> calculations = (from != null && to != null)
+            ? taxCalculationRepository.findAllByUserAndDateRange(user, from, to)
+            : taxCalculationRepository.findAllByUser(user);
+        if (calculations.isEmpty()) {
+            throw new NotFoundException("No tax calculations found for this period. Log transactions or run a recalculation first.");
+        }
+
+        LocalDate periodStart = from != null ? from : calculations.stream().map(TaxCalculation::getPeriodStart).min(LocalDate::compareTo).orElse(LocalDate.now());
+        LocalDate periodEnd   = to   != null ? to   : calculations.stream().map(TaxCalculation::getPeriodEnd).max(LocalDate::compareTo).orElse(LocalDate.now());
 
         List<TaxBreakdownItemDto> breakdown = calculations.stream()
             .map(c -> new TaxBreakdownItemDto(
@@ -59,12 +73,21 @@ public class TaxCalculationService {
             .map(TaxBreakdownItemDto::getTaxLiability)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        BigDecimal totalAmountPaid = java.util.Optional.ofNullable(
+            (from != null && to != null)
+                ? paymentRepository.sumSuccessfulTaxPaymentsByUserAndDateRange(user, from, to)
+                : paymentRepository.sumAllSuccessfulTaxPaymentsByUser(user))
+            .orElse(BigDecimal.ZERO);
+
+        BigDecimal netLiability = total.subtract(totalAmountPaid).max(BigDecimal.ZERO);
+
         LocalDateTime lastUpdated = calculations.stream()
             .map(TaxCalculation::getCalculatedAt)
             .max(LocalDateTime::compareTo)
             .orElse(LocalDateTime.now());
 
-        return new TaxLiabilityResponse(taxYear, periodStart, periodEnd, total, breakdown, lastUpdated);
+        int taxYear = periodStart.getYear();
+        return new TaxLiabilityResponse(taxYear, periodStart, periodEnd, total, totalAmountPaid, netLiability, breakdown, lastUpdated);
     }
 
     public TaxLiabilityDetailResponse getLiabilityByType(User user, String taxType, Integer year, Integer month) {
@@ -137,30 +160,54 @@ public class TaxCalculationService {
             throw new IllegalStateException("Too many recalculation requests");
         }
 
-        List<TaxCalculation> calculations = taxCalculationRepository.findAllByUser(user);
+        List<Integer> years = transactionRepository.findDistinctYearsByUser(user);
+        if (years.isEmpty()) {
+            throw new NotFoundException("No transactions found. Log your first transaction to get started.");
+        }
 
-        List<String> updated = calculations.stream()
-            .map(c -> {
-                BigDecimal taxableIncome = c.getGrossIncome().subtract(c.getTotalDeductions());
-                c.setTaxableIncome(taxableIncome);
+        List<String> updated = new java.util.ArrayList<>();
+        for (int year : years) {
+            LocalDate start = LocalDate.of(year, 1, 1);
+            LocalDate end   = LocalDate.of(year, 12, 31);
 
-                BigDecimal liability = switch (c.getTaxType()) {
-                    case "income_tax"  -> taxEngine.calculateIncomeTax(taxableIncome);
-                    case "vat"         -> taxEngine.calculateVat(taxableIncome);
-                    case "paye"        -> taxEngine.calculatePaye(taxableIncome);
-                    case "withholding" -> c.getTaxLiability();
-                    default            -> BigDecimal.ZERO;
-                };
+            BigDecimal grossIncome = java.util.Optional.ofNullable(
+                transactionRepository.sumAmountByUserAndTypeAndDateRange(user, "income", start, end))
+                .orElse(BigDecimal.ZERO);
+            BigDecimal totalDeductions = java.util.Optional.ofNullable(
+                transactionRepository.sumDeductibleExpensesByUserAndDateRange(user, start, end))
+                .orElse(BigDecimal.ZERO);
+            BigDecimal taxableIncome = grossIncome.subtract(totalDeductions).max(BigDecimal.ZERO);
+            BigDecimal liability = taxEngine.calculateIncomeTax(taxableIncome);
 
-                c.setTaxLiability(liability);
-                taxCalculationRepository.save(c);
-                return c.getTaxType();
-            }).toList();
+            TaxCalculation calc = taxCalculationRepository
+                .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, "income_tax", start, end)
+                .orElseGet(() -> {
+                    TaxCalculation c = new TaxCalculation();
+                    c.setUser(user);
+                    c.setTaxType("income_tax");
+                    c.setPeriodStart(start);
+                    c.setPeriodEnd(end);
+                    return c;
+                });
+
+            calc.setGrossIncome(grossIncome);
+            calc.setTotalDeductions(totalDeductions);
+            calc.setTaxableIncome(taxableIncome);
+            calc.setTaxLiability(liability);
+            taxCalculationRepository.save(calc);
+            updated.add("income_tax:" + year);
+        }
 
         BigDecimal newTotal = taxCalculationRepository.findAllByUser(user).stream()
             .map(TaxCalculation::getTaxLiability)
             .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        return new RecalculateResponse(true, updated, newTotal, LocalDateTime.now());
+        BigDecimal totalAmountPaid = java.util.Optional.ofNullable(
+            paymentRepository.sumAllSuccessfulTaxPaymentsByUser(user))
+            .orElse(BigDecimal.ZERO);
+
+        BigDecimal netLiability = newTotal.subtract(totalAmountPaid).max(BigDecimal.ZERO);
+
+        return new RecalculateResponse(true, updated, newTotal, totalAmountPaid, netLiability, LocalDateTime.now());
     }
 }

@@ -1,15 +1,20 @@
 package com.taxpadi.api.service;
 
+import com.taxpadi.api.constant.SubscriptionStatus;
 import com.taxpadi.api.dto.referral.*;
 import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.exception.ForbiddenException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.OfferType;
 import com.taxpadi.api.model.ReferralOffer;
 import com.taxpadi.api.model.ReferralStatus;
 import com.taxpadi.api.model.User;
+import com.taxpadi.api.repository.PartnerRepository;
 import com.taxpadi.api.repository.ReferralOfferRepository;
+import com.taxpadi.api.repository.SubscriptionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,12 +26,28 @@ import java.util.UUID;
 public class ReferralService {
 
     private final ReferralOfferRepository referralOfferRepository;
+    private final PartnerRepository partnerRepository;
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final SubscriptionRepository subscriptionRepository;
 
-    public ReferralService(ReferralOfferRepository referralOfferRepository) {
+    public ReferralService(ReferralOfferRepository referralOfferRepository,
+                           PartnerRepository partnerRepository,
+                           BCryptPasswordEncoder passwordEncoder,
+                           SubscriptionRepository subscriptionRepository) {
         this.referralOfferRepository = referralOfferRepository;
+        this.partnerRepository = partnerRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.subscriptionRepository = subscriptionRepository;
+    }
+
+    private void requirePaidSubscription(User user) {
+        if (!subscriptionRepository.existsByUserAndStatus(user, SubscriptionStatus.ACTIVE)) {
+            throw new ForbiddenException("Referral offers require an active TaxPadi subscription.");
+        }
     }
 
     public ReferralListResponse getOffers(User user, String offerType, int page, int limit) {
+        requirePaidSubscription(user);
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 20);
 
@@ -51,6 +72,7 @@ public class ReferralService {
     }
 
     public EligibilityResponse checkEligibility(User user) {
+        requirePaidSubscription(user);
         long monthsOfData = java.time.temporal.ChronoUnit.MONTHS.between(
             user.getCreatedAt().toLocalDate().atStartOfDay(),
             LocalDateTime.now()
@@ -74,6 +96,7 @@ public class ReferralService {
 
     @Transactional
     public OfferStatusResponse markViewed(User user, UUID id) {
+        requirePaidSubscription(user);
         ReferralOffer offer = findOffer(user, id);
         if (offer.getStatus() == ReferralStatus.ACTIVE) {
             offer.setStatus(ReferralStatus.VIEWED);
@@ -84,6 +107,7 @@ public class ReferralService {
 
     @Transactional
     public ClickedOfferResponse markClicked(User user, UUID id) {
+        requirePaidSubscription(user);
         ReferralOffer offer = findOffer(user, id);
         if (offer.getExpiresAt() != null && offer.getExpiresAt().isBefore(LocalDateTime.now())) {
             offer.setStatus(ReferralStatus.EXPIRED);
@@ -104,6 +128,7 @@ public class ReferralService {
 
     @Transactional
     public OfferStatusResponse dismiss(User user, UUID id) {
+        requirePaidSubscription(user);
         ReferralOffer offer = findOffer(user, id);
         offer.setStatus(ReferralStatus.DISMISSED);
         referralOfferRepository.save(offer);
@@ -111,9 +136,14 @@ public class ReferralService {
     }
 
     @Transactional
-    public ConvertedOfferResponse markConverted(UUID id, MarkConvertedRequest request) {
+    public ConvertedOfferResponse markConverted(UUID id, MarkConvertedRequest request, String apiKey) {
         ReferralOffer offer = referralOfferRepository.findById(id)
             .orElseThrow(() -> new NotFoundException("Offer not found"));
+
+        partnerRepository.findByNameIgnoreCase(offer.getPartnerName())
+            .filter(p -> Boolean.TRUE.equals(p.getIsActive()))
+            .filter(p -> apiKey != null && passwordEncoder.matches(apiKey, p.getApiKeyHash()))
+            .orElseThrow(() -> new ForbiddenException("Invalid or missing partner API key."));
         offer.setStatus(ReferralStatus.CONVERTED);
         offer.setPartnerReference(request.getPartnerReference());
         offer.setConvertedAt(request.getConvertedAt() != null

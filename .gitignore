@@ -1,13 +1,72 @@
-Add these lines under the Mobile (React Native / Expo) section:
+# HTTP request files
+requests.http
+
+# Maven build output
+target/
+
+# Compiled class file
+*.class
+
+# Log file
+*.log
+
+# BlueJ files
+*.ctxt
+
+# Mobile Tools for Java (J2ME)
+.mtj.tmp/
+
+# Package Files #
+*.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# virtual machine crash logs, see http://www.java.com/en/download/help/error_hotspot.xml
+hs_err_pid*
+replay_pid*
+
 
 # Mobile (React Native / Expo)
 mobile/node_modules/
 mobile/.expo/
 mobile/dist/
 mobile/build/
+mobile/.env
+mobile/*.jks
+mobile/*.p8
+mobile/*.p12
+mobile/*.key
+mobile/*.mobileprovision
 
-# Add these
-node_modules/
-.expo/
-mobile/taxpadi-mobile/node_modules/
-mobile/taxpadi-mobile/.expo/
+# Environment files
+.env
+*.env
+!.env.example
+
+
+# IDE files
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+
+Thumbs.db.claude/
+CLAUDE.md
+.claude/
+
+google-services.json
+
+
+CBG-bank-statement.csv
+TaxPadi API-documentation.html
+docs/refactor1.md
+docs/refactor2.md
+docs/refactor3.md
+run.sh
+taxpadi-api.json
+test-statement-100.csv

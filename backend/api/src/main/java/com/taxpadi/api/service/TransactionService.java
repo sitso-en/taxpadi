@@ -28,6 +28,7 @@ import com.taxpadi.api.dto.transaction.ImportHistoryItem;
 import com.taxpadi.api.dto.transaction.ImportHistoryListResponse;
 import com.taxpadi.api.dto.transaction.ImportStatementResponse;
 import com.taxpadi.api.dto.transaction.PaginationInfo;
+import com.taxpadi.api.dto.transaction.ScanTransactionResponse;
 import com.taxpadi.api.dto.transaction.TransactionDetailResponse;
 import com.taxpadi.api.dto.transaction.TransactionListResponse;
 import com.taxpadi.api.dto.transaction.TransactionSummaryResponse;
@@ -35,6 +36,7 @@ import com.taxpadi.api.dto.transaction.UpdateTransactionRequest;
 import com.taxpadi.api.dto.transaction.UpdateTransactionResponse;
 import com.taxpadi.api.dto.transaction.ValidateImportResponse;
 import com.taxpadi.api.dto.transaction.VaultSuggestion;
+import com.taxpadi.api.dto.transaction.VoiceTransactionResponse;
 import com.taxpadi.api.dto.transaction.WithholdingInfo;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.ConflictException;
@@ -53,6 +55,8 @@ import com.taxpadi.api.model.User;
 public class TransactionService {
 
     private static final long MAX_FILE_SIZE = 10 * 1024 * 1024;
+    private static final long MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+    private static final long MAX_AUDIO_SIZE = 25 * 1024 * 1024;
     private static final List<String> AMBIGUOUS_KEYWORDS = List.of(
         "transfer", "float", "commission", "adjustment");
 
@@ -61,17 +65,26 @@ public class TransactionService {
     private final TaxCalculationRepository taxCalculationRepository;
     private final GhanaTaxEngine taxEngine;
     private final AuditLogService auditLogService;
+    private final CloudinaryService cloudinaryService;
+    private final OcrService ocrService;
+    private final SpeechService speechService;
 
     public TransactionService(TransactionRepository transactionRepository,
             ImportHistoryRepository importHistoryRepository,
             TaxCalculationRepository taxCalculationRepository,
             GhanaTaxEngine taxEngine,
-            AuditLogService auditLogService) {
+            AuditLogService auditLogService,
+            CloudinaryService cloudinaryService,
+            OcrService ocrService,
+            SpeechService speechService) {
         this.transactionRepository = transactionRepository;
         this.importHistoryRepository = importHistoryRepository;
         this.taxCalculationRepository = taxCalculationRepository;
         this.taxEngine = taxEngine;
         this.auditLogService = auditLogService;
+        this.cloudinaryService = cloudinaryService;
+        this.ocrService = ocrService;
+        this.speechService = speechService;
     }
 
 
@@ -165,7 +178,7 @@ public class TransactionService {
         t.setWithholdingAmount(whtAmount);
 
         transactionRepository.save(t);
-        updateIncomeTaxCalculation(user);
+        updateIncomeTaxCalculationForYear(user, transactionDate.getYear());
         auditLogService.log(user, "TRANSACTION_CREATED",
             "Transaction " + t.getTransactionId() + " created. Type: " + type
                 + ", Amount: " + amount + ", Category: " + category, null);
@@ -208,6 +221,110 @@ public class TransactionService {
                 });
         }
 
+        return response;
+    }
+
+    @Transactional
+    public ScanTransactionResponse scan(User user, MultipartFile image, String transactionType) {
+        String filename = image.getOriginalFilename() != null ? image.getOriginalFilename().toLowerCase() : "";
+        if (!filename.endsWith(".jpg") && !filename.endsWith(".jpeg") && !filename.endsWith(".png") && !filename.endsWith(".webp"))
+            throw new BadRequestException("Only JPG, PNG, and WebP images are supported. If you have a HEIC photo (iPhone), convert it to JPG first");
+        if (image.getSize() > MAX_IMAGE_SIZE)
+            throw new BadRequestException("Image size exceeds the 5MB limit");
+        if (!transactionType.equals("income") && !transactionType.equals("expense"))
+            throw new BadRequestException("transaction_type must be income or expense");
+
+        byte[] imageBytes;
+        try { imageBytes = image.getBytes(); } catch (Exception e) {
+            throw new BadRequestException("Could not read image file");
+        }
+
+        String mediaType = filename.endsWith(".png") ? "image/png"
+                : filename.endsWith(".webp") ? "image/webp"
+                : "image/jpeg";
+        String receiptUrl = cloudinaryService.uploadFile(imageBytes, "receipts",
+            "receipt-" + user.getUserId() + "-" + System.currentTimeMillis());
+
+        OcrService.OcrResult ocr = ocrService.extractFromImage(imageBytes, mediaType);
+
+        Transaction t = new Transaction();
+        t.setUser(user);
+        t.setType(transactionType);
+        t.setAmount(ocr.amount);
+        t.setCategory(ocr.category);
+        t.setDescription(ocr.description);
+        t.setEntryMethod("scan");
+        t.setReceiptUrl(receiptUrl);
+        t.setTaxDeductible(false);
+        t.setWithholdingApplicable(false);
+        t.setWithholdingAmount(BigDecimal.ZERO);
+        t.setTransactionDate(ocr.transactionDate);
+        transactionRepository.save(t);
+        updateIncomeTaxCalculationForYear(user, t.getTransactionDate().getYear());
+        auditLogService.log(user, "TRANSACTION_CREATED",
+            "Scan transaction " + t.getTransactionId() + " created via OCR. Amount: " + ocr.amount, null);
+
+        ScanTransactionResponse response = new ScanTransactionResponse();
+        response.setTransactionId(t.getTransactionId());
+        response.setType(t.getType());
+        response.setAmount(t.getAmount());
+        response.setCategory(t.getCategory());
+        response.setDescription(t.getDescription());
+        response.setEntryMethod("scan");
+        response.setReceiptUrl(receiptUrl);
+        response.setTaxDeductible(false);
+        response.setTransactionDate(t.getTransactionDate());
+        response.setOcrConfidence(ocr.confidence);
+        response.setNeedsReview(ocr.needsReview);
+        response.setTaxLiabilityUpdated(true);
+        return response;
+    }
+
+    @Transactional
+    public VoiceTransactionResponse voice(User user, MultipartFile audio, String language) {
+        String filename = audio.getOriginalFilename() != null ? audio.getOriginalFilename().toLowerCase() : "";
+        List<String> allowed = List.of(".mp3", ".wav", ".m4a", ".mp4", ".aac", ".ogg", ".opus", ".webm", ".flac", ".3gp");
+        if (allowed.stream().noneMatch(filename::endsWith))
+            throw new BadRequestException("Unsupported audio format. Accepted formats: MP3, WAV, M4A, MP4, AAC, OGG, OPUS, WEBM, FLAC, 3GP");
+        if (audio.getSize() > MAX_AUDIO_SIZE)
+            throw new BadRequestException("Audio file exceeds the 25MB limit");
+
+        byte[] audioBytes;
+        try { audioBytes = audio.getBytes(); } catch (Exception e) {
+            throw new BadRequestException("Could not read audio file");
+        }
+
+        SpeechService.SpeechResult speech = speechService.transcribe(audioBytes, language);
+
+        Transaction t = new Transaction();
+        t.setUser(user);
+        t.setType(speech.type);
+        t.setAmount(speech.amount);
+        t.setCategory(speech.category);
+        t.setDescription(speech.description);
+        t.setEntryMethod("voice");
+        t.setTaxDeductible(false);
+        t.setWithholdingApplicable(false);
+        t.setWithholdingAmount(BigDecimal.ZERO);
+        t.setTransactionDate(LocalDate.now());
+        transactionRepository.save(t);
+        updateIncomeTaxCalculationForYear(user, t.getTransactionDate().getYear());
+        auditLogService.log(user, "TRANSACTION_CREATED",
+            "Voice transaction " + t.getTransactionId() + " created. Transcription: " + speech.transcription, null);
+
+        VoiceTransactionResponse response = new VoiceTransactionResponse();
+        response.setTransactionId(t.getTransactionId());
+        response.setType(t.getType());
+        response.setAmount(t.getAmount());
+        response.setCategory(t.getCategory());
+        response.setDescription(t.getDescription());
+        response.setEntryMethod("voice");
+        response.setTranscription(speech.transcription);
+        response.setTaxDeductible(false);
+        response.setTransactionDate(t.getTransactionDate());
+        response.setConfidence(speech.confidence);
+        response.setNeedsReview(speech.needsReview);
+        response.setTaxLiabilityUpdated(true);
         return response;
     }
 
@@ -294,7 +411,7 @@ public class TransactionService {
         t.setWithholdingAmount(whtAmount);
 
         transactionRepository.save(t);
-        updateIncomeTaxCalculation(user);
+        updateIncomeTaxCalculationForYear(user, t.getTransactionDate().getYear());
         auditLogService.log(user, "TRANSACTION_UPDATED",
             "Transaction " + id + " updated. Before: [" + oldValues + "] After: [Amount: "
                 + t.getAmount() + ", Category: " + t.getCategory() + ", Date: " + t.getTransactionDate() + "]", null);
@@ -329,8 +446,10 @@ public class TransactionService {
             "Transaction " + id + " deleted. Amount: " + t.getAmount() + ", Category: " + t.getCategory(),
             null);
 
-        transactionRepository.delete(t);
-        updateIncomeTaxCalculation(user);
+        int deletedYear = t.getTransactionDate().getYear();
+        t.setIsActive(false);
+        transactionRepository.save(t);
+        updateIncomeTaxCalculationForYear(user, deletedYear);
     }
 
 
@@ -395,7 +514,10 @@ public class TransactionService {
         history.setTotalSkipped(skipped);
         importHistoryRepository.save(history);
 
-        updateIncomeTaxCalculation(user);
+        saved.stream()
+            .map(tx -> tx.getTransactionDate().getYear())
+            .distinct()
+            .forEach(year -> updateIncomeTaxCalculationForYear(user, year));
         auditLogService.log(user, "STATEMENT_IMPORTED",
             "Statement imported from " + provider + " (" + statementFrom + " to " + statementTo
                 + "). Imported: " + saved.size() + ", Skipped: " + skipped, null);
@@ -463,11 +585,12 @@ public class TransactionService {
     }
 
 
-    
     private void updateIncomeTaxCalculation(User user) {
-        int year = LocalDate.now().getYear();
-        LocalDate start = LocalDate.of(year, 1, 1);
+        updateIncomeTaxCalculationForYear(user, LocalDate.now().getYear());
+    }
 
+    private void updateIncomeTaxCalculationForYear(User user, int year) {
+        LocalDate start = LocalDate.of(year, 1, 1);
         LocalDate end   = LocalDate.of(year, 12, 31);
 
         BigDecimal grossIncome = Optional.ofNullable(
@@ -492,11 +615,10 @@ public class TransactionService {
                 c.setPeriodEnd(end);
                 return c;
             });
-            
-            calc.setGrossIncome(grossIncome);
-            calc.setTotalDeductions(totalDeductions);
-            calc.setTaxableIncome(taxableIncome);
 
+        calc.setGrossIncome(grossIncome);
+        calc.setTotalDeductions(totalDeductions);
+        calc.setTaxableIncome(taxableIncome);
         calc.setTaxLiability(liability);
         taxCalculationRepository.save(calc);
     }
@@ -523,18 +645,28 @@ public class TransactionService {
                 return rows;
             }
 
-            String[] cols = header.toLowerCase().split(",");
+            // Auto-detect delimiter: tab or comma
+            String delimiter = header.contains("\t") ? "\t" : ",";
+            String[] cols = header.toLowerCase().split(delimiter);
 
             int dateIdx = -1, descIdx = -1, amountIdx = -1, typeIdx = -1, debitIdx = -1, creditIdx = -1;
-            
+
             for (int i = 0; i < cols.length; i++) {
                 switch (cols[i].trim()) {
-                    case "date"                                -> dateIdx   = i;
-                    case "description", "narration", "details" -> descIdx  = i;
-                    case "amount"                              -> amountIdx = i;
-                    case "type", "transaction type"            -> typeIdx   = i;
-                    case "debit"                               -> debitIdx  = i;
-                    case "credit"                              -> creditIdx = i;
+                    case "date", "transaction date", "value date", "post date",
+                         "posting date", "date processed", "process date",
+                         "processed date", "trans date", "txn date" -> dateIdx = i;
+                    case "description", "narration", "details", "particulars",
+                         "remarks", "transaction details", "memo", "reference",
+                         "payee", "merchant", "transaction description",
+                         "trans description", "narrative" -> descIdx = i;
+                    case "amount", "transaction amount", "txn amount" -> amountIdx = i;
+                    case "type", "transaction type", "txn type", "trans type" -> typeIdx = i;
+                    case "debit", "withdrawls", "withdrawals", "withdrawal",
+                         "dr", "debit amount", "payments", "charges",
+                         "payment", "charge" -> debitIdx = i;
+                    case "credit", "deposits", "deposit", "cr", "credit amount",
+                         "credits" -> creditIdx = i;
                 }
             }
 
@@ -544,7 +676,7 @@ public class TransactionService {
                     continue;
                 }
 
-                String[] parts = line.split(",", -1);
+                String[] parts = line.split(delimiter, -1);
 
                 ParsedRow row = new ParsedRow();
 
@@ -609,16 +741,30 @@ public class TransactionService {
     }
 
     private LocalDate parseDate(String s) {
+        if (s == null || s.isBlank()) return null;
+        // Strip leading/trailing quotes and whitespace some CSVs add
+        s = s.replaceAll("^\"|\"$", "").trim();
         for (DateTimeFormatter fmt : List.of(
                 DateTimeFormatter.ofPattern("yyyy-MM-dd"),
                 DateTimeFormatter.ofPattern("dd/MM/yyyy"),
                 DateTimeFormatter.ofPattern("MM/dd/yyyy"),
-                DateTimeFormatter.ofPattern("dd-MM-yyyy"))) {
-            try{
-                return LocalDate.parse(s, fmt); 
-            }catch (DateTimeParseException ignored) {}
+                DateTimeFormatter.ofPattern("dd-MM-yyyy"),
+                DateTimeFormatter.ofPattern("MM-dd-yyyy"),
+                DateTimeFormatter.ofPattern("dd-MMM-yy"),
+                DateTimeFormatter.ofPattern("dd-MMM-yyyy"),
+                DateTimeFormatter.ofPattern("dd/MMM/yyyy"),
+                DateTimeFormatter.ofPattern("dd MMM yyyy"),
+                DateTimeFormatter.ofPattern("MMM dd, yyyy"),
+                DateTimeFormatter.ofPattern("MMM d, yyyy"),
+                DateTimeFormatter.ofPattern("MMM dd yyyy"),
+                DateTimeFormatter.ofPattern("d MMM yyyy"),
+                DateTimeFormatter.ofPattern("d/M/yyyy"),
+                DateTimeFormatter.ofPattern("d-M-yyyy"),
+                DateTimeFormatter.ofPattern("yyyyMMdd"))) {
+            try {
+                return LocalDate.parse(s, fmt);
+            } catch (DateTimeParseException ignored) {}
         }
-
         return null;
     }
 

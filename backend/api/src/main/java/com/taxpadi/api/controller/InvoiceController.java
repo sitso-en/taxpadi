@@ -6,6 +6,8 @@ import com.taxpadi.api.model.Invoice;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.InvoiceService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -46,9 +48,9 @@ public class InvoiceController {
     @PostMapping
     public ResponseEntity<ApiResponse<CreateInvoiceResponse>> create(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
-            @RequestBody CreateInvoiceRequest request) {
+            @Valid @RequestBody CreateInvoiceRequest request) {
         User user = userDetails.getUser();
-        return ResponseEntity.ok(new ApiResponse<>(true,
+        return ResponseEntity.status(HttpStatus.CREATED).body(new ApiResponse<>(true,
             invoiceService.create(user, request),
             "Invoice created successfully."));
     }
@@ -67,7 +69,7 @@ public class InvoiceController {
     public ResponseEntity<ApiResponse<UpdateInvoiceResponse>> update(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody UpdateInvoiceRequest request) {
+            @Valid @RequestBody UpdateInvoiceRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             invoiceService.update(user, id, request),
@@ -107,21 +109,22 @@ public class InvoiceController {
     }
 
     @GetMapping("/{id}/pdf/download")
-    public ResponseEntity<byte[]> downloadPdf(@PathVariable UUID id) {
+    public ResponseEntity<Void> downloadPdf(@PathVariable UUID id) {
         Invoice invoice = invoiceService.getInvoiceForDownload(id);
-        byte[] pdf = invoiceService.downloadPdfPublic(id);
-        String filename = invoice.getInvoiceRef() + ".pdf";
-        return ResponseEntity.ok()
-            .header("Content-Type", "application/pdf")
-            .header("Content-Disposition", "attachment; filename=\"" + filename + "\"")
-            .body(pdf);
+        String pdfUrl = invoice.getPdfUrl();
+        if (pdfUrl == null || pdfUrl.isBlank()) {
+            throw new RuntimeException("PDF_NOT_AVAILABLE");
+        }
+        return ResponseEntity.status(HttpStatus.FOUND)
+            .header("Location", pdfUrl)
+            .build();
     }
 
     @PostMapping("/{id}/send")
     public ResponseEntity<ApiResponse<SendInvoiceResponse>> send(
             @AuthenticationPrincipal TaxPadiUserDetails userDetails,
             @PathVariable UUID id,
-            @RequestBody SendInvoiceRequest request) {
+            @Valid @RequestBody SendInvoiceRequest request) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             invoiceService.send(user, id, request.getChannel()),

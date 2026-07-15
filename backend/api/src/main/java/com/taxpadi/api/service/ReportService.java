@@ -1,9 +1,30 @@
 package com.taxpadi.api.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.Duration;
+import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+
+import com.taxpadi.api.constant.TaxReturnStatus;
 import com.taxpadi.api.dto.report.Averages;
 import com.taxpadi.api.dto.report.CategoryTotal;
-import com.taxpadi.api.dto.report.ExportResponse;
 import com.taxpadi.api.dto.report.ExpenseBreakdown;
+import com.taxpadi.api.dto.report.ExportResponse;
 import com.taxpadi.api.dto.report.IncomeBreakdown;
 import com.taxpadi.api.dto.report.IncomeStatementResponse;
 import com.taxpadi.api.dto.report.MonthlySummaryItem;
@@ -19,26 +40,11 @@ import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.TaxCalculation;
 import com.taxpadi.api.model.TaxReturn;
+import com.taxpadi.api.model.Transaction;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.repository.TaxCalculationRepository;
 import com.taxpadi.api.repository.TaxReturnRepository;
 import com.taxpadi.api.repository.TransactionRepository;
-import org.springframework.stereotype.Service;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.format.TextStyle;
-import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 public class ReportService {
@@ -46,13 +52,19 @@ public class ReportService {
     private final TransactionRepository transactionRepository;
     private final TaxCalculationRepository taxCalculationRepository;
     private final TaxReturnRepository taxReturnRepository;
+    private final ExportJobProcessor exportJobProcessor;
+    private final StringRedisTemplate redis;
 
     public ReportService(TransactionRepository transactionRepository,
                          TaxCalculationRepository taxCalculationRepository,
-                         TaxReturnRepository taxReturnRepository) {
+                         TaxReturnRepository taxReturnRepository,
+                         ExportJobProcessor exportJobProcessor,
+                         StringRedisTemplate redis) {
         this.transactionRepository = transactionRepository;
         this.taxCalculationRepository = taxCalculationRepository;
         this.taxReturnRepository = taxReturnRepository;
+        this.exportJobProcessor = exportJobProcessor;
+        this.redis = redis;
     }
 
     public SummaryResponse getSummary(User user, String period, LocalDate dateFrom, LocalDate dateTo) {
@@ -96,27 +108,83 @@ public class ReportService {
             throw new BadRequestException("Format must be one of: json, pdf, excel.");
         }
 
-        long txCount     = includeTransactions ? transactionRepository.countByUserAndDateRange(user, dateFrom, dateTo) : 0;
-        long returnCount = includeTaxReturns   ? taxReturnRepository.findAllByUserAndYearRange(user, dateFrom.getYear(), dateTo.getYear()).size() : 0;
-
-        RecordsIncluded recordsIncluded = new RecordsIncluded(
-            includeTransactions ? txCount     : 0,
-            includeTaxReturns   ? returnCount : 0,
-            0,
-            0
-        );
+        List<Transaction> transactions = includeTransactions
+            ? transactionRepository.findAllByUserAndDateRange(user, dateFrom, dateTo)
+            : List.of();
+        List<TaxReturn> taxReturns = includeTaxReturns
+            ? taxReturnRepository.findAllByUserAndYearRange(user, dateFrom.getYear(), dateTo.getYear())
+            : List.of();
 
         ExportResponse response = new ExportResponse();
-        response.setExportId(UUID.randomUUID());
+        UUID exportId = UUID.randomUUID();
+        response.setExportId(exportId);
         response.setFormat(format);
         response.setPeriodStart(dateFrom);
         response.setPeriodEnd(dateTo);
-        response.setRecordsIncluded(recordsIncluded);
+        response.setRecordsIncluded(new RecordsIncluded(transactions.size(), taxReturns.size(), 0, 0));
 
-        if (!"json".equals(format)) {
-            response.setNote(format.toUpperCase() + " export requires S3 configuration. Use format=json for immediate data.");
+        if ("json".equals(format)) {
+            response.setStatus("done");
+            response.setData(buildJsonMap(user, dateFrom, dateTo, transactions, taxReturns));
+        } else {
+            // PDF and Excel are offloaded to a background thread
+            String jobKey = "export:" + exportId;
+            redis.opsForValue().set(jobKey, "{\"status\":\"processing\"}", Duration.ofHours(1));
+            exportJobProcessor.process(exportId.toString(), user, format, dateFrom, dateTo, transactions, taxReturns);
+            response.setStatus("processing");
+            response.setNote("Your export is being generated. Poll GET /api/v1/reports/export/status/" + exportId + " to check progress.");
         }
         return response;
+    }
+
+    public Map<String, String> getExportStatus(String jobId) {
+        String raw = redis.opsForValue().get("export:" + jobId);
+        if (raw == null) {
+            throw new NotFoundException("Export job not found or has expired.");
+        }
+        // Parse the simple JSON manually to avoid adding a full Jackson dependency here
+        Map<String, String> result = new LinkedHashMap<>();
+        raw = raw.replaceAll("[{}\"]", "");
+        for (String pair : raw.split(",")) {
+            String[] kv = pair.split(":", 2);
+            if (kv.length == 2) result.put(kv[0].trim(), kv[1].trim());
+        }
+        return result;
+    }
+
+    private Map<String, Object> buildJsonMap(User user, LocalDate from, LocalDate to,
+                                              List<Transaction> transactions, List<TaxReturn> taxReturns) {
+        Map<String, Object> data = new LinkedHashMap<>();
+        data.put("generated_at", LocalDateTime.now().toString());
+        data.put("taxpayer", user.getFullName());
+        data.put("period_start", from.toString());
+        data.put("period_end", to.toString());
+
+        data.put("transactions", transactions.stream().map(t -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("date", t.getTransactionDate().toString());
+            m.put("type", t.getType());
+            m.put("amount", t.getAmount());
+            m.put("category", t.getCategory());
+            m.put("description", t.getDescription());
+            m.put("tax_deductible", t.getTaxDeductible());
+            m.put("withholding_amount", t.getWithholdingAmount());
+            return m;
+        }).toList());
+
+        data.put("tax_returns", taxReturns.stream().map(r -> {
+            Map<String, Object> m = new LinkedHashMap<>();
+            m.put("tax_type", r.getTaxType());
+            m.put("tax_year", r.getTaxYear());
+            m.put("period_start", r.getPeriodStart().toString());
+            m.put("period_end", r.getPeriodEnd().toString());
+            m.put("status", r.getStatus());
+            m.put("tax_liability", r.getTaxLiability());
+            m.put("submitted_at", r.getSubmittedAt() != null ? r.getSubmittedAt().toString() : null);
+            return m;
+        }).toList());
+
+        return data;
     }
 
     public IncomeStatementResponse getIncomeStatement(User user, int months) {
@@ -165,7 +233,7 @@ public class ReportService {
         BigDecimal avgExp    = sumExp.divide(BigDecimal.valueOf(divisor), 2, RoundingMode.HALF_UP);
 
         List<TaxReturn> returns = taxReturnRepository.findAllByUserAndYearRange(user, from.getYear(), to.getYear());
-        boolean allFiled = !returns.isEmpty() && returns.stream().allMatch(r -> "submitted".equals(r.getStatus()));
+        boolean allFiled = !returns.isEmpty() && returns.stream().allMatch(r -> TaxReturnStatus.SUBMITTED.equals(r.getStatus()));
         String score = returns.isEmpty() ? "No Data" : allFiled ? "Good" : "Needs Attention";
 
         IncomeStatementResponse response = new IncomeStatementResponse();
@@ -203,12 +271,12 @@ public class ReportService {
                     tt.setReturnStatus(r.getStatus());
                     tt.setTaxLiability(r.getTaxLiability());
                     tt.setFiledOn(r.getSubmittedAt());
-                    tt.setCompliant("submitted".equals(r.getStatus()));
+                    tt.setCompliant(TaxReturnStatus.SUBMITTED.equals(r.getStatus()));
                     return tt;
                 }).toList();
 
                 boolean overallCompliant = entry.getValue().stream()
-                    .allMatch(r -> "submitted".equals(r.getStatus()));
+                    .allMatch(r -> TaxReturnStatus.SUBMITTED.equals(r.getStatus()));
 
                 return new YearHistoryEntry(entry.getKey(), taxTypes, overallCompliant);
             }).toList();

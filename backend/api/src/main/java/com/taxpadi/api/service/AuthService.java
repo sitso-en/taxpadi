@@ -34,17 +34,21 @@ import com.taxpadi.api.dto.auth.VerifyOtpRequest;
 import com.taxpadi.api.dto.auth.VerifyOtpResponse;
 import com.taxpadi.api.dto.auth.VerifyResetOtpResponse;
 import com.taxpadi.api.exception.ConflictException;
+import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.DeviceToken;
 import com.taxpadi.api.model.OtpPurpose;
 import com.taxpadi.api.model.OtpVerification;
 import com.taxpadi.api.model.RefreshToken;
+import com.taxpadi.api.model.SubscriptionTier;
 import com.taxpadi.api.model.TaxProfile;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.model.UserTaxProfile;
 import com.taxpadi.api.repository.DeviceTokenRepository;
 import com.taxpadi.api.repository.OtpVerificationRepository;
 import com.taxpadi.api.repository.RefreshTokenRepository;
+import com.taxpadi.api.constant.SubscriptionStatus;
+import com.taxpadi.api.repository.SubscriptionRepository;
 import com.taxpadi.api.repository.TaxProfileRepository;
 import com.taxpadi.api.repository.UserRepository;
 import com.taxpadi.api.repository.UserTaxProfileRepository;
@@ -62,6 +66,7 @@ public class AuthService {
     private final OtpVerificationRepository otpVerificationRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final DeviceTokenRepository deviceTokenRepository;
+    private final SubscriptionRepository subscriptionRepository;
     private final PasswordEncoder passwordEncoder;
     private final SmsService smsService;
     private final JwtService jwtService;
@@ -72,6 +77,7 @@ public class AuthService {
         UserTaxProfileRepository userTaxProfileRepository, TaxProfileRepository taxProfileRepository,
         RefreshTokenRepository refreshTokenRepository,
         DeviceTokenRepository deviceTokenRepository,
+        SubscriptionRepository subscriptionRepository,
         BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService,
         AuditLogService auditLogService, EmailService emailService
     ){
@@ -81,6 +87,7 @@ public class AuthService {
         this.otpVerificationRepository = otpVerificationRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.deviceTokenRepository = deviceTokenRepository;
+        this.subscriptionRepository = subscriptionRepository;
         this.passwordEncoder = bCryptPasswordEncoder;
         this.smsService = smsService;
         this.jwtService = jwtService;
@@ -163,7 +170,7 @@ public class AuthService {
 
         OtpVerification otp = otpVerificationRepository
                 .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
-                .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
+                .orElseThrow(() -> new BadRequestException("No active OTP found. Please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
             log.warn("OTP expired for userId={}", user.getUserId());
@@ -262,15 +269,20 @@ public class AuthService {
         auditLogService.log(user, "LOGIN", "Login from device: " + request.getDeviceInfo(), ipAddress);
         log.info("Login successful for userId={}", user.getUserId());
 
+        boolean isPaid = subscriptionRepository.existsByUserAndStatus(user, SubscriptionStatus.ACTIVE);
+        boolean onboardingComplete = userTaxProfileRepository.findByUser(user)
+                .map(p -> Boolean.TRUE.equals(p.getOnboardingComplete())
+                        || (user.getTin() != null && !user.getTin().isBlank() && p.getTaxYearStart() != null))
+                .orElse(false);
         UserSummary userSummary = new UserSummary(
                 user.getUserId(),
                 user.getFullName(),
                 user.getPhone(),
-                user.getSubscriptionTier().name(),
-                false
+                isPaid ? SubscriptionTier.PAID.name() : SubscriptionTier.FREE.name(),
+                onboardingComplete
         );
 
-        return new LoginResponse(accessToken, rawRefreshToken, "Bearer", 900, false, userSummary);
+        return new LoginResponse(accessToken, rawRefreshToken, "Bearer", JwtService.ACCESS_TOKEN_EXPIRY_SECONDS, false, userSummary);
     }
 
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
@@ -363,15 +375,20 @@ public class AuthService {
         auditLogService.log(user, "BIOMETRIC_LOGIN", "Device: " + request.getDeviceInfo(), ipAddress);
         log.info("Biometric login successful for userId={}", user.getUserId());
 
+        boolean isPaid = subscriptionRepository.existsByUserAndStatus(user, SubscriptionStatus.ACTIVE);
+        boolean onboardingComplete = userTaxProfileRepository.findByUser(user)
+                .map(p -> Boolean.TRUE.equals(p.getOnboardingComplete())
+                        || (user.getTin() != null && !user.getTin().isBlank() && p.getTaxYearStart() != null))
+                .orElse(false);
         UserSummary userSummary = new UserSummary(
                 user.getUserId(),
                 user.getFullName(),
                 user.getPhone(),
-                user.getSubscriptionTier().name(),
-                false
+                isPaid ? SubscriptionTier.PAID.name() : SubscriptionTier.FREE.name(),
+                onboardingComplete
         );
 
-        return new BiometricLoginResponse(accessToken, rawRefreshToken, "Bearer", 900, userSummary);
+        return new BiometricLoginResponse(accessToken, rawRefreshToken, "Bearer", JwtService.ACCESS_TOKEN_EXPIRY_SECONDS, userSummary);
     }
 
     private String hashToken(String token) {
@@ -426,7 +443,7 @@ public class AuthService {
 
         OtpVerification otp = otpVerificationRepository
                 .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
-                .orElseThrow(() -> new NotFoundException("No active OTP found. Please request a new one"));
+                .orElseThrow(() -> new BadRequestException("No active OTP found. Please request a new one"));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
             log.warn("OTP expired for userId={}", user.getUserId());

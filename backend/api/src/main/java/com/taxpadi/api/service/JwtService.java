@@ -23,6 +23,7 @@ public class JwtService {
     private static final Logger log = LoggerFactory.getLogger(JwtService.class);
 
     private static final long ACCESS_TOKEN_EXPIRY_MS = 15 * 60 * 1000L; // 15 minutes
+    public static final int ACCESS_TOKEN_EXPIRY_SECONDS = (int) (ACCESS_TOKEN_EXPIRY_MS / 1000);
 
     @Value("${jwt.secret}")
     private String secret;

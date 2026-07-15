@@ -1,7 +1,38 @@
 package com.taxpadi.api.service;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.taxpadi.api.constant.InvoiceStatus;
 import com.taxpadi.api.dto.common.PaginationInfo;
-import com.taxpadi.api.dto.invoice.*;
+import com.taxpadi.api.dto.invoice.CancelInvoiceRequest;
+import com.taxpadi.api.dto.invoice.CancelInvoiceResponse;
+import com.taxpadi.api.dto.invoice.CreateInvoiceRequest;
+import com.taxpadi.api.dto.invoice.CreateInvoiceResponse;
+import com.taxpadi.api.dto.invoice.DeliveryInfo;
+import com.taxpadi.api.dto.invoice.InvoiceCountDto;
+import com.taxpadi.api.dto.invoice.InvoiceDetailDto;
+import com.taxpadi.api.dto.invoice.InvoiceListResponse;
+import com.taxpadi.api.dto.invoice.InvoiceStatsResponse;
+import com.taxpadi.api.dto.invoice.InvoiceSummaryDto;
+import com.taxpadi.api.dto.invoice.MarkPaidRequest;
+import com.taxpadi.api.dto.invoice.MarkPaidResponse;
+import com.taxpadi.api.dto.invoice.PdfUrlResponse;
+import com.taxpadi.api.dto.invoice.SendInvoiceResponse;
+import com.taxpadi.api.dto.invoice.SentTo;
+import com.taxpadi.api.dto.invoice.UpdateInvoiceRequest;
+import com.taxpadi.api.dto.invoice.UpdateInvoiceResponse;
 import com.taxpadi.api.dto.transaction.VaultSuggestion;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.NotFoundException;
@@ -14,18 +45,6 @@ import com.taxpadi.api.repository.InvoiceRepository;
 import com.taxpadi.api.repository.TaxCalculationRepository;
 import com.taxpadi.api.repository.TransactionRepository;
 import com.taxpadi.api.repository.UserTaxProfileRepository;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.util.List;
-import java.util.UUID;
 
 @Service
 public class InvoiceService {
@@ -82,14 +101,14 @@ public class InvoiceService {
 
     public InvoiceStatsResponse getStats(User user) {
         LocalDate today = LocalDate.now();
-        BigDecimal totalPaid = invoiceRepository.sumTotalAmountByUserAndStatus(user, "paid");
-        BigDecimal totalOutstanding = invoiceRepository.sumTotalAmountByUserAndStatus(user, "unpaid");
+        BigDecimal totalPaid = Optional.ofNullable(invoiceRepository.sumTotalAmountByUserAndStatus(user, "paid")).orElse(BigDecimal.ZERO);
+        BigDecimal totalOutstanding = Optional.ofNullable(invoiceRepository.sumTotalAmountByUserAndStatus(user, InvoiceStatus.UNPAID)).orElse(BigDecimal.ZERO);
         BigDecimal totalInvoiced = totalPaid.add(totalOutstanding);
-        BigDecimal totalOverdue = invoiceRepository.sumOverdueByUser(user, today);
+        BigDecimal totalOverdue = Optional.ofNullable(invoiceRepository.sumOverdueByUser(user, today)).orElse(BigDecimal.ZERO);
 
         long countPaid = invoiceRepository.countByUserAndStatus(user, "paid");
-        long countUnpaid = invoiceRepository.countByUserAndStatus(user, "unpaid");
-        long countCancelled = invoiceRepository.countByUserAndStatus(user, "cancelled");
+        long countUnpaid = invoiceRepository.countByUserAndStatus(user, InvoiceStatus.UNPAID);
+        long countCancelled = invoiceRepository.countByUserAndStatus(user, InvoiceStatus.CANCELLED);
         long countOverdue = invoiceRepository.countOverdueByUser(user, today);
         long countTotal = countPaid + countUnpaid + countCancelled;
 
@@ -156,7 +175,7 @@ public class InvoiceService {
     public UpdateInvoiceResponse update(User user, UUID id, UpdateInvoiceRequest request) {
         Invoice invoice = invoiceRepository.findByInvoiceIdAndUser(id, user)
             .orElseThrow(() -> new NotFoundException("Invoice not found"));
-        if (!"unpaid".equals(invoice.getStatus())) {
+        if (!InvoiceStatus.UNPAID.equals(invoice.getStatus())) {
             throw new BadRequestException("Only unpaid invoices can be edited");
         }
 
@@ -199,11 +218,11 @@ public class InvoiceService {
     public MarkPaidResponse markPaid(User user, UUID id, MarkPaidRequest request) {
         Invoice invoice = invoiceRepository.findByInvoiceIdAndUser(id, user)
             .orElseThrow(() -> new NotFoundException("Invoice not found"));
-        if (!"unpaid".equals(invoice.getStatus())) {
+        if (!InvoiceStatus.UNPAID.equals(invoice.getStatus())) {
             throw new BadRequestException("Only unpaid invoices can be marked as paid");
         }
 
-        LocalDateTime paidAt = (request != null && request.getPaidAt() != null)
+        LocalDateTime paidAt = (request != null && request.getPaidAt() != null && !request.getPaidAt().isBlank())
             ? LocalDateTime.parse(request.getPaidAt())
             : LocalDateTime.now();
 
@@ -217,7 +236,7 @@ public class InvoiceService {
         tx.setTransactionDate(paidAt.toLocalDate());
         tx = transactionRepository.save(tx);
 
-        invoice.setStatus("paid");
+        invoice.setStatus(InvoiceStatus.PAID);
         invoice.setPaidAt(paidAt);
         invoice.setTransaction(tx);
         invoiceRepository.save(invoice);
@@ -232,7 +251,7 @@ public class InvoiceService {
         MarkPaidResponse response = new MarkPaidResponse();
         response.setInvoiceId(invoice.getInvoiceId());
         response.setInvoiceRef(invoice.getInvoiceRef());
-        response.setStatus("paid");
+        response.setStatus(InvoiceStatus.PAID);
         response.setPaidAt(paidAt);
         response.setTransactionCreated(true);
         response.setTransactionId(tx.getTransactionId());
@@ -245,11 +264,11 @@ public class InvoiceService {
     public CancelInvoiceResponse cancel(User user, UUID id, CancelInvoiceRequest request) {
         Invoice invoice = invoiceRepository.findByInvoiceIdAndUser(id, user)
             .orElseThrow(() -> new NotFoundException("Invoice not found"));
-        if (!"unpaid".equals(invoice.getStatus())) {
+        if (!InvoiceStatus.UNPAID.equals(invoice.getStatus())) {
             throw new BadRequestException("Only unpaid invoices can be cancelled");
         }
 
-        invoice.setStatus("cancelled");
+        invoice.setStatus(InvoiceStatus.CANCELLED);
         invoice.setCancelledAt(LocalDateTime.now());
         if (request != null && request.getReason() != null) {
             invoice.setCancelReason(request.getReason());
@@ -259,7 +278,7 @@ public class InvoiceService {
         CancelInvoiceResponse response = new CancelInvoiceResponse();
         response.setInvoiceId(invoice.getInvoiceId());
         response.setInvoiceRef(invoice.getInvoiceRef());
-        response.setStatus("cancelled");
+        response.setStatus(InvoiceStatus.CANCELLED);
         response.setCancelledAt(invoice.getCancelledAt());
         return response;
     }
@@ -317,6 +336,7 @@ public class InvoiceService {
                 invoice.getClientName(),
                 invoice.getInvoiceRef(),
                 invoice.getTotalAmount().toPlainString(),
+                invoice.getDueDate() != null ? invoice.getDueDate().toString() : null,
                 baseUrl + "/api/v1/invoices/" + invoice.getInvoiceId() + "/pdf/download",
                 user.getFullName(),
                 user.getEmail()
@@ -380,15 +400,18 @@ public class InvoiceService {
 
     private String generateAndUploadPdf(Invoice invoice) {
         byte[] pdfBytes = pdfService.generateInvoicePdf(invoice);
-        return cloudinaryService.uploadPdf(pdfBytes, "invoices/" + invoice.getInvoiceRef() + ".pdf");
+        return cloudinaryService.uploadPdf(pdfBytes, "invoices/" + invoice.getInvoiceRef(), "taxpadi-invoice-" + invoice.getInvoiceRef() + ".pdf");
     }
 
     private byte[] fetchPdfBytes(Invoice invoice) {
+        if (invoice.getPdfUrl() == null || invoice.getPdfUrl().isBlank()) {
+            throw new RuntimeException("PDF_NOT_AVAILABLE");
+        }
         try {
             java.net.URL url = new java.net.URI(invoice.getPdfUrl()).toURL();
             return url.openStream().readAllBytes();
         } catch (Exception e) {
-            throw new RuntimeException("Failed to fetch PDF: " + e.getMessage());
+            throw new RuntimeException("PDF_NOT_AVAILABLE");
         }
     }
 

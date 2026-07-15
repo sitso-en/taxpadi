@@ -36,13 +36,18 @@ import com.taxpadi.api.dto.paye.PayeSummaryDto;
 import com.taxpadi.api.dto.paye.RemitRequest;
 import com.taxpadi.api.dto.paye.UpdateEmployeeRequest;
 import com.taxpadi.api.dto.paye.UpdateEmployeeResponse;
+import com.taxpadi.api.constant.SubscriptionStatus;
 import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.exception.ForbiddenException;
 import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.Employee;
 import com.taxpadi.api.model.PayeRecord;
 import com.taxpadi.api.model.User;
+import com.taxpadi.api.model.UserTaxProfile;
 import com.taxpadi.api.repository.EmployeeRepository;
 import com.taxpadi.api.repository.PayeRecordRepository;
+import com.taxpadi.api.repository.SubscriptionRepository;
+import com.taxpadi.api.repository.UserTaxProfileRepository;
 
 @Service
 public class PayeService {
@@ -50,17 +55,30 @@ public class PayeService {
     private final EmployeeRepository employeeRepository;
     private final PayeRecordRepository payeRecordRepository;
     private final GhanaTaxEngine taxEngine;
+    private final SubscriptionRepository subscriptionRepository;
+    private final UserTaxProfileRepository userTaxProfileRepository;
 
     public PayeService(EmployeeRepository employeeRepository,
                        PayeRecordRepository payeRecordRepository,
-                       GhanaTaxEngine taxEngine) {
+                       GhanaTaxEngine taxEngine,
+                       SubscriptionRepository subscriptionRepository,
+                       UserTaxProfileRepository userTaxProfileRepository) {
         this.employeeRepository = employeeRepository;
         this.payeRecordRepository = payeRecordRepository;
         this.taxEngine = taxEngine;
+        this.subscriptionRepository = subscriptionRepository;
+        this.userTaxProfileRepository = userTaxProfileRepository;
+    }
+
+    private void requirePaidSubscription(User user) {
+        if (!subscriptionRepository.existsByUserAndStatus(user, SubscriptionStatus.ACTIVE)) {
+            throw new ForbiddenException("PAYE management requires an active TaxPadi subscription.");
+        }
     }
 
 
     public EmployeeListResponse getEmployees(User user, String status, int page, int limit) {
+        requirePaidSubscription(user);
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 100);
         PageRequest pageable = PageRequest.of(safePage, safeLimit);
@@ -83,6 +101,7 @@ public class PayeService {
 
     @Transactional
     public AddEmployeeResponse addEmployee(User user, CreateEmployeeRequest request) {
+        requirePaidSubscription(user);
         if (request.getFullName() == null || request.getFullName().isBlank()) {
             throw new BadRequestException("full_name is required.");
         }
@@ -105,6 +124,15 @@ public class PayeService {
         emp.setStartDate(request.getStartDate());
         employeeRepository.save(emp);
 
+        // Toggle paye_registered on first active employee
+        long activeCount = employeeRepository.countByUserAndIsActive(user, true);
+        if (activeCount == 1) {
+            userTaxProfileRepository.findByUser(user).ifPresent(profile -> {
+                profile.setPayeRegistered(true);
+                userTaxProfileRepository.save(profile);
+            });
+        }
+
         BigDecimal monthlyPaye = computePaye(emp);
 
         AddEmployeeResponse response = new AddEmployeeResponse();
@@ -118,6 +146,7 @@ public class PayeService {
     }
 
     public EmployeeDetailDto getEmployee(User user, UUID employeeId) {
+        requirePaidSubscription(user);
         Employee emp = employeeRepository.findByEmployeeIdAndUser(employeeId, user)
             .orElseThrow(() -> new NotFoundException("No employee found with this ID."));
 
@@ -147,6 +176,7 @@ public class PayeService {
 
     @Transactional
     public UpdateEmployeeResponse updateEmployee(User user, UUID employeeId, UpdateEmployeeRequest request) {
+        requirePaidSubscription(user);
         Employee emp = employeeRepository.findByEmployeeIdAndUser(employeeId, user)
             .orElseThrow(() -> new NotFoundException("No employee found with this ID."));
 
@@ -180,6 +210,7 @@ public class PayeService {
 
     @Transactional
     public DeactivateEmployeeResponse deactivateEmployee(User user, UUID employeeId, DeactivateEmployeeRequest request) {
+        requirePaidSubscription(user);
         Employee emp = employeeRepository.findByEmployeeIdAndUser(employeeId, user)
             .orElseThrow(() -> new NotFoundException("No employee found with this ID."));
 
@@ -194,6 +225,15 @@ public class PayeService {
         emp.setEndDate(request.getEndDate());
         employeeRepository.save(emp);
 
+        // Clear paye_registered when last active employee is deactivated
+        long remaining = employeeRepository.countByUserAndIsActive(user, true);
+        if (remaining == 0) {
+            userTaxProfileRepository.findByUser(user).ifPresent(profile -> {
+                profile.setPayeRegistered(false);
+                userTaxProfileRepository.save(profile);
+            });
+        }
+
         DeactivateEmployeeResponse response = new DeactivateEmployeeResponse();
         response.setEmployeeId(emp.getEmployeeId());
         response.setFullName(emp.getFullName());
@@ -204,6 +244,7 @@ public class PayeService {
 
     public PayeRecordListResponse getRecords(User user, Integer month, Integer year,
                                              UUID employeeId, Boolean remitted, int page, int limit) {
+        requirePaidSubscription(user);
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 100);
         PageRequest pageable = PageRequest.of(safePage, safeLimit);
@@ -241,6 +282,7 @@ public class PayeService {
     }
 
     public MonthlySummaryResponse getMonthlySummary(User user, int month, int year) {
+        requirePaidSubscription(user);
         if (month < 1 || month > 12) throw new BadRequestException("Month must be between 1 and 12.");
 
         generateMonthlyRecords(user, month, year);
@@ -275,6 +317,7 @@ public class PayeService {
 
     @Transactional
     public PayeRemitResponse remit(User user, UUID payeId, RemitRequest request) {
+        requirePaidSubscription(user);
         PayeRecord record = payeRecordRepository.findByPayeIdAndUser(payeId, user)
             .orElseThrow(() -> new NotFoundException("No PAYE record found with this ID."));
 
@@ -298,6 +341,7 @@ public class PayeService {
     }
 
     public AnnualReturnResponse getAnnualReturn(User user, int year) {
+        requirePaidSubscription(user);
         List<PayeRecord> allRecords = payeRecordRepository.findAllByUserAndYear(user, year);
         if (allRecords.isEmpty()) throw new NotFoundException("No PAYE records found for this year.");
 
@@ -358,10 +402,11 @@ public class PayeService {
     @Transactional
     public void generateMonthlyRecords(User user, int month, int year) {
         List<Employee> activeEmployees = employeeRepository.findAllByUserAndIsActive(user, true);
+        java.util.Set<UUID> existingIds = payeRecordRepository.findEmployeeIdsWithRecords(user, month, year);
+
+        List<PayeRecord> newRecords = new ArrayList<>();
         for (Employee emp : activeEmployees) {
-            if (payeRecordRepository.existsByEmployeeAndMonthAndYear(emp, month, year)) {
-                continue;
-            }
+            if (existingIds.contains(emp.getEmployeeId())) continue;
             BigDecimal taxableSalary = computeTaxableSalary(emp);
             BigDecimal payeDeducted = taxEngine.calculatePaye(taxableSalary);
 
@@ -374,7 +419,10 @@ public class PayeService {
             record.setTaxableSalary(taxableSalary);
             record.setPayeDeducted(payeDeducted);
             record.setRemitted(false);
-            payeRecordRepository.save(record);
+            newRecords.add(record);
+        }
+        if (!newRecords.isEmpty()) {
+            payeRecordRepository.saveAll(newRecords);
         }
     }
 
