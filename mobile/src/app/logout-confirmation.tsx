@@ -1,36 +1,70 @@
-import {
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { clearTokens, getRefreshToken } from "@/utils/storage";
+import { logout } from "@/services/auth.service";
+import { useUser } from "../context/UserContext";
 
 export default function LogoutConfirmationScreen() {
+  const { setUser } = useUser();
+
+  const handleLogout = async () => {
+    try {
+      const refreshToken = await getRefreshToken();
+
+      if (refreshToken) {
+        try {
+          await logout(refreshToken);
+        } catch {
+        }
+      }
+
+      await clearTokens();
+
+      setUser({
+        fullName: "User",
+        phoneNumber: "",
+        email: "",
+        region: "",
+        category: "",
+        subscription_tier: "FREE",
+        is_active: false,
+        label: "",
+        tin: "",
+        taxpayer_category: "",
+        active_profile: false,
+      });
+
+      router.replace("/login");
+    } catch {
+      router.replace("/login");
+    }
+  };
+
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>
-        Log Out
-      </Text>
+      <View style={styles.iconCircle}>
+        <Ionicons name="log-out-outline" size={42} color="#C44736" />
+      </View>
+
+      <Text style={styles.title}>Log Out</Text>
 
       <Text style={styles.message}>
-        Are you sure you want to log out of your account?
+        Are you sure you want to log out of your TaxPadi account?
       </Text>
 
       <TouchableOpacity
         style={styles.logoutButton}
-        onPress={() => alert("Logged out successfully")}
+        onPress={handleLogout}
       >
-        <Text style={styles.logoutButtonText}>
-          Log Out
-        </Text>
+        <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.cancelButton}
+        onPress={() => router.back()}
       >
-        <Text style={styles.cancelButtonText}>
-          Cancel
-        </Text>
+        <Text style={styles.cancelButtonText}>Cancel</Text>
       </TouchableOpacity>
     </View>
   );
@@ -45,46 +79,69 @@ const styles = StyleSheet.create({
     padding: 24,
   },
 
+  iconCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: "#FCE8E6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    color: "#110503",
-    marginBottom: 20,
+    fontSize: 34,
+    color: "#111827",
+    fontFamily: "Inter_700Bold",
+    marginTop: 20,
+    marginBottom: 10,
   },
 
   message: {
-    fontSize: 16,
+    fontSize: 15,
     textAlign: "center",
-    color: "#1F1F1F",
-    marginBottom: 30,
+    color: "#6B7280",
+    fontFamily: "Inter_400Regular",
+    lineHeight: 22,
+    marginBottom: 34,
   },
 
   logoutButton: {
-    width: "80%",
-    backgroundColor: "#B83729",
-    padding: 15,
-    borderRadius: 10,
+    width: "100%",
+    backgroundColor: "#C44736",
+    paddingVertical: 18,
+    borderRadius: 16,
     alignItems: "center",
+
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 5,
   },
 
   logoutButtonText: {
     color: "#FFFFFF",
-    fontWeight: "bold",
     fontSize: 16,
+    fontFamily: "Inter_700Bold",
   },
 
   cancelButton: {
-    width: "80%",
-    marginTop: 15,
-    padding: 15,
-    borderRadius: 10,
+    width: "100%",
+    marginTop: 16,
+    paddingVertical: 18,
+    borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#EBEBEB",
+    borderColor: "#E5E7EB",
     alignItems: "center",
+    backgroundColor: "#FFFFFF",
   },
 
   cancelButtonText: {
-    color: "#110503",
-    fontWeight: "600",
+    color: "#111827",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
   },
 });

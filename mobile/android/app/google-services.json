@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "370443150946",
+    "project_id": "taxpadi-5a843",
+    "storage_bucket": "taxpadi-5a843.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:370443150946:android:fdb6a4d3c29b0cc8b8933b",
+        "android_client_info": {
+          "package_name": "com.taxpadi.api"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDB5nDhBF2Dat5GByjFDucMcJmkI6keh2E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
