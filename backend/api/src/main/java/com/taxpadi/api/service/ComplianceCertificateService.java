@@ -1,5 +1,6 @@
 package com.taxpadi.api.service;
 
+import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.Color;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.colors.DeviceRgb;
@@ -9,8 +10,10 @@ import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.borders.Border;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import java.io.InputStream;
 import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
@@ -76,7 +79,7 @@ public class ComplianceCertificateService {
         String pdfUrl = c.getDownloadUrl();
         if (pdfUrl == null) {
             byte[] pdf = buildCertificatePdf(c, user);
-            String publicId = "certificates/" + user.getUserId() + "/" + c.getCertificateNumber();
+            String publicId = "certificates/" + user.getUserId() + "/" + c.getCertificateNumber() + ".pdf";
             pdfUrl = cloudinaryService.uploadPdf(pdf, publicId, "taxpadi-compliance-certificate-" + c.getCertificateNumber() + ".pdf");
             c.setDownloadUrl(pdfUrl);
             repo.save(c);
@@ -192,7 +195,14 @@ public class ComplianceCertificateService {
         doc.add(new Paragraph("This certificate is computer-generated and valid without a physical signature.")
                 .setFontColor(MUTED).setFontSize(7.5f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(2));
         doc.add(new Paragraph("Verify authenticity at taxpadi.com  ·  Ghana Revenue Authority, Accra, Ghana")
-                .setFontColor(MUTED).setFontSize(7.5f).setTextAlignment(TextAlignment.CENTER));
+                .setFontColor(MUTED).setFontSize(7.5f).setTextAlignment(TextAlignment.CENTER).setMarginBottom(8));
+        try (InputStream is = getClass().getResourceAsStream("/images/logo.png")) {
+            if (is != null) {
+                Image logo = new Image(ImageDataFactory.create(is.readAllBytes()))
+                        .setWidth(80).setHorizontalAlignment(HorizontalAlignment.CENTER);
+                doc.add(logo);
+            }
+        } catch (Exception ignored) {}
 
         doc.setLeftMargin(0);
         doc.setRightMargin(0);

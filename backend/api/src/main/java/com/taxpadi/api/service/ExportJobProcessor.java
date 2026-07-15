@@ -1,13 +1,17 @@
 package com.taxpadi.api.service;
 
+import com.itextpdf.io.image.ImageDataFactory;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.pdf.PdfDocument;
 import com.itextpdf.kernel.pdf.PdfWriter;
 import com.itextpdf.layout.Document;
 import com.itextpdf.layout.element.Cell;
+import com.itextpdf.layout.element.Image;
 import com.itextpdf.layout.element.Paragraph;
 import com.itextpdf.layout.element.Table;
+import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import java.io.InputStream;
 import com.taxpadi.api.model.TaxReturn;
 import com.taxpadi.api.model.Transaction;
 import com.taxpadi.api.model.User;
@@ -131,7 +135,13 @@ public class ExportJobProcessor {
         PdfDocument pdf = new PdfDocument(writer);
         Document doc = new Document(pdf);
 
-        doc.add(new Paragraph("TaxPadi").setFontSize(22).setBold().setFontColor(new com.itextpdf.kernel.colors.DeviceRgb(184, 55, 41)));
+        try (InputStream is = getClass().getResourceAsStream("/images/logo.png")) {
+            if (is != null) {
+                Image logo = new Image(ImageDataFactory.create(is.readAllBytes()))
+                        .setWidth(130).setHorizontalAlignment(HorizontalAlignment.LEFT);
+                doc.add(logo);
+            }
+        } catch (Exception ignored) {}
         doc.add(new Paragraph("Financial Export Report").setFontSize(14).setFontColor(ColorConstants.DARK_GRAY));
         doc.add(new Paragraph("Taxpayer: " + user.getFullName()));
         doc.add(new Paragraph("Period: " + from + " to " + to));

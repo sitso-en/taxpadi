@@ -39,7 +39,8 @@ public class CloudinaryService {
                 )
             );
             String url = (String) result.get("secure_url");
-            String downloadUrl = url.replace("/upload/", "/upload/fl_attachment:" + downloadFilename + "/");
+            String attachmentName = downloadFilename.replaceAll("\\.[^.]+$", "");
+            String downloadUrl = url.replace("/upload/", "/upload/fl_attachment:" + attachmentName + "/");
             log.info("Cloudinary upload result download_url={}", downloadUrl);
             return downloadUrl;
         } catch (Exception e) {

@@ -13,6 +13,7 @@ import com.sendgrid.helpers.mail.objects.Attachments;
 import com.sendgrid.helpers.mail.objects.Content;
 import com.sendgrid.helpers.mail.objects.Email;
 import java.util.Base64;
+import java.io.InputStream;
 
 @Service
 public class EmailService {
@@ -27,6 +28,16 @@ public class EmailService {
 
     @Value("${sendgrid.from-name}")
     private String fromName;
+
+    private String logoImgTag() {
+        try (InputStream is = getClass().getResourceAsStream("/images/logo.png")) {
+            if (is == null) return "<p style=\"font-size:22px;font-weight:700;color:#B83729;\">TaxPadi</p>";
+            String b64 = Base64.getEncoder().encodeToString(is.readAllBytes());
+            return "<img src=\"data:image/png;base64," + b64 + "\" alt=\"TaxPadi\" style=\"height:48px;display:block;margin:0 auto;\" />";
+        } catch (Exception e) {
+            return "<p style=\"font-size:22px;font-weight:700;color:#B83729;\">TaxPadi</p>";
+        }
+    }
 
     public void send(String to, String subject, String htmlBody) {
         try {
@@ -51,11 +62,11 @@ public class EmailService {
 
     public void sendWelcome(String to, String fullName) {
         String subject = "Welcome to TaxPadi — You're all set! :)";
-        String body = """
+        String logo = logoImgTag();
+        String body = ("""
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: auto; background: #ffffff; border-radius: 8px; overflow: hidden; border: 1px solid #e5e7eb;">
-              <div style="background: #1a6b3c; padding: 32px 40px; text-align: center;">
-                <h1 style="color: #ffffff; margin: 0; font-size: 28px; letter-spacing: 1px;">TaxPadi</h1>
-                <p style="color: #a7f3c0; margin: 8px 0 0; font-size: 14px;">Your smart tax companion</p>
+              <div style="background: #ffffff; padding: 28px 40px 20px; text-align: center; border-bottom: 4px solid #B83729;">
+                %s
               </div>
               <div style="padding: 40px;">
                 <p style="font-size: 18px; color: #111827; font-weight: bold; margin-bottom: 4px;">Hey %s,</p>
@@ -70,7 +81,7 @@ public class EmailService {
                 <table style="width: 100%%; border-collapse: collapse;">
                   <tr>
                     <td style="width: 36px; vertical-align: top; padding: 8px 0;">
-                      <div style="background: #1a6b3c; color: white; border-radius: 50%%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-size: 13px; font-weight: bold;">1</div>
+                      <div style="background: #B83729; color: white; border-radius: 50%%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-size: 13px; font-weight: bold;">1</div>
                     </td>
                     <td style="padding: 8px 0 8px 12px; color: #374151; font-size: 14px; line-height: 1.6;">
                       <strong>Set up your tax profile</strong><br/>
@@ -79,7 +90,7 @@ public class EmailService {
                   </tr>
                   <tr>
                     <td style="width: 36px; vertical-align: top; padding: 8px 0;">
-                      <div style="background: #1a6b3c; color: white; border-radius: 50%%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-size: 13px; font-weight: bold;">2</div>
+                      <div style="background: #B83729; color: white; border-radius: 50%%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-size: 13px; font-weight: bold;">2</div>
                     </td>
                     <td style="padding: 8px 0 8px 12px; color: #374151; font-size: 14px; line-height: 1.6;">
                       <strong>Log your first transaction</strong><br/>
@@ -88,7 +99,7 @@ public class EmailService {
                   </tr>
                   <tr>
                     <td style="width: 36px; vertical-align: top; padding: 8px 0;">
-                      <div style="background: #1a6b3c; color: white; border-radius: 50%%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-size: 13px; font-weight: bold;">3</div>
+                      <div style="background: #B83729; color: white; border-radius: 50%%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-size: 13px; font-weight: bold;">3</div>
                     </td>
                     <td style="padding: 8px 0 8px 12px; color: #374151; font-size: 14px; line-height: 1.6;">
                       <strong>Know what you owe</strong><br/>
@@ -97,7 +108,7 @@ public class EmailService {
                   </tr>
                   <tr>
                     <td style="width: 36px; vertical-align: top; padding: 8px 0;">
-                      <div style="background: #1a6b3c; color: white; border-radius: 50%%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-size: 13px; font-weight: bold;">4</div>
+                      <div style="background: #B83729; color: white; border-radius: 50%%; width: 26px; height: 26px; text-align: center; line-height: 26px; font-size: 13px; font-weight: bold;">4</div>
                     </td>
                     <td style="padding: 8px 0 8px 12px; color: #374151; font-size: 14px; line-height: 1.6;">
                       <strong>File your returns</strong><br/>
@@ -130,25 +141,48 @@ public class EmailService {
                 </p>
               </div>
             </div>
-            """.formatted(fullName);
+            """).formatted(logo, fullName);
         send(to, subject, body);
     }
 
+    private String brandedEmail(String logoTag, String heading, String greeting, String message) {
+        return "<!DOCTYPE html><html><head><meta charset=\"UTF-8\"></head>"
+            + "<body style=\"margin:0;padding:0;background:#f3f4f6;font-family:Arial,sans-serif;\">"
+            + "<table width=\"100%\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#f3f4f6;padding:40px 0;\">"
+            + "<tr><td align=\"center\">"
+            + "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:8px;overflow:hidden;border:1px solid #e5e7eb;\">"
+            + "<tr><td style=\"background:#ffffff;padding:28px 40px 20px;text-align:center;border-bottom:4px solid #B83729;\">"
+            + logoTag
+            + "</td></tr>"
+            + "<tr><td style=\"padding:40px;\">"
+            + "<p style=\"font-size:18px;font-weight:bold;color:#111827;margin:0 0 8px;\">" + heading + "</p>"
+            + "<p style=\"font-size:15px;color:#374151;margin:0 0 16px;\">" + greeting + "</p>"
+            + "<p style=\"font-size:15px;color:#374151;line-height:1.7;margin:0 0 28px;\">" + message + "</p>"
+            + "<p style=\"font-size:14px;color:#4b5563;margin:0;\">With you all the way,<br/><strong style=\"color:#111827;\">The TaxPadi Team</strong></p>"
+            + "</td></tr>"
+            + "<tr><td style=\"background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;\">"
+            + "<p style=\"font-size:12px;color:#9ca3af;margin:0;\">Smart Tax Management for Ghana &mdash; <a href=\"mailto:sitso.nkrumah@gmail.com\" style=\"color:#B83729;\">sitso.nkrumah@gmail.com</a></p>"
+            + "</td></tr>"
+            + "</table></td></tr></table></body></html>";
+    }
+
     public void sendPasswordReset(String to, String fullName) {
-        String subject = "Your password has been reset";
-        String body = "<h2>Hello " + fullName + ",</h2>"
-            + "<p>Your TaxPadi password was successfully reset. "
-            + "If you did not request this change, please contact support immediately.</p>"
-            + "<p>The TaxPadi Team</p>";
+        String subject = "Your TaxPadi password has been reset";
+        String body = brandedEmail(logoImgTag(),
+            "Password Reset Confirmation",
+            "Hello <strong>" + fullName + "</strong>,",
+            "Your TaxPadi password was successfully reset. If you did not request this change, please contact us immediately at "
+            + "<a href=\"mailto:sitso.nkrumah@gmail.com\" style=\"color:#B83729;\">sitso.nkrumah@gmail.com</a>.");
         send(to, subject, body);
     }
 
     public void sendNewSessionAlert(String to, String fullName, String deviceInfo) {
-        String subject = "New login detected on your account";
-        String body = "<h2>Hello " + fullName + ",</h2>"
-            + "<p>A new login was detected on your TaxPadi account from <strong>" + deviceInfo + "</strong>.</p>"
-            + "<p>If this was you, no action is needed. If not, please change your password immediately.</p>"
-            + "<p>The TaxPadi Team</p>";
+        String subject = "New login detected on your TaxPadi account";
+        String body = brandedEmail(logoImgTag(),
+            "New Login Detected",
+            "Hello <strong>" + fullName + "</strong>,",
+            "A new login was detected on your TaxPadi account from <strong>" + deviceInfo + "</strong>. "
+            + "If this was you, no action is needed. If not, please change your password immediately.");
         send(to, subject, body);
     }
 
@@ -166,8 +200,8 @@ public class EmailService {
             + "<table width=\"600\" cellpadding=\"0\" cellspacing=\"0\" style=\"background:#ffffff;border-radius:8px;overflow:hidden;\">"
 
             // Header
-            + "<tr><td style=\"background:#B83729;padding:32px 40px;text-align:center;\">"
-            + "<p style=\"margin:0;font-size:22px;font-weight:700;color:#ffffff;letter-spacing:0.5px;\">TaxPadi</p>"
+            + "<tr><td style=\"background:#ffffff;padding:24px 40px 16px;text-align:center;border-bottom:4px solid #B83729;\">"
+            + logoImgTag()
             + "</td></tr>"
 
             // Body
@@ -236,16 +270,14 @@ public class EmailService {
     }
 
     public void sendDataExport(String to, String fullName, String jsonData) {
-        String subject = "Your TaxPadi data export";
-        String body = "<div style=\"font-family: Arial, sans-serif; max-width: 600px; margin: auto;\">"
-            + "<h2 style=\"color: #1a6b3c;\">Your data is ready</h2>"
-            + "<p>Hello " + fullName + ",</p>"
-            + "<p>As requested, we've attached a full export of your TaxPadi account data. "
-            + "It includes your profile, transactions, invoices, tax returns, VAT records, savings vault, and activity log.</p>"
-            + "<p>If you did not request this export, please contact us immediately at "
-            + "<a href=\"mailto:sitso.nkrumah@gmail.com\">sitso.nkrumah@gmail.com</a>.</p>"
-            + "<p>The TaxPadi Team</p>"
-            + "</div>";
+        String subject = "Your TaxPadi data export is ready";
+        String body = brandedEmail(logoImgTag(),
+            "Your Data Export",
+            "Hello <strong>" + fullName + "</strong>,",
+            "As requested, we've attached a full export of your TaxPadi account data. "
+            + "It includes your profile, transactions, invoices, tax returns, VAT records, savings vault, and activity log. "
+            + "If you did not request this export, please contact us immediately at "
+            + "<a href=\"mailto:sitso.nkrumah@gmail.com\" style=\"color:#B83729;\">sitso.nkrumah@gmail.com</a>.");
         try {
             Email from = new Email(fromEmail, fromName);
             Email toEmail = new Email(to);

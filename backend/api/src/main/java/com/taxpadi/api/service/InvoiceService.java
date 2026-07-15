@@ -400,7 +400,7 @@ public class InvoiceService {
 
     private String generateAndUploadPdf(Invoice invoice) {
         byte[] pdfBytes = pdfService.generateInvoicePdf(invoice);
-        return cloudinaryService.uploadPdf(pdfBytes, "invoices/" + invoice.getInvoiceRef(), "taxpadi-invoice-" + invoice.getInvoiceRef() + ".pdf");
+        return cloudinaryService.uploadPdf(pdfBytes, "invoices/" + invoice.getInvoiceRef() + ".pdf", "taxpadi-invoice-" + invoice.getInvoiceRef() + ".pdf");
     }
 
     private byte[] fetchPdfBytes(Invoice invoice) {
