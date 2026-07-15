@@ -2,7 +2,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
-
+import { getUserFriendlyError } from "@/utils/error";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useUser } from "../../context/UserContext";
@@ -128,11 +128,10 @@ export default function PaymentsScreen() {
             } catch (error: any) {
               console.log(error);
 
-              Alert.alert(
-                "Payment Failed",
-                error?.response?.data?.message ??
-                  "Unable to initiate payment."
-              );
+Alert.alert(
+  "Payment Unsuccessful",
+  getUserFriendlyError(error)
+);
             } finally {
               setPaying(false);
             }
@@ -170,9 +169,8 @@ export default function PaymentsScreen() {
 
           <View style={{ flex: 1 }}>
             <Text style={styles.balanceLabel}>TOTAL OUTSTANDING</Text>
-            <Text style={styles.currencyLabel}>GH¢</Text>
             <Text style={styles.balanceAmount}>
-              {remainingBalance.toFixed(2)}
+              GH¢ {remainingBalance.toFixed(2)}
             </Text>
           </View>
         </View>
@@ -181,6 +179,23 @@ export default function PaymentsScreen() {
           Tax: GH¢ {taxDue.toFixed(2)} • Penalties: GH¢ {penalties.toFixed(2)}
         </Text>
       </View>
+
+      <TouchableOpacity
+        disabled={paying || remainingBalance <= 0}
+        style={[
+          styles.payButton,
+          remainingBalance <= 0 && { backgroundColor: "#9CA3AF" },
+        ]}
+        onPress={handlePayment}
+      >
+        <Text style={styles.payButtonText}>
+          {paying
+            ? "Processing..."
+            : remainingBalance > 0
+            ? `Pay GH¢ ${remainingBalance.toFixed(2)}`
+            : "Nothing To Pay"}
+        </Text>
+      </TouchableOpacity>
 
       <Text style={styles.sectionLabel}>PAYMENT METHOD</Text>
 
@@ -239,29 +254,12 @@ export default function PaymentsScreen() {
 
         <Text style={styles.numberText}>
           {paymentMethod === "momo"
-            ? "Phone number will be loaded after authentication integration."
-            : `${user?.fullName || "TaxPadi User"} • ${
+  ? user?.phoneNumber || "No phone number available"
+  : `${user?.fullName || "TaxPadi User"} • ${
                 user?.category || "No email available"
               }`}
         </Text>
       </View>
-
-      <TouchableOpacity
-        disabled={paying || remainingBalance <= 0}
-        style={[
-          styles.payButton,
-          remainingBalance <= 0 && { backgroundColor: "#9CA3AF" },
-        ]}
-        onPress={handlePayment}
-      >
-        <Text style={styles.payButtonText}>
-          {paying
-            ? "Processing..."
-            : remainingBalance > 0
-            ? `Pay GH¢ ${remainingBalance.toFixed(2)}`
-            : "Nothing To Pay"}
-        </Text>
-      </TouchableOpacity>
 
       <Text style={styles.sectionLabel}>PAYMENT HISTORY</Text>
 
@@ -325,67 +323,67 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 34,
+    fontSize: 28,
     color: "#111827",
     fontFamily: "Inter_700Bold",
     marginLeft: 8,
   },
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: "Inter_400Regular",
-    marginTop: -18,
-    marginBottom: 28,
+    marginTop: 0,
+    marginBottom: 18,
   },
   balanceCard: {
     backgroundColor: "#C44736",
-    borderRadius: 18,
-    padding: 22,
-    marginBottom: 24,
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 18,
+    marginBottom: 18,
   },
   balanceHeader: {
     flexDirection: "row",
     alignItems: "center",
   },
   balanceIcon: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 18,
+    marginRight: 14,
   },
   balanceLabel: {
     color: "#FDECEC",
-    fontSize: 11,
+    fontSize: 10,
+    letterSpacing: 0.5,
     fontFamily: "Inter_600SemiBold",
-  },
-  currencyLabel: {
-    color: "#FDECEC",
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    marginTop: 6,
   },
   balanceAmount: {
     color: "#FFFFFF",
-    fontSize: 34,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
-    marginTop: 8,
+    marginTop: 2,
   },
   balanceSubText: {
     color: "#FDECEC",
-    marginTop: 12,
+    marginTop: 4,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
   sectionLabel: {
-    color: "#C44736",
-    fontSize: 11,
+    fontSize: 16,
+    color: "#111827",
     marginBottom: 10,
-    fontFamily: "Inter_600SemiBold",
+    fontFamily: "Inter_700Bold",
   },
   methodContainer: {
     flexDirection: "row",
@@ -395,9 +393,9 @@ const styles = StyleSheet.create({
   methodButton: {
     flex: 1,
     backgroundColor: "#F3F4F6",
-    paddingVertical: 18,
+    paddingVertical: 14,
     paddingHorizontal: 14,
-    borderRadius: 16,
+    borderRadius: 14,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -425,8 +423,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#ECECEC",
     borderRadius: 14,
-    padding: 18,
-    marginBottom: 24,
+    padding: 16,
+    marginBottom: 18,
   },
   numberLabel: {
     color: "#C44736",
@@ -441,9 +439,9 @@ const styles = StyleSheet.create({
   payButton: {
     backgroundColor: "#C44736",
     borderRadius: 16,
-    paddingVertical: 20,
+    paddingVertical: 16,
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 20,
     shadowColor: "#000",
     shadowOpacity: 0.12,
     shadowRadius: 10,
@@ -455,14 +453,14 @@ const styles = StyleSheet.create({
   },
   payButtonText: {
     color: "#FFFFFF",
-    fontSize: 16,
+    fontSize: 15,
     fontFamily: "Inter_600SemiBold",
   },
   historyCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
     borderColor: "#ECECEC",
   },
@@ -506,7 +504,7 @@ const styles = StyleSheet.create({
   emptyStateCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 32,
+    padding: 24,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,

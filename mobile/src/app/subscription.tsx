@@ -15,11 +15,9 @@ import {
 import { useUser } from "../context/UserContext";
 
 export default function SubscriptionScreen() {
-  const { user, updateUser } =
-    useUser();
+  const { user, updateUser } = useUser();
 
-  const isPro =
-    user.plan === "PRO";
+  const isPro = user.subscription_tier !== "FREE";
 
   const freeFeatures = [
     "Transaction Tracking",
@@ -40,62 +38,57 @@ export default function SubscriptionScreen() {
     "Premium Notifications",
   ];
 
-  const handlePlanChange =
-    () => {
-      if (isPro) {
-        Alert.alert(
-          "Downgrade Plan",
-          "Move back to the Free plan?",
-          [
-            {
-              text: "Cancel",
-              style: "cancel",
+  const handlePlanChange = () => {
+    if (isPro) {
+      Alert.alert(
+        "Downgrade Plan",
+        "Move back to the Free plan?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Downgrade",
+            onPress: () => {
+              updateUser({
+                subscription_tier: "FREE",
+              });
+
+              Alert.alert(
+                "Success",
+                "You are now on the Free Plan."
+              );
             },
+          },
+        ]
+      );
+    } else {
+      Alert.alert(
+        "Upgrade Plan",
+        "Upgrade to the Pro plan?",
+        [
+          {
+            text: "Cancel",
+            style: "cancel",
+          },
+          {
+            text: "Upgrade",
+            onPress: () => {
+              updateUser({
+                subscription_tier: "PRO",
+              });
 
-            {
-              text: "Downgrade",
-
-              onPress: () => {
-                updateUser({
-                  plan: "FREE",
-                });
-
-                Alert.alert(
-                  "Success",
-                  "You are now on the Free Plan."
-                );
-              },
+              Alert.alert(
+                "Success",
+                "Welcome to TaxPadi Pro!"
+              );
             },
-          ]
-        );
-      } else {
-        Alert.alert(
-          "Upgrade Plan",
-          "Upgrade to the Pro plan?",
-          [
-            {
-              text: "Cancel",
-              style: "cancel",
-            },
-
-            {
-              text: "Upgrade",
-
-              onPress: () => {
-                updateUser({
-                  plan: "PRO",
-                });
-
-                Alert.alert(
-                  "Success",
-                  "Welcome to TaxPadi Pro!"
-                );
-              },
-            },
-          ]
-        );
-      }
-    };
+          },
+        ]
+      );
+    }
+  };
 
   return (
     <ScrollView
@@ -103,16 +96,11 @@ export default function SubscriptionScreen() {
       contentContainerStyle={{
         paddingBottom: 40,
       }}
-      showsVerticalScrollIndicator={
-        false
-      }
+      showsVerticalScrollIndicator={false}
     >
       {/* Back */}
-
       <TouchableOpacity
-        onPress={() =>
-          router.back()
-        }
+        onPress={() => router.back()}
         style={styles.backButton}
       >
         <Ionicons
@@ -127,7 +115,6 @@ export default function SubscriptionScreen() {
       </Text>
 
       {/* Current Plan */}
-
       <View style={styles.planCard}>
         <Ionicons
           name={
@@ -140,68 +127,37 @@ export default function SubscriptionScreen() {
         />
 
         <Text style={styles.planName}>
-          {isPro
-            ? "Pro Plan"
-            : "Free Plan"}
+          {isPro ? "Pro Plan" : "Free Plan"}
         </Text>
 
-        <Text
-          style={
-            styles.planDescription
-          }
-        >
+        <Text style={styles.planDescription}>
           {isPro
             ? "Enjoy premium TaxPadi features with advanced analytics, exports and AI-powered tax assistance."
             : "Basic tax management features with transactions, tax returns, payments, invoices and reports."}
         </Text>
 
-        <View
-          style={styles.statusBadge}
-        >
-          <Text
-            style={
-              styles.statusText
-            }
-          >
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusText}>
             CURRENT PLAN
           </Text>
         </View>
       </View>
 
       {/* Features */}
-
-      <View
-        style={styles.featuresCard}
-      >
-        <Text
-          style={
-            styles.sectionTitle
-          }
-        >
+      <View style={styles.featuresCard}>
+        <Text style={styles.sectionTitle}>
           Included Features
         </Text>
 
-        {(isPro
-          ? proFeatures
-          : freeFeatures
-        ).map((feature) => (
-          <View
-            key={feature}
-            style={
-              styles.featureRow
-            }
-          >
+        {(isPro ? proFeatures : freeFeatures).map((feature) => (
+          <View key={feature} style={styles.featureRow}>
             <Ionicons
               name="checkmark-circle"
               size={18}
               color="#34A853"
             />
 
-            <Text
-              style={
-                styles.feature
-              }
-            >
+            <Text style={styles.feature}>
               {feature}
             </Text>
           </View>
@@ -209,14 +165,9 @@ export default function SubscriptionScreen() {
       </View>
 
       {/* Action */}
-
       <TouchableOpacity
-        style={
-          styles.actionButton
-        }
-        onPress={
-          handlePlanChange
-        }
+        style={styles.actionButton}
+        onPress={handlePlanChange}
       >
         <Ionicons
           name={
@@ -228,129 +179,109 @@ export default function SubscriptionScreen() {
           color="#FFFFFF"
         />
 
-        <Text
-          style={
-            styles.actionButtonText
-          }
-        >
-          {isPro
-            ? "Downgrade to Free"
-            : "Upgrade to Pro"}
+        <Text style={styles.actionButtonText}>
+          {isPro ? "Downgrade to Free" : "Upgrade to Pro"}
         </Text>
       </TouchableOpacity>
     </ScrollView>
   );
 }
 
-const styles =
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor:
-        "#FAFAFA",
-      padding: 20,
-      paddingTop: 55,
-    },
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#FAFAFA",
+    padding: 20,
+    paddingTop: 55,
+  },
 
-    backButton: {
-      marginBottom: 15,
-    },
+  backButton: {
+    marginBottom: 15,
+  },
 
-    title: {
-      fontSize: 30,
-      color: "#111827",
-      fontFamily:
-        "Inter_700Bold",
-      marginBottom: 20,
-    },
+  title: {
+    fontSize: 30,
+    color: "#111827",
+    fontFamily: "Inter_700Bold",
+    marginBottom: 20,
+  },
 
-    planCard: {
-      backgroundColor:
-        "#FFFFFF",
-      borderRadius: 20,
-      padding: 24,
-      alignItems: "center",
-      marginBottom: 20,
-    },
+  planCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    alignItems: "center",
+    marginBottom: 20,
+  },
 
-    planName: {
-      fontSize: 24,
-      color: "#C44736",
-      fontFamily:
-        "Inter_700Bold",
-      marginTop: 12,
-    },
+  planName: {
+    fontSize: 24,
+    color: "#C44736",
+    fontFamily: "Inter_700Bold",
+    marginTop: 12,
+  },
 
-    planDescription: {
-      color: "#6B7280",
-      textAlign: "center",
-      marginTop: 12,
-      lineHeight: 22,
-      fontFamily:
-        "Inter_400Regular",
-    },
+  planDescription: {
+    color: "#6B7280",
+    textAlign: "center",
+    marginTop: 12,
+    lineHeight: 22,
+    fontFamily: "Inter_400Regular",
+  },
 
-    statusBadge: {
-      marginTop: 18,
-      backgroundColor:
-        "#FCE8E6",
-      paddingHorizontal: 14,
-      paddingVertical: 7,
-      borderRadius: 20,
-    },
+  statusBadge: {
+    marginTop: 18,
+    backgroundColor: "#FCE8E6",
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 20,
+  },
 
-    statusText: {
-      color: "#C44736",
-      fontSize: 11,
-      fontFamily:
-        "Inter_600SemiBold",
-    },
+  statusText: {
+    color: "#C44736",
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+  },
 
-    featuresCard: {
-      backgroundColor:
-        "#FFFFFF",
-      borderRadius: 20,
-      padding: 20,
-      marginBottom: 24,
-    },
+  featuresCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 20,
+    marginBottom: 24,
+  },
 
-    sectionTitle: {
-      fontSize: 18,
-      color: "#111827",
-      fontFamily:
-        "Inter_700Bold",
-      marginBottom: 16,
-    },
+  sectionTitle: {
+    fontSize: 18,
+    color: "#111827",
+    fontFamily: "Inter_700Bold",
+    marginBottom: 16,
+  },
 
-    featureRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: 14,
-    },
+  featureRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 14,
+  },
 
-    feature: {
-      marginLeft: 10,
-      color: "#111827",
-      fontFamily:
-        "Inter_400Regular",
-    },
+  feature: {
+    marginLeft: 10,
+    color: "#111827",
+    fontFamily: "Inter_400Regular",
+  },
 
-    actionButton: {
-      backgroundColor:
-        "#C44736",
-      borderRadius: 14,
-      padding: 16,
-      flexDirection: "row",
-      justifyContent:
-        "center",
-      alignItems: "center",
-    },
+  actionButton: {
+    backgroundColor: "#C44736",
+    borderRadius: 14,
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+  },
 
-    actionButtonText: {
-      color: "#FFFFFF",
-      marginLeft: 8,
-      fontSize: 16,
-      fontFamily:
-        "Inter_600SemiBold",
-    },
-  });
+  actionButtonText: {
+    color: "#FFFFFF",
+    marginLeft: 8,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+});

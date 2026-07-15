@@ -144,7 +144,7 @@ export default function TaxBotScreen() {
         <View style={styles.botIcon}>
           <Ionicons
             name="chatbubble-ellipses"
-            size={28}
+            size={24}
             color="#C44736"
           />
         </View>
@@ -211,6 +211,7 @@ export default function TaxBotScreen() {
               setShowSuggestions(false);
             }}
           >
+            <Ionicons name="calculator-outline" size={16} color="#111827" style={{ marginRight: 6 }} />
             <Text style={styles.quickText}>What is VAT?</Text>
           </TouchableOpacity>
 
@@ -221,6 +222,7 @@ export default function TaxBotScreen() {
               setShowSuggestions(false);
             }}
           >
+            <Ionicons name="receipt-outline" size={16} color="#111827" style={{ marginRight: 6 }} />
             <Text style={styles.quickText}>My invoices</Text>
           </TouchableOpacity>
 
@@ -231,6 +233,7 @@ export default function TaxBotScreen() {
               setShowSuggestions(false);
             }}
           >
+            <Ionicons name="calendar-outline" size={16} color="#111827" style={{ marginRight: 6 }} />
             <Text style={styles.quickText}>Deadlines</Text>
           </TouchableOpacity>
         </ScrollView>
@@ -299,7 +302,7 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: 24,
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
     color: "#111827",
   },
@@ -307,19 +310,19 @@ const styles = StyleSheet.create({
   heroCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
-    padding: 20,
+    padding: 16,
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 16,
   },
 
   botIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#FCE8E6",
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 14,
+    marginBottom: 10,
   },
 
   heroTitle: {
@@ -331,8 +334,9 @@ const styles = StyleSheet.create({
   heroText: {
     textAlign: "center",
     color: "#6B7280",
-    marginTop: 8,
-    lineHeight: 22,
+    marginTop: 4,
+    lineHeight: 18,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
   },
 
@@ -362,6 +366,8 @@ const styles = StyleSheet.create({
 
   botBubble: {
     backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#ECECEC",
   },
 
   userBubble: {
@@ -380,15 +386,20 @@ const styles = StyleSheet.create({
 
   quickButton: {
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
     marginRight: 10,
   },
 
   quickText: {
     color: "#111827",
-    fontFamily: "Inter_500Medium",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
   },
 
   inputRow: {
@@ -402,13 +413,13 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 14,
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     fontFamily: "Inter_400Regular",
   },
 
   sendButton: {
-    width: 52,
-    height: 52,
+    width: 48,
+    height: 48,
     borderRadius: 14,
     backgroundColor: "#C44736",
     justifyContent: "center",
@@ -416,3 +427,4 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
 });
+

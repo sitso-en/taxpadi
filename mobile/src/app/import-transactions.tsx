@@ -20,6 +20,7 @@ import {
   getTransactionImportHistory,
 } from "@/services/transaction.service";
 import { useTransactions } from "@/context/TransactionContext";
+import { getUserFriendlyError } from "@/utils/error";
 
 const providers = [
   { label: "MTN MoMo", value: "mtn" },
@@ -93,10 +94,9 @@ export default function TransactionImportScreen() {
       );
     } catch (error: any) {
       Alert.alert(
-        "Validation Failed",
-        error?.response?.data?.message ??
-          "Unable to validate the file."
-      );
+  "Validation Unsuccessful",
+  getUserFriendlyError(error)
+);
     } finally {
       setValidating(false);
     }
@@ -143,10 +143,9 @@ export default function TransactionImportScreen() {
       await refreshTransactions();
     } catch (error: any) {
       Alert.alert(
-        "Import Failed",
-        error?.response?.data?.message ??
-          "Unable to import transactions."
-      );
+  "Import Unsuccessful",
+  getUserFriendlyError(error)
+);
     } finally {
       setUploading(false);
     }

@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { router } from "expo-router";
 import { useState } from "react";
 import { Dropdown } from "react-native-element-dropdown";
+import { getUserFriendlyError } from "@/utils/error";
 import {
   uploadVoiceTransaction,
   scanReceiptTransaction,
@@ -16,6 +17,7 @@ import {
   ScrollView,
   StyleSheet,
   Switch,
+  Alert,
   Text,
   TextInput,
   TouchableOpacity,
@@ -94,18 +96,30 @@ export default function AddTransactionScreen() {
       await transactions.refreshTransactions();
       alert("Transaction added successfully.");
     
-    } catch (error: any) {
-      console.log(error);
-      alert(
-        error?.response?.data?.message ??
-        "Failed to save transaction."
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error: any) {
+  console.log("========== CREATE TRANSACTION ==========");
+  console.log("Payload:", {
+    type,
+    amount: Number(amount),
+    category,
+    transaction_date: date.toISOString().split("T")[0],
+    tax_deductible: isDeductible,
+    withholding_applicable: false,
+    description,
+  });
 
-  const onDateChange = (event: any, selectedDate?: Date) => {
+  console.log(error);
+
+ Alert.alert(
+  "Transaction Unsuccessful",
+  getUserFriendlyError(error)
+);
+} finally {
+  setLoading(false);
+}
+};
+
+const onDateChange = (event: any, selectedDate?: Date) => {
     setShowDatePicker(false);
     if (selectedDate) {
       setDate(selectedDate);
@@ -146,9 +160,28 @@ export default function AddTransactionScreen() {
 
         alert("Receipt scanned successfully.");
       }
-    } catch (error) {
-      console.log(error);
-    }
+    
+     } catch (error: any) {
+  console.log("========== CREATE TRANSACTION ==========");
+  console.log("Payload:", {
+    type,
+    amount: Number(amount),
+    category,
+    transaction_date: date.toISOString().split("T")[0],
+    tax_deductible: isDeductible,
+    withholding_applicable: false,
+    description,
+  });
+
+  console.log(error);
+
+  alert(
+    error?.response?.data?.message ??
+      "Failed to save transaction."
+  );
+} finally {
+  setLoading(false);
+}
   };
 
   // const toggleRecording = async () => {

@@ -1,23 +1,29 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useUser } from "../../context/UserContext";
 import { useTransactions } from "../../context/TransactionContext";
 import { usePayments } from "../../context/PaymentContext";
 import { useNotifications } from "../../context/NotificationContext";
 import { useDeadlines } from "../../context/DeadlineContext";
 import Card from "../../components/Card";
+import { getTaxLiability } from "@/services/tax.service";
 
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 
 import {
   ScrollView,
-
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat("en-GH", {
+    style: "currency",
+    currency: "GHS",
+    minimumFractionDigits: 2,
+  }).format(value);
 
 export default function HomeScreen() {
   const { user } = useUser();
@@ -28,47 +34,35 @@ export default function HomeScreen() {
 
   const [hideAmounts, setHideAmounts] = useState(false);
 
-  const firstName = user?.fullName?.split(" ")[0] || "User";
+  const [taxableIncome, setTaxableIncome] = useState(0);
+  const [totalDeductions, setTotalDeductions] = useState(0);
+  const [taxLiability, setTaxLiability] = useState(0);
+  const [totalAmountPaid, setTotalAmountPaid] = useState(0);
+  const [netLiability, setNetLiability] = useState(0);
 
-  const hour = new Date().getHours();
-  const greeting =
-    hour < 12
-      ? "Good morning"
-      : hour < 17
-      ? "Good afternoon"
-      : "Good evening";
+  useEffect(() => {
+    const loadLiability = async () => {
+      try {
+        const response = await getTaxLiability();
+        const data = response.data ?? response;
+
+        setTaxableIncome(data.taxable_income ?? 0);
+        setTotalDeductions(data.total_deductions ?? 0);
+        setTaxLiability(data.tax_liability ?? 0);
+        setTotalAmountPaid(data.total_amount_paid ?? 0);
+        setNetLiability(data.net_liability ?? 0);
+      } catch (error) {
+        console.log("Failed to load tax liability:", error);
+      }
+    };
+
+    loadLiability();
+  }, [transactions]);
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     month: "long",
     year: "numeric",
   });
-
-  const totalIncome = transactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const totalExpenses = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const deductibleExpenses = transactions
-    .filter((t) => t.type === "expense")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const taxableProfit = totalIncome - deductibleExpenses;
-
-  const totalPayments = payments.reduce(
-    (sum, payment) => sum + payment.amount,
-    0
-  );
-
-  const vatDue = totalIncome * 0.15;
-  const payeDue = totalIncome * 0.055;
-  const incomeTax = taxableProfit > 0 ? taxableProfit * 0.25 : 0;
-  const withholdingTax = totalIncome * 0.05;
-
-  const totalTaxLiability = vatDue + payeDue + incomeTax + withholdingTax;
-  const netTaxLiability = totalTaxLiability - totalPayments;
 
   const calculateDaysLeft = (dueDate: string) => {
     const today = new Date();
@@ -82,11 +76,16 @@ export default function HomeScreen() {
       contentContainerStyle={{ paddingBottom: 100 }}
       showsVerticalScrollIndicator={false}
     >
-    
       {/* Header */}
       <View style={styles.header}>
         <View>
-          <Text style={styles.greeting}>{greeting}, {user?.fullName?.split(" ")[0] || "User"}</Text>
+          <Text style={styles.greeting}>
+            {new Date().getHours() < 12
+              ? "Good morning"
+              : new Date().getHours() < 17
+              ? "Good afternoon"
+              : "Good evening"}, {user?.fullName?.split(" ")[0] || "User"}
+          </Text>
           <Text style={styles.date}>{currentDate}</Text>
         </View>
 
@@ -114,7 +113,7 @@ export default function HomeScreen() {
           <Text style={styles.taxAmount}>
             {hideAmounts
               ? "••••••"
-              : `GH¢ ${Math.max(netTaxLiability, 0).toFixed(2)}`}
+              : formatCurrency(Math.max(netLiability, 0))}
           </Text>
           <TouchableOpacity
             onPress={() => setHideAmounts(!hideAmounts)}
@@ -135,17 +134,17 @@ export default function HomeScreen() {
       {/* Summary Cards */}
       <View style={styles.grid}>
         <Card style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Income</Text>
+          <Text style={styles.summaryTitle}>Taxable Income</Text>
           <Text style={styles.summaryAmount}>
-            {hideAmounts ? "••••••" : `GH¢ ${totalIncome.toFixed(2)}`}
+            {hideAmounts ? "••••••" : formatCurrency(taxableIncome)}
           </Text>
           <Text style={styles.summaryCaption}>This month</Text>
         </Card>
 
         <Card style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Expenses</Text>
+          <Text style={styles.summaryTitle}>Total Deductions</Text>
           <Text style={styles.summaryAmount}>
-            {hideAmounts ? "••••••" : `GH¢ ${totalExpenses.toFixed(2)}`}
+            {hideAmounts ? "••••••" : formatCurrency(totalDeductions)}
           </Text>
           <Text style={styles.summaryCaption}>This month</Text>
         </Card>
@@ -153,7 +152,7 @@ export default function HomeScreen() {
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Total Tax Liability</Text>
           <Text style={styles.summaryAmount}>
-            {hideAmounts ? "••••••" : `GH¢ ${totalTaxLiability.toFixed(2)}`}
+            {hideAmounts ? "••••••" : formatCurrency(taxLiability)}
           </Text>
           <Text style={styles.summaryCaption}>This month</Text>
         </Card>
@@ -161,7 +160,7 @@ export default function HomeScreen() {
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Tax Paid</Text>
           <Text style={styles.summaryAmount}>
-            {hideAmounts ? "••••••" : `GH¢ ${totalPayments.toFixed(2)}`}
+            {hideAmounts ? "••••••" : formatCurrency(totalAmountPaid)}
           </Text>
           <Text style={styles.summaryCaption}>This month</Text>
         </Card>
@@ -172,10 +171,10 @@ export default function HomeScreen() {
       <View style={styles.quickGrid}>
         <TouchableOpacity
           style={styles.quickCard}
-          onPress={() => router.push("/transactions")}
+          onPress={() => router.push("//(tabs)/add-transaction")}
         >
-          <Ionicons name="swap-horizontal-outline" size={24} color="#C44736" />
-          <Text style={styles.quickTitle}>Transactions</Text>
+          <Ionicons name="add-circle-outline" size={24} color="#C44736" />
+          <Text style={styles.quickTitle}>Log Transaction</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -183,15 +182,23 @@ export default function HomeScreen() {
           onPress={() => router.push("/payments")}
         >
           <Ionicons name="card-outline" size={24} color="#C44736" />
-          <Text style={styles.quickTitle}>Payments</Text>
+          <Text style={styles.quickTitle}>Pay Tax</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.quickCard}
-          onPress={() => router.push("/invoices")}
+          onPress={() => router.push("//(tabs)/create-invoice")}
         >
           <Ionicons name="receipt-outline" size={24} color="#C44736" />
-          <Text style={styles.quickTitle}>Invoices</Text>
+          <Text style={styles.quickTitle}>Create Invoice</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.quickCard}
+          onPress={() => router.push("/compliance-certificate")}
+        >
+          <Ionicons name="shield-checkmark-outline" size={24} color="#C44736" />
+          <Text style={styles.quickTitle}>Tax Compliance</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -199,23 +206,15 @@ export default function HomeScreen() {
           onPress={() => router.push("/tax-returns")}
         >
           <Ionicons name="document-text-outline" size={24} color="#C44736" />
-          <Text style={styles.quickTitle}>Returns</Text>
+          <Text style={styles.quickTitle}>File Tax Return</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={styles.quickCard}
-          onPress={() => router.push("/reports")}
+          onPress={() => router.push("/tax")}
         >
-          <Ionicons name="bar-chart-outline" size={24} color="#C44736" />
-          <Text style={styles.quickTitle}>Reports</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.quickCard}
-          onPress={() => router.push("/deadlines")}
-        >
-          <Ionicons name="calendar-outline" size={24} color="#C44736" />
-          <Text style={styles.quickTitle}>Deadlines</Text>
+          <Ionicons name="calculator-outline" size={24} color="#C44736" />
+          <Text style={styles.quickTitle}>Tax Rates</Text>
         </TouchableOpacity>
       </View>
 
@@ -245,13 +244,21 @@ export default function HomeScreen() {
               </Text>
             </View>
 
-            {daysLeft >= 0 ? (
-              <Text style={styles.daysLeft}>{daysLeft} days left</Text>
-            ) : (
-              <View style={styles.overdueBadge}>
-                <Text style={styles.overdueText}>Overdue</Text>
-              </View>
-            )}
+            <Text
+              style={[
+                styles.deadlineStatus,
+                {
+                  color:
+                    daysLeft >= 0
+                      ? "#16A34A"
+                      : "#C44736",
+                },
+              ]}
+            >
+              {daysLeft >= 0
+                ? `${daysLeft} days left`
+                : "Overdue"}
+            </Text>
           </Card>
         );
       })}
@@ -449,12 +456,12 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontFamily: "Inter_700Bold",
-    color: "#111827",
+    color: "#C44736",
     marginBottom: 10,
   },
 
   seeAll: {
-    color: "#C44736",
+    color: "#111827",
     fontFamily: "Inter_600SemiBold",
   },
 
@@ -488,27 +495,8 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
   },
 
-  daysLeft: {
-    backgroundColor: "#FCE8E6",
-    color: "#C44736",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    fontFamily: "Inter_600SemiBold",
+  deadlineStatus: {
     fontSize: 12,
-    overflow: "hidden",
-  },
-
-  overdueBadge: {
-    backgroundColor: "#C44736",
-    borderRadius: 14,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-
-  overdueText: {
-    color: "#FFFFFF",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 11,
   },
 });

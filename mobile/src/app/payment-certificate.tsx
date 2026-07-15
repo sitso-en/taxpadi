@@ -13,6 +13,7 @@ import {
 } from "react-native";
 
 import { usePayments } from "@/context/PaymentContext";
+import { getUserFriendlyError } from "@/utils/error";
 
 export default function PaymentCertificateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -36,7 +37,10 @@ export default function PaymentCertificateScreen() {
         setCertificate(response.data);
       } catch (error) {
         console.log(error);
-        Alert.alert("Error", "Unable to load certificate.");
+       Alert.alert(
+  "Unable to Load Payment Certificate",
+  getUserFriendlyError(error)
+);
       } finally {
         setLoading(false);
       }

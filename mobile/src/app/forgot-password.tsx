@@ -1,6 +1,7 @@
 import { forgotPassword } from "@/services/auth.service";
 import { router } from "expo-router";
 import React, { useState } from "react";
+import { getUserFriendlyError } from "@/utils/error";
 import {
   ActivityIndicator,
   Alert,
@@ -43,19 +44,28 @@ export default function ForgotPasswordScreen() {
         return;
       }
 
-      router.push({
-        pathname: "/otp-verification",
-        params: {
-          phone: fullPhone,
-          purpose: "PASSWORD_RESET",
-        },
-      });
+      Alert.alert(
+        "OTP Sent",
+        "A password reset code has been sent to your phone.",
+        [
+          {
+            text: "Continue",
+            onPress: () =>
+              router.push({
+                pathname: "/otp-verification",
+                params: {
+                  phone: fullPhone,
+                  purpose: "PASSWORD_RESET",
+                },
+              }),
+          },
+        ]
+      );
     } catch (error: any) {
       Alert.alert(
-        "Request Failed",
-        error?.response?.data?.message ??
-          "Unable to send OTP."
-      );
+  "Request Unsuccessful",
+  getUserFriendlyError(error)
+);
     } finally {
       setLoading(false);
     }

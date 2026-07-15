@@ -27,7 +27,6 @@ export const login = async (
 
   if (
     response.data.success &&
-    !response.data.data.requires_otp &&
     response.data.data.access_token
   ) {
 
@@ -63,36 +62,30 @@ export const register = async (payload: {
 
 export const verifyOTP = async (
   phone: string,
-  otp: string
+  otp: string,
+  purpose: string
 ) => {
   const response = await client.post(
     ENDPOINTS.AUTH.VERIFY_OTP,
     {
       phone,
-      otp,
+      purpose,
+      otp_code: otp,
     }
   );
-
-  if (
-    response.data.success &&
-    response.data.data?.access_token
-  ) {
-    await saveTokens(
-      response.data.data.access_token,
-      response.data.data.refresh_token
-    );
-  }
 
   return response.data;
 };
 
 export const resendOTP = async (
-  phone: string
+  phone: string,
+  purpose: string
 ) => {
   const response = await client.post(
     ENDPOINTS.AUTH.RESEND_OTP,
     {
       phone,
+      purpose,
     }
   );
 
@@ -120,7 +113,7 @@ export const verifyResetOTP = async (
     ENDPOINTS.AUTH.VERIFY_RESET_OTP,
     {
       phone,
-      otp,
+      otp_code: otp,
     }
   );
 

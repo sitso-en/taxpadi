@@ -18,6 +18,7 @@ import {
   deleteNotification as deleteNotificationApi,
   deleteAllNotifications,
 } from "@/services/notification.service";
+import { getUserFriendlyError } from "@/utils/error";
 
 export default function NotificationPreferencesScreen() {
   const [notifications, setNotifications] = useState<any[]>([]);
@@ -40,10 +41,10 @@ export default function NotificationPreferencesScreen() {
       );
     } catch (error) {
       console.log(error);
-      Alert.alert(
-        "Error",
-        "Failed to load notifications."
-      );
+     Alert.alert(
+  "Unable to Update Notification Preferences",
+  getUserFriendlyError(error)
+);
     }
   };
 
@@ -108,7 +109,7 @@ export default function NotificationPreferencesScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -140,7 +141,7 @@ export default function NotificationPreferencesScreen() {
             }
           },
         },
-      ]
+      ],
     );
   };
 
@@ -171,7 +172,6 @@ export default function NotificationPreferencesScreen() {
       }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => {
@@ -182,7 +182,7 @@ export default function NotificationPreferencesScreen() {
             }
           }}
         >
-          <Ionicons name="arrow-back" size={24} color="#111827" />
+          <Ionicons name="chevron-back" size={26} color="#111827" />
         </TouchableOpacity>
 
         <Text style={styles.title}>Notifications</Text>
@@ -192,7 +192,6 @@ export default function NotificationPreferencesScreen() {
         Stay updated with payments, reminders and tax activity.
       </Text>
 
-      {/* Summary Card */}
       <View style={styles.summaryCard}>
         <View style={styles.summaryIcon}>
           <Ionicons name="notifications-outline" size={28} color="#FFFFFF" />
@@ -205,7 +204,6 @@ export default function NotificationPreferencesScreen() {
         </View>
       </View>
 
-      {/* Top Controls Row */}
       {notifications.length > 0 && (
         <View style={styles.topRow}>
           <View style={styles.actionsRow}>
@@ -234,7 +232,6 @@ export default function NotificationPreferencesScreen() {
         </View>
       )}
 
-      {/* Empty State */}
       {notifications.length === 0 && (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconCircle}>
@@ -247,7 +244,6 @@ export default function NotificationPreferencesScreen() {
         </View>
       )}
 
-      {/* Notifications List */}
       {notifications.map((item) => {
         const iconConfig = getIconConfig(item.title);
 
@@ -297,7 +293,6 @@ export default function NotificationPreferencesScreen() {
         );
       })}
 
-      {/* Interaction Hint */}
       {notifications.length > 0 && (
         <Text style={styles.hintText}>
           Long press a notification to delete it.
@@ -322,7 +317,7 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 34,
+    fontSize: 28,
     color: "#111827",
     fontFamily: "Inter_700Bold",
     marginLeft: 10,
@@ -330,17 +325,18 @@ const styles = StyleSheet.create({
 
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    marginTop: -8,
-    marginBottom: 24,
+    marginTop: 0,
+    marginBottom: 18,
+    lineHeight: 18,
   },
 
   summaryCard: {
     backgroundColor: "#C44736",
     borderRadius: 18,
-    paddingVertical: 28,
-    paddingHorizontal: 24,
+    paddingVertical: 20,
+    paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 24,
@@ -352,10 +348,12 @@ const styles = StyleSheet.create({
   },
 
   summaryIcon: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -390,7 +388,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF5F3",
     paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 18,
+    borderRadius: 14,
   },
 
   actionText: {
@@ -401,9 +399,9 @@ const styles = StyleSheet.create({
 
   notificationCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 16,
-    marginBottom: 14,
+    marginBottom: 10,
     flexDirection: "row",
     alignItems: "center",
     borderWidth: 1,
@@ -478,7 +476,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 60,
+    marginTop: 40,
     paddingHorizontal: 30,
   },
 

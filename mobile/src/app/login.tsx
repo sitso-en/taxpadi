@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
+import { getUserFriendlyError } from "@/utils/error";
 import {
   ActivityIndicator,
   Alert,
@@ -21,6 +22,7 @@ import { useUser, type User } from "@/context/UserContext";
 import { getDeviceInfo } from "@/utils/device";
 // import { getDeviceToken } from "@/services/notifications.service";
 import { registerNotificationToken } from "@/services/notification.service";
+import { saveTokens } from "@/utils/storage";
 
 const countryCodes = [
   { label: "🇬🇭 +233", value: "+233" },
@@ -80,22 +82,10 @@ export default function LoginScreen() {
         return;
       }
 
-      if (response.data.requires_otp) {
-        Alert.alert(
-          "OTP Required",
-          "Please verify the OTP sent to your phone.",
-        );
-
-        router.push({
-          pathname: "/otp-verification",
-          params: {
-            phone: fullPhone,
-            purpose: "LOGIN",
-          },
-        });
-
-        return;
-      }
+      await saveTokens(
+        response.data.access_token,
+        response.data.refresh_token
+      );
 
       // const device = await getDeviceToken();
 
@@ -119,7 +109,9 @@ export default function LoginScreen() {
         email: email ?? "",
         region: "",
         category: "",
-        plan: "FREE",
+        subscription_tier:
+          response.data.user.subscription_tier ?? "FREE",
+        is_active: false,
         label: "",
         tin: "",
         taxpayer_category: "",
@@ -137,10 +129,10 @@ export default function LoginScreen() {
     } catch (error: any) {
       console.log(error);
 
-      Alert.alert(
-        "Login Failed",
-        error?.response?.data?.message ?? "Unable to connect to the server.",
-      );
+     Alert.alert(
+  "Unable to Sign In",
+  getUserFriendlyError(error)
+);
     } finally {
       setLoading(false);
     }
@@ -186,7 +178,7 @@ export default function LoginScreen() {
             if (cleaned.length > 2) {
               formatted = cleaned.replace(
                 /(\d{2})(\d{0,3})(\d{0,4})/,
-                (_, p1, p2, p3) => [p1, p2, p3].filter(Boolean).join(" "),
+                (_, p1, p2, p3) => [p1, p2, p3].filter(Boolean).join(" ")
               );
             }
 
@@ -228,26 +220,6 @@ export default function LoginScreen() {
         <Text style={styles.buttonText}>
           {loading ? "Logging In..." : "Log In"}
         </Text>
-      </TouchableOpacity>
-
-      <View style={styles.dividerContainer}>
-        <View style={styles.divider} />
-        <Text style={styles.orText}>or</Text>
-        <View style={styles.divider} />
-      </View>
-
-      <TouchableOpacity
-        style={styles.secondaryButton}
-        onPress={() =>
-          router.push({
-            pathname: "/otp-verification",
-            params: {
-              purpose: "LOGIN",
-            },
-          })
-        }
-      >
-        <Text style={styles.secondaryButtonText}>Continue with OTP</Text>
       </TouchableOpacity>
 
       <TouchableOpacity onPress={() => router.push("/register")}>
@@ -351,36 +323,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontFamily: "Inter_600SemiBold",
     fontSize: 16,
-  },
-
-  dividerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginVertical: 10,
-  },
-
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: "#E5E7EB",
-  },
-
-  orText: {
-    marginHorizontal: 12,
-    color: "#6B7280",
-    fontFamily: "Inter_400Regular",
-  },
-
-  secondaryButton: {
-    backgroundColor: "#F3F4F6",
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: "center",
-  },
-
-  secondaryButtonText: {
-    color: "#111827",
-    fontFamily: "Inter_500Medium",
   },
 
   registerText: {

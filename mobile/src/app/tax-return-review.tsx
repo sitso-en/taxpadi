@@ -1,6 +1,7 @@
+import React, { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import React, { useState } from "react";
+import { getUserFriendlyError } from "@/utils/error";
 import {
   Alert,
   ScrollView,
@@ -10,6 +11,11 @@ import {
   View,
 } from "react-native";
 import { useTaxReturns } from "../context/TaxReturnsContext";
+import {
+  getTaxReturns,
+  previewTaxReturn,
+  submitTaxReturn,
+} from "@/services/taxReturns.service";
 
 export default function TaxReturnReviewScreen() {
   const { returnId } = useLocalSearchParams<{
@@ -19,6 +25,28 @@ export default function TaxReturnReviewScreen() {
   const { fileCurrentReturn } = useTaxReturns();
 
   const [loading, setLoading] = useState(false);
+  const [taxReturn, setTaxReturn] = useState<any>(null);
+  const [loadingReturn, setLoadingReturn] = useState(true);
+
+  useEffect(() => {
+    const loadReturn = async () => {
+      if (!returnId) return;
+
+      try {
+        const response = await previewTaxReturn(returnId as string);
+        setTaxReturn(response.data ?? response);
+      } catch (error: any) {
+       Alert.alert(
+  "Unable to Load Tax Return",
+  getUserFriendlyError(error)
+);
+      } finally {
+        setLoadingReturn(false);
+      }
+    };
+
+    loadReturn();
+  }, [returnId]);
 
   const handleSubmit = async () => {
     if (loading) return;
@@ -26,19 +54,33 @@ export default function TaxReturnReviewScreen() {
     setLoading(true);
 
     try {
+      await submitTaxReturn(returnId as string, "");
       await fileCurrentReturn();
 
       router.replace("/tax-return-confirmation" as never);
     } catch (error: any) {
       Alert.alert(
-        "Submission Failed",
-        error?.response?.data?.message ??
-          "Unable to submit tax return."
-      );
+  "Tax Return Submission Unsuccessful",
+  getUserFriendlyError(error)
+);
     } finally {
       setLoading(false);
     }
   };
+
+  if (loadingReturn) {
+    return (
+      <View
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <Text>Loading...</Text>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -67,28 +109,28 @@ export default function TaxReturnReviewScreen() {
       <View style={styles.card}>
         <Row
           label="Tax Type"
-          value="Income Tax"
+          value={taxReturn?.tax_type ?? "Income Tax"}
         />
 
         <Divider />
 
         <Row
           label="Tax Year"
-          value="2026"
+          value={String(taxReturn?.tax_year ?? "")}
         />
 
         <Divider />
 
         <Row
           label="Estimated Liability"
-          value="GH¢ 4,280.00"
+          value={`GH¢ ${Number(taxReturn?.tax_liability ?? 0).toFixed(2)}`}
         />
 
         <Divider />
 
         <Row
           label="Status"
-          value="Draft"
+          value={taxReturn?.status ?? "Draft"}
         />
       </View>
 
@@ -140,24 +182,35 @@ const styles = StyleSheet.create({
 
   title: {
     marginLeft: 10,
-    fontSize: 30,
+    fontSize: 34,
     color: "#111827",
     fontFamily: "Inter_700Bold",
   },
 
   subtitle: {
     color: "#6B7280",
-    marginBottom: 24,
     fontFamily: "Inter_400Regular",
+    marginTop: 2,
+    marginBottom: 18,
+    fontSize: 13,
+    lineHeight: 18,
   },
 
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 20,
+    borderRadius: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: "#ECECEC",
     marginBottom: 30,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
 
   row: {
@@ -184,8 +237,8 @@ const styles = StyleSheet.create({
 
   button: {
     backgroundColor: "#C44736",
-    borderRadius: 14,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: "center",
   },
 

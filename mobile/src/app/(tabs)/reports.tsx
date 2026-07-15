@@ -21,6 +21,7 @@ import { usePayments } from "../../context/PaymentContext";
 import { useInvoices } from "../../context/InvoiceContext";
 import { useTaxReturns } from "../../context/TaxReturnsContext";
 import { useUser } from "../../context/UserContext";
+import { getUserFriendlyError } from "@/utils/error";
 
 export default function ReportsScreen() {
   const { transactions } = useTransactions();
@@ -91,8 +92,8 @@ export default function ReportsScreen() {
         <html>
           <body style="font-family: Arial; padding: 20px;">
             <h1>${reportTitle}</h1>
-            <h2>${user?.label}</h2>
-            <p>Generated: ${new Date().toLocaleString()}</p>
+            <h2>${user?.fullName}</h2>
+            <p>Generated: ${new Date().toLocaleString("en-US")}</p>
             <hr/>
             <p><strong>Total Income:</strong> GH¢ ${totalIncome.toFixed(2)}</p>
             <p><strong>Total Expenses:</strong> GH¢ ${totalExpenses.toFixed(2)}</p>
@@ -135,8 +136,8 @@ export default function ReportsScreen() {
       const csv = Papa.unparse([
         {
           Report: reportTitle,
-          User: user?.label,
-          Generated: new Date().toLocaleString(),
+          User: user?.fullName,
+          Generated: new Date().toLocaleString("en-US"),
           Income: totalIncome,
           Expenses: totalExpenses,
           NetProfit: netProfit,
@@ -151,7 +152,9 @@ export default function ReportsScreen() {
 
       const file = new FileSystem.File(
         FileSystem.Paths.document,
-        `${reportTitle.replace(/\s+/g, "_")}.csv`
+        `${reportTitle.replace(/\s+/g, "_")}_${new Date()
+          .toISOString()
+          .slice(0, 10)}.csv`
       );
 
       console.log("Saving CSV to:", file.uri);
@@ -171,15 +174,45 @@ export default function ReportsScreen() {
       }
     } catch (error: any) {
       console.log("CSV ERROR:", error);
-      Alert.alert(
-        "Export Failed",
-        error?.response?.data?.message ??
-          "Unable to export CSV."
-      );
+     Alert.alert(
+  "Export Unsuccessful",
+  getUserFriendlyError(error)
+);
     } finally {
       setExportingCsv(false);
     }
   };
+
+  if (
+    transactions.length === 0 &&
+    payments.length === 0 &&
+    invoices.length === 0
+  ) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={26} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Reports & Export</Text>
+        </View>
+
+        <View style={styles.emptyState}>
+          <Ionicons
+            name="bar-chart-outline"
+            size={56}
+            color="#9CA3AF"
+          />
+          <Text style={styles.emptyTitle}>
+            No Reports Available
+          </Text>
+          <Text style={styles.emptySubtitle}>
+            Add transactions or payments to generate reports.
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <ScrollView
@@ -217,11 +250,15 @@ export default function ReportsScreen() {
           </Text>
 
           <Text style={styles.summarySubtitle}>
-            Income GH¢ {totalIncome.toFixed(2)}
+            Income • GH¢ {totalIncome.toFixed(2)}
           </Text>
 
           <Text style={styles.summarySubtitle}>
-            Profit GH¢ {netProfit.toFixed(2)}
+            Expenses • GH¢ {totalExpenses.toFixed(2)}
+          </Text>
+
+          <Text style={styles.summarySubtitle}>
+            Net Profit • GH¢ {netProfit.toFixed(2)}
           </Text>
         </View>
       </View>
@@ -238,7 +275,11 @@ export default function ReportsScreen() {
               <Text style={styles.cardTitle}>{report.title}</Text>
               <Text style={styles.cardSubtitle}>{report.subtitle}</Text>
               <Text style={styles.generatedText}>
-                Updated {new Date().toLocaleDateString()}
+                Updated {new Date().toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                })}
               </Text>
             </View>
           </View>
@@ -305,26 +346,38 @@ const styles = StyleSheet.create({
 
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
-    marginTop: -6,
-    marginBottom: 28,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
+    marginBottom: 18,
     fontFamily: "Inter_400Regular",
   },
 
   summaryCard: {
     backgroundColor: "#C44736",
-    borderRadius: 18,
-    padding: 22,
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 28,
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    elevation: 5,
   },
 
   summaryIcon: {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
@@ -344,8 +397,8 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 20,
+    borderRadius: 16,
+    padding: 18,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#ECECEC",
@@ -365,9 +418,9 @@ const styles = StyleSheet.create({
   },
 
   iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: "#FCE8E6",
     justifyContent: "center",
     alignItems: "center",
@@ -407,8 +460,8 @@ const styles = StyleSheet.create({
   pdfButton: {
     flex: 1,
     backgroundColor: "#C44736",
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
     marginRight: 8,
     flexDirection: "row",
     justifyContent: "center",
@@ -418,8 +471,8 @@ const styles = StyleSheet.create({
   csvButton: {
     flex: 1,
     backgroundColor: "#FFFFFF",
-    paddingVertical: 14,
-    borderRadius: 12,
+    paddingVertical: 16,
+    borderRadius: 16,
     marginLeft: 8,
     borderWidth: 1,
     borderColor: "#D1D5DB",
@@ -436,5 +489,26 @@ const styles = StyleSheet.create({
   csvText: {
     color: "#111827",
     fontFamily: "Inter_600SemiBold",
+  },
+
+  emptyState: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 80,
+  },
+
+  emptyTitle: {
+    marginTop: 16,
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+  },
+
+  emptySubtitle: {
+    marginTop: 6,
+    color: "#6B7280",
+    textAlign: "center",
+    fontFamily: "Inter_400Regular",
   },
 });

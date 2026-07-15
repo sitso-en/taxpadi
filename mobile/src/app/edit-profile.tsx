@@ -2,6 +2,7 @@ import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useUser } from "../context/UserContext";
+
 import {
   ScrollView,
   StyleSheet,
@@ -54,14 +55,6 @@ export default function TaxProfileScreen() {
           {user?.taxpayer_category || "Taxpayer"}
         </Text>
 
-        <Text style={styles.infoText}>
-          {user?.tin || "No TIN"}
-        </Text>
-
-        <Text style={styles.infoText}>
-          {user?.taxpayer_category || "Not specified"}
-        </Text>
-
         <View
           style={[
             styles.planBadge,
@@ -70,7 +63,7 @@ export default function TaxProfileScreen() {
             },
           ]}
         >
-          <Text style={styles.planText}>★ {user?.active_profile ? "ACTIVE" : "INACTIVE"}</Text>
+          <Text style={styles.planText}>{user?.active_profile ? "Active" : "Inactive"}</Text>
         </View>
       </View>
 
@@ -79,7 +72,7 @@ export default function TaxProfileScreen() {
 
       <TouchableOpacity
         style={styles.optionCard}
-        onPress={() => router.push("/settings")}
+        onPress={() => router.push("/alter-profile")}
       >
         <Ionicons name="create-outline" size={22} color="#C44736" />
 
@@ -98,7 +91,9 @@ export default function TaxProfileScreen() {
 
       <View style={styles.subscriptionCard}>
         <Text style={styles.subscriptionTitle}>Current Plan</Text>
-        <Text style={styles.subscriptionPlan}>{user?.active_profile ? "ACTIVE" : "INACTIVE"}</Text>
+        <Text style={styles.subscriptionPlan}>
+          {user?.active_profile ? "Pro" : "Free"}
+        </Text>
         <Text style={styles.subscriptionText}>
           {user?.active_profile
             ? "You currently have access to premium features."
@@ -118,18 +113,19 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    marginBottom: 28,
+    marginBottom: 18,
   },
 
   title: {
-    fontSize: 32,
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
     color: "#111827",
   },
 
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: "Inter_400Regular",
     marginTop: 4,
   },
@@ -137,24 +133,26 @@ const styles = StyleSheet.create({
   profileSection: {
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    paddingVertical: 30,
+    borderRadius: 16,
+    paddingVertical: 24,
     paddingHorizontal: 20,
     marginBottom: 30,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
     shadowColor: "#000",
-    shadowOpacity: 0.06,
-    shadowRadius: 10,
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
     shadowOffset: {
       width: 0,
-      height: 3,
+      height: 2,
     },
-    elevation: 3,
+    elevation: 2,
   },
 
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: "#C44736",
     justifyContent: "center",
     alignItems: "center",
@@ -171,12 +169,12 @@ const styles = StyleSheet.create({
 
   avatarText: {
     color: "#FFFFFF",
-    fontSize: 32,
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
   },
 
   name: {
-    fontSize: 24,
+    fontSize: 20,
     color: "#111827",
     fontFamily: "Inter_700Bold",
     marginBottom: 10,
@@ -205,15 +203,15 @@ const styles = StyleSheet.create({
 
   sectionLabel: {
     color: "#C44736",
-    fontSize: 11,
+    fontSize: 16,
     marginBottom: 10,
     fontFamily: "Inter_600SemiBold",
   },
 
   optionCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 16,
+    padding: 16,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 24,
@@ -249,8 +247,8 @@ const styles = StyleSheet.create({
 
   subscriptionCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 22,
+    borderRadius: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: "#ECECEC",
     shadowColor: "#000",

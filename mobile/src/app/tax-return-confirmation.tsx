@@ -1,5 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
 import {
   ScrollView,
@@ -10,6 +10,10 @@ import {
 } from "react-native";
 
 export default function TaxReturnConfirmationScreen() {
+  const { returnId } = useLocalSearchParams<{
+    returnId: string;
+  }>();
+
   return (
     <ScrollView
       style={styles.container}
@@ -35,7 +39,7 @@ export default function TaxReturnConfirmationScreen() {
       <View style={styles.card}>
         <View style={styles.row}>
           <Text style={styles.label}>Status</Text>
-          <Text style={styles.value}>Submitted</Text>
+          <Text style={styles.value}>Successfully Submitted</Text>
         </View>
 
         <View style={styles.divider} />
@@ -43,7 +47,7 @@ export default function TaxReturnConfirmationScreen() {
         <View style={styles.row}>
           <Text style={styles.label}>Reference</Text>
           <Text style={styles.value}>
-            GRA-{Date.now().toString().slice(-6)}
+            {returnId ?? "Pending"}
           </Text>
         </View>
 
@@ -51,7 +55,7 @@ export default function TaxReturnConfirmationScreen() {
 
         <View style={styles.row}>
           <Text style={styles.label}>Next Step</Text>
-          <Text style={styles.value}>Proceed to Payment</Text>
+          <Text style={styles.value}>Review payment status</Text>
         </View>
       </View>
 
@@ -96,15 +100,17 @@ const styles = StyleSheet.create({
 
   title: {
     marginTop: 24,
-    fontSize: 30,
+    fontSize: 34,
     color: "#111827",
     textAlign: "center",
     fontFamily: "Inter_700Bold",
   },
 
   subtitle: {
-    marginTop: 8,
-    marginBottom: 30,
+    marginTop: 4,
+    marginBottom: 22,
+    fontSize: 13,
+    lineHeight: 18,
     textAlign: "center",
     color: "#6B7280",
     fontFamily: "Inter_400Regular",
@@ -112,11 +118,19 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
-    padding: 22,
+    borderRadius: 16,
+    padding: 18,
     borderWidth: 1,
     borderColor: "#ECECEC",
     marginBottom: 28,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
 
   row: {
@@ -143,8 +157,8 @@ const styles = StyleSheet.create({
 
   primaryButton: {
     backgroundColor: "#C44736",
-    borderRadius: 14,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: "center",
     marginBottom: 14,
   },
@@ -158,8 +172,8 @@ const styles = StyleSheet.create({
   secondaryButton: {
     borderWidth: 1,
     borderColor: "#D1D5DB",
-    borderRadius: 14,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingVertical: 20,
     alignItems: "center",
   },
 

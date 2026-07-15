@@ -15,113 +15,81 @@ import { useSavings } from "../context/SavingsContext";
 
 export default function SavingsVaultScreen() {
   const {
-  savings,
-  totalSaved,
-  addSaving,
-  deleteSaving,
-} = useSavings();
-  const [amount, setAmount] =
-    useState("");
+    savings,
+    totalSaved,
+    addSaving,
+    deleteSaving,
+  } = useSavings();
 
-  const [selectedActivity, setSelectedActivity] =
-    useState<number | null>(null);
+  const [amount, setAmount] = useState("");
+  const [selectedActivity, setSelectedActivity] = useState<number | null>(null);
 
-  // Local withdrawals until
-  // SavingsContext is extended
-
-  const [withdrawals, setWithdrawals] =
-    useState<
-      {
-        id: number;
-        amount: number;
-        date: string;
-      }[]
-    >([]);
-
-  // Current balance
+  const [withdrawals, setWithdrawals] = useState<
+    {
+      id: number;
+      amount: number;
+      date: string;
+    }[]
+  >([]);
 
   const currentBalance =
     totalSaved -
     withdrawals.reduce(
-      (sum, item) =>
-        sum + item.amount,
+      (sum, item) => sum + item.amount,
       0
     );
-
-  // Current month deposits
 
   const monthlySaved = useMemo(() => {
     const now = new Date();
 
     return savings
       .filter((saving) => {
-        const date = new Date(
-          saving.date
-        );
+        const date = new Date(saving.date);
 
         return (
-          date.getMonth() ===
-            now.getMonth() &&
-          date.getFullYear() ===
-            now.getFullYear()
+          date.getMonth() === now.getMonth() &&
+          date.getFullYear() === now.getFullYear()
         );
       })
       .reduce(
-        (sum, saving) =>
-          sum + saving.amount,
+        (sum, saving) => sum + saving.amount,
         0
       );
   }, [savings]);
 
-  // Suggested amount
-
-  const suggestedAmount =
-    Math.max(
-      currentBalance * 0.2,
-      100
-    );
-
-  // Activity feed
+  const suggestedAmount = Math.max(
+    currentBalance * 0.2,
+    100
+  );
 
   const activity = useMemo(() => {
-    const deposits = savings.map(
-      (saving) => ({
-        id: saving.id,
-        type: "Deposit",
-        amount: saving.amount,
-        date: saving.date,
-        positive: true,
-      })
-    );
+    const deposits = savings.map((saving) => ({
+      id: saving.id,
+      type: "Deposit",
+      amount: saving.amount,
+      date: saving.date,
+      positive: true,
+    }));
 
-    const withdrawalsList =
-      withdrawals.map((item) => ({
-        id: item.id,
-        type: "Withdrawal",
-        amount: item.amount,
-        date: item.date,
-        positive: false,
-      }));
+    const withdrawalsList = withdrawals.map((item) => ({
+      id: item.id,
+      type: "Withdrawal",
+      amount: item.amount,
+      date: item.date,
+      positive: false,
+    }));
 
-    return [
-      ...deposits,
-      ...withdrawalsList,
-    ].sort(
+    return [...deposits, ...withdrawalsList].sort(
       (a, b) =>
         new Date(b.date).getTime() -
         new Date(a.date).getTime()
     );
   }, [savings, withdrawals]);
 
-  // Deposit
-
   const handleDeposit = () => {
     const value = Number(amount);
 
-    if (
-      !amount.trim() ||
-      value <= 0
-    ) {
+    if (!amount.trim() || value <= 0) {
       Alert.alert(
         "Invalid Amount",
         "Enter a valid amount."
@@ -133,7 +101,7 @@ export default function SavingsVaultScreen() {
     addSaving(value);
 
     Alert.alert(
-      "Success",
+      "Deposit Successful",
       `GH¢ ${value.toFixed(
         2
       )} deposited successfully.`
@@ -142,15 +110,10 @@ export default function SavingsVaultScreen() {
     setAmount("");
   };
 
-  // Withdraw
-
   const handleWithdraw = () => {
     const value = Number(amount);
 
-    if (
-      !amount.trim() ||
-      value <= 0
-    ) {
+    if (!amount.trim() || value <= 0) {
       Alert.alert(
         "Invalid Amount",
         "Enter a valid amount."
@@ -161,8 +124,10 @@ export default function SavingsVaultScreen() {
 
     if (value > currentBalance) {
       Alert.alert(
-        "Insufficient Funds",
-        "You do not have enough savings."
+        "Withdrawal Unsuccessful",
+        `You only have GH¢ ${currentBalance.toFixed(
+          2
+        )} available in your Savings Vault.\n\nReduce the withdrawal amount or make another deposit before trying again.`
       );
 
       return;
@@ -173,13 +138,12 @@ export default function SavingsVaultScreen() {
       {
         id: Date.now(),
         amount: value,
-        date:
-          new Date().toISOString(),
+        date: new Date().toISOString(),
       },
     ]);
 
     Alert.alert(
-      "Success",
+      "Withdrawal Successful",
       `GH¢ ${value.toFixed(
         2
       )} withdrawn successfully.`
@@ -188,45 +152,42 @@ export default function SavingsVaultScreen() {
     setAmount("");
   };
 
-  // Delete Activity
+  const handleDeleteActivity = (id: number) => {
+    console.log(
+      "Delete tapped:",
+      id,
+      "deleteSaving type:",
+      typeof deleteSaving
+    );
 
- const handleDeleteActivity = (id: number) => {
-  console.log("Delete tapped:", id, "deleteSaving type:", typeof deleteSaving);
+    const isWithdrawal = withdrawals.some(
+      (item) => item.id === id
+    );
 
-  const isWithdrawal =
-  withdrawals.some(
-    (item) => item.id === id
-  );
+    if (isWithdrawal) {
+      setWithdrawals((prev) =>
+        prev.filter(
+          (item) => item.id !== id
+        )
+      );
+    } else {
+      deleteSaving(id);
+    }
 
-if (isWithdrawal) {
-  setWithdrawals((prev) =>
-    prev.filter(
-      (item) => item.id !== id
-    )
-  );
-} else {
-  deleteSaving(id);
-}
+    setSelectedActivity(null);
+  };
 
-setSelectedActivity(null);
-};
   return (
     <ScrollView
       style={styles.container}
-      showsVerticalScrollIndicator={
-        false
-      }
+      showsVerticalScrollIndicator={false}
       contentContainerStyle={{
         paddingBottom: 120,
       }}
     >
-      {/* Header */}
-
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() =>
-            router.back()
-          }
+          onPress={() => router.back()}
         >
           <Ionicons
             name="chevron-back"
@@ -240,12 +201,8 @@ setSelectedActivity(null);
         </Text>
       </View>
 
-      {/* Hero */}
-
       <View style={styles.heroCard}>
-        <View
-          style={styles.iconCircle}
-        >
+        <View style={styles.iconCircle}>
           <Ionicons
             name="wallet-outline"
             size={28}
@@ -253,33 +210,23 @@ setSelectedActivity(null);
           />
         </View>
 
-        <Text
-          style={styles.heroLabel}
-        >
+        <Text style={styles.heroLabel}>
           VAULT BALANCE
         </Text>
 
-        <Text
-          style={styles.heroAmount}
-        >
+        <Text style={styles.heroAmount}>
           GH¢{" "}
           {currentBalance.toLocaleString()}
         </Text>
 
-        <Text
-          style={styles.heroSubText}
-        >
+        <Text style={styles.heroSubText}>
           GH¢{" "}
-          {monthlySaved.toFixed(2)}{" "}
-          added this month
+          {monthlySaved.toFixed(2)} added this
+          month
         </Text>
       </View>
 
-      {/* Suggested */}
-
-      <View
-        style={styles.suggestionCard}
-      >
+      <View style={styles.suggestionCard}>
         <Ionicons
           name="bulb-outline"
           size={18}
@@ -293,47 +240,31 @@ setSelectedActivity(null);
           }}
         >
           <Text
-            style={
-              styles.suggestionTitle
-            }
+            style={styles.suggestionTitle}
           >
             Suggested savings
           </Text>
 
           <Text
-            style={
-              styles.suggestionText
-            }
+            style={styles.suggestionText}
           >
-            Based on your current
-            vault activity.
+            Based on your current vault
+            activity.
           </Text>
         </View>
 
         <Text
-          style={
-            styles.suggestedAmount
-          }
+          style={styles.suggestedAmount}
         >
           GH¢{" "}
-          {suggestedAmount.toFixed(
-            2
-          )}
+          {suggestedAmount.toFixed(2)}
         </Text>
       </View>
 
-      {/* Buttons */}
-
-      <View
-        style={styles.buttonRow}
-      >
+      <View style={styles.buttonRow}>
         <TouchableOpacity
-          style={
-            styles.depositButton
-          }
-          onPress={
-            handleDeposit
-          }
+          style={styles.depositButton}
+          onPress={handleDeposit}
         >
           <Text
             style={
@@ -348,9 +279,7 @@ setSelectedActivity(null);
           style={
             styles.withdrawButton
           }
-          onPress={
-            handleWithdraw
-          }
+          onPress={handleWithdraw}
         >
           <Text
             style={
@@ -362,8 +291,6 @@ setSelectedActivity(null);
         </TouchableOpacity>
       </View>
 
-      {/* Amount */}
-
       <TextInput
         style={styles.input}
         placeholder="Enter amount"
@@ -371,8 +298,6 @@ setSelectedActivity(null);
         value={amount}
         onChangeText={setAmount}
       />
-
-      {/* Activity */}
 
       <Text
         style={styles.sectionTitle}
@@ -490,10 +415,9 @@ setSelectedActivity(null);
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor:
-      "#FAFAFA",
+    backgroundColor: "#FAFAFA",
     paddingHorizontal: 20,
-    paddingTop: 55,
+    paddingTop: 44,
   },
 
   header: {
@@ -504,68 +428,63 @@ const styles = StyleSheet.create({
 
   title: {
     fontSize: 24,
-    fontFamily:
-      "Inter_700Bold",
+    fontFamily: "Inter_700Bold",
     color: "#111827",
     marginLeft: 10,
   },
 
   heroCard: {
-    backgroundColor:
-      "#C44736",
-    borderRadius: 18,
-    padding: 24,
+    backgroundColor: "#C44736",
+    borderRadius: 20,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginBottom: 16,
     alignItems: "center",
-    marginBottom: 18,
   },
 
   iconCircle: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    backgroundColor:
-      "#FFFFFF",
-    justifyContent:
-      "center",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: "#FFFFFF20",
+    justifyContent: "center",
     alignItems: "center",
-    marginBottom: 12,
+    marginBottom: 10,
   },
 
   heroLabel: {
     color: "#FDECEC",
-    fontSize: 11,
-    fontFamily:
-      "Inter_600SemiBold",
+    fontSize: 10,
+    letterSpacing: 1,
+    fontFamily: "Inter_600SemiBold",
   },
 
   heroAmount: {
     color: "#FFFFFF",
-    fontSize: 32,
-    fontFamily:
-      "Inter_700Bold",
-    marginTop: 8,
+    fontSize: 26,
+    fontFamily: "Inter_700Bold",
+    marginTop: 4,
   },
 
   heroSubText: {
     color: "#FDECEC",
-    marginTop: 6,
-    fontFamily:
-      "Inter_400Regular",
+    marginTop: 4,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
   },
 
   suggestionCard: {
-    backgroundColor:
-      "#FFFFFF",
+    backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 20,
   },
 
   suggestionTitle: {
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
     color: "#111827",
   },
 
@@ -577,53 +496,47 @@ const styles = StyleSheet.create({
 
   suggestedAmount: {
     color: "#C44736",
-    fontFamily:
-      "Inter_700Bold",
-    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
   },
 
   buttonRow: {
     flexDirection: "row",
-    justifyContent:
-      "space-between",
+    justifyContent: "space-between",
     marginBottom: 16,
   },
 
   depositButton: {
     width: "48%",
-    backgroundColor:
-      "#C44736",
+    backgroundColor: "#D95C4B",
     borderRadius: 12,
-    paddingVertical: 15,
+    paddingVertical: 13,
     alignItems: "center",
   },
 
   withdrawButton: {
     width: "48%",
-    backgroundColor:
-      "#FFFFFF",
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    paddingVertical: 15,
+    paddingVertical: 13,
     alignItems: "center",
   },
 
   depositButtonText: {
     color: "#FFFFFF",
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   withdrawButtonText: {
     color: "#111827",
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   input: {
-    backgroundColor:
-      "#FFFFFF",
+    backgroundColor: "#FFFFFF",
     borderRadius: 12,
-    padding: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     marginBottom: 24,
   },
 
@@ -631,42 +544,42 @@ const styles = StyleSheet.create({
     color: "#C44736",
     fontSize: 11,
     marginBottom: 12,
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
   },
 
- activityWrapper: {
-  position: "relative",
-  marginBottom: 10,
-  overflow: "visible", // add this
-},
+  activityWrapper: {
+    position: "relative",
+    marginBottom: 10,
+    overflow: "visible",
+  },
 
-deleteButton: {
-  position: "absolute",
-  left: 10, // change from 0 to 10
-  top: 18, // center vertically
-  width: 36, // slightly smaller
-  height: 36,
-  borderRadius: 18,
-  backgroundColor: "#C44736",
-  justifyContent: "center",
-  alignItems: "center",
-  zIndex: 1,
-},
+  deleteButton: {
+    position: "absolute",
+    left: 10,
+    top: 18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#C44736",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1,
+  },
 
-activityItem: {
-  backgroundColor: "#FFFFFF",
-  borderRadius: 14,
-  padding: 16,
-  flexDirection: "row",
-  justifyContent: "space-between",
-  alignItems: "center",
-  minHeight: 80, 
-},
+  activityItem: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 68,
+  },
+
   activityTitle: {
     color: "#111827",
-    fontFamily:
-      "Inter_600SemiBold",
+    fontFamily: "Inter_600SemiBold",
   },
 
   activityDate: {
@@ -676,17 +589,14 @@ activityItem: {
   },
 
   activityAmount: {
-    fontFamily:
-      "Inter_700Bold",
+    fontFamily: "Inter_700Bold",
     fontSize: 15,
   },
 
   emptyActivity: {
-    backgroundColor:
-      "#FFFFFF",
+    backgroundColor: "#FFFFFF",
     borderRadius: 14,
     padding: 24,
     alignItems: "center",
   },
 });
-

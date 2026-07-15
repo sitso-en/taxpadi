@@ -18,20 +18,24 @@ import {
 
 import Card from "../components/Card";
 
+const formatCurrency = (value: number) => {
+  return new Intl.NumberFormat("en-GH", {
+    style: "currency",
+    currency: "GHS",
+  }).format(value);
+};
+
 export default function DeadlinesScreen() {
   const { transactions } = useTransactions();
   const { payments } = usePayments();
   const { deadlines, toggleDeadline } = useDeadlines();
-  
 
-  // Financial calculations
   const totalIncome = transactions
     .filter((t) => t.type === "income")
     .reduce((sum, t) => sum + t.amount, 0);
 
   const payeDue = totalIncome * 0.055;
 
-  // Overdue deadlines
   const overdueDeadlines = deadlines.filter(
     (deadline) =>
       !deadline.completed && new Date(deadline.dueDate) < new Date()
@@ -41,14 +45,12 @@ export default function DeadlinesScreen() {
 
   const totalPenalty = overdueDeadlines.length > 0 ? payeDue + lateFee : 0;
 
-  // Days left
   const calculateDaysLeft = (date: string) => {
     const today = new Date();
     const difference = new Date(date).getTime() - today.getTime();
     return Math.ceil(difference / (1000 * 60 * 60 * 24));
   };
 
-  // Week strip
   const dates = Array.from({ length: 7 }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() - 3 + index);
@@ -62,18 +64,14 @@ export default function DeadlinesScreen() {
     };
   });
 
-  // Complete deadline
   const handleDeadlinePress = (
     id: number,
     title: string,
     completed: boolean
   ) => {
     toggleDeadline(id);
-
-  
   };
 
-  // Penalty payment
   const handlePayPenalty = () => {
     if (totalPenalty <= 0) {
       Alert.alert(
@@ -99,7 +97,6 @@ export default function DeadlinesScreen() {
         paddingBottom: 40,
       }}
     >
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           onPress={() => {
@@ -120,7 +117,6 @@ export default function DeadlinesScreen() {
         Keep track of filing deadlines and avoid penalties.
       </Text>
 
-      {/* Week Strip */}
       <View style={styles.dateContainer}>
         {dates.map((item) => (
           <View
@@ -172,13 +168,7 @@ export default function DeadlinesScreen() {
 
           return (
             <Card key={item.id} style={styles.card}>
-              <TouchableOpacity
-                activeOpacity={0.9}
-                onPress={() =>
-                  handleDeadlinePress(item.id, item.title, item.completed)
-                }
-                style={styles.cardContent}
-              >
+              <View style={styles.cardContent}>
                 <View style={styles.leftSection}>
                   <View style={styles.calendarIcon}>
                     <Ionicons
@@ -192,28 +182,48 @@ export default function DeadlinesScreen() {
                     <Text style={styles.cardTitle}>{item.title}</Text>
                     <Text style={styles.subText}>{item.authority}</Text>
                     <Text style={styles.dateText}>
-                      {new Date(item.dueDate).toLocaleDateString()}
+                      {new Date(item.dueDate).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                     </Text>
                   </View>
                 </View>
 
-                {item.completed ? (
-                  <View style={styles.greenBadge}>
-                    <Text style={styles.badgeText}>✓ Completed</Text>
-                  </View>
-                ) : daysLeft >= 0 ? (
-                  <View style={styles.greenBadge}>
-                    <Text style={styles.badgeText}>Upcoming</Text>
-                    <Text style={[styles.badgeText, { fontSize: 10, textAlign: 'center' }]}>
-                      {daysLeft} days left
-                    </Text>
-                  </View>
-                ) : (
-                  <View style={styles.redBadge}>
-                    <Text style={styles.redBadgeText}>⚠ Overdue</Text>
-                  </View>
-                )}
-              </TouchableOpacity>
+                <View style={{ alignItems: "flex-end" }}>
+                  <Text
+                    style={[
+                      styles.statusText,
+                      {
+                        color: item.completed
+                          ? "#16A34A"
+                          : daysLeft >= 0
+                          ? "#16A34A"
+                          : "#C44736",
+                        marginBottom: !item.completed ? 8 : 0,
+                      },
+                    ]}
+                  >
+                    {item.completed
+                      ? "✓ Completed"
+                      : daysLeft >= 0
+                      ? `Upcoming\n(${daysLeft} days left)`
+                      : "⚠ Overdue"}
+                  </Text>
+
+                  {!item.completed && (
+                    <TouchableOpacity
+                      style={styles.markCompleteButton}
+                      onPress={() =>
+                        handleDeadlinePress(item.id, item.title, item.completed)
+                      }
+                    >
+                      <Text style={styles.markCompleteText}>Mark Complete</Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
             </Card>
           );
         })
@@ -235,15 +245,15 @@ export default function DeadlinesScreen() {
             </View>
 
             <Text style={styles.penaltyInfo}>
-              Original: GH¢ {payeDue.toFixed(2)}
+              Original: {formatCurrency(payeDue)}
               {"\n"}
-              Late Fee: GH¢ {lateFee.toFixed(2)}
+              Late Fee: {formatCurrency(lateFee)}
             </Text>
 
             <View style={styles.penaltyRow}>
               <Text style={styles.totalLabel}>Total Due</Text>
               <Text style={styles.totalAmount}>
-                GH¢ {totalPenalty.toFixed(2)}
+                {formatCurrency(totalPenalty)}
               </Text>
             </View>
           </View>
@@ -279,11 +289,11 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: 12,
   },
 
   title: {
-    fontSize: 34,
+    fontSize: 28,
     fontFamily: "Inter_700Bold",
     marginLeft: 10,
     color: "#111827",
@@ -291,10 +301,11 @@ const styles = StyleSheet.create({
 
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    marginTop: -16,
-    marginBottom: 28,
+    marginTop: 0,
+    marginBottom: 18,
+    lineHeight: 18,
   },
 
   dateContainer: {
@@ -318,13 +329,15 @@ const styles = StyleSheet.create({
   },
 
   dateNumber: {
-    fontSize: 18,
-    color: "#444",
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
   },
 
   dateWeek: {
-    fontSize: 10,
-    color: "#888",
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#6B7280",
   },
 
   activeDateText: {
@@ -332,7 +345,7 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    fontSize: 11,
+    fontSize: 16,
     color: "#C44736",
     fontFamily: "Inter_700Bold",
     marginBottom: 10,
@@ -341,8 +354,8 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 20,
+    borderRadius: 16,
+    padding: 16,
     marginBottom: 16,
     borderWidth: 1,
     borderColor: "#ECECEC",
@@ -365,50 +378,42 @@ const styles = StyleSheet.create({
   subText: {
     color: "#888",
     fontSize: 12,
+    fontFamily: "Inter_400Regular",
     marginTop: 3,
   },
 
   dateText: {
-    color: "#555",
+    color: "#111827",
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
     marginTop: 6,
   },
 
-  greenBadge: {
-    backgroundColor: "#DFF5E7",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  badgeText: {
-    color: "#34A853",
+  statusText: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
+    textAlign: "right",
   },
 
-  redBadge: {
+  markCompleteButton: {
     backgroundColor: "#FCE8E6",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    alignItems: "center",
-    justifyContent: "center",
+    borderRadius: 8,
   },
 
-  redBadgeText: {
+  markCompleteText: {
     color: "#C44736",
-    fontFamily: "Inter_600SemiBold",
     fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
   },
 
   penaltyCard: {
     backgroundColor: "#FFF8F6",
     borderWidth: 1,
     borderColor: "#F4D7D2",
-    borderRadius: 18,
-    padding: 20,
+    borderRadius: 16,
+    padding: 16,
     marginTop: 10,
   },
 
@@ -425,6 +430,7 @@ const styles = StyleSheet.create({
 
   penaltyInfo: {
     color: "#666",
+    fontFamily: "Inter_400Regular",
     marginBottom: 12,
   },
 
@@ -468,7 +474,7 @@ const styles = StyleSheet.create({
   footerText: {
     textAlign: "center",
     color: "#6B7280",
-    marginTop: 18,
+    marginTop: 8,
     marginBottom: 10,
     fontSize: 12,
     fontFamily: "Inter_400Regular",
@@ -497,7 +503,7 @@ const styles = StyleSheet.create({
 
   emptyStateCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
+    borderRadius: 16,
     padding: 36,
     alignItems: "center",
     justifyContent: "center",
@@ -519,3 +525,4 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 });
+

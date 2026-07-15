@@ -12,7 +12,10 @@ export type User = {
   email: string;
   region: string;
   category: string;
-  plan: "FREE" | "PRO";
+  
+  subscription_tier: string;
+  is_active: boolean;
+
   label: string;
   tin: string;
   taxpayer_category: string;
@@ -21,20 +24,12 @@ export type User = {
 
 type UserContextType = {
   user: User;
-
   setUser: (user: User) => void;
-
-  updateUser: (
-    updates: Partial<User>
-  ) => void;
-
+  updateUser: (updates: Partial<User>) => void;
   loading: boolean;
 };
 
-const UserContext =
-  createContext<
-    UserContextType | undefined
-  >(undefined);
+const UserContext = createContext<UserContextType | undefined>(undefined);
 
 const defaultUser: User = {
   fullName: "User",
@@ -42,7 +37,8 @@ const defaultUser: User = {
   email: "",
   region: "",
   category: "",
-  plan: "FREE",
+  subscription_tier: "FREE",
+  is_active: false,
   label: "",
   tin: "",
   taxpayer_category: "",
@@ -63,7 +59,8 @@ const normalizeStoredUser = (storedUser: Record<string, any> | null | undefined)
     email: storedUser.email ?? "",
     region: storedUser.region ?? "",
     category: storedUser.category ?? "",
-    plan: storedUser.plan ?? "FREE",
+    subscription_tier: storedUser.subscription_tier ?? "FREE",
+    is_active: storedUser.is_active ?? false,
     label: storedUser.label ?? "",
     tin: storedUser.tin ?? "",
     taxpayer_category: storedUser.taxpayer_category ?? "",
@@ -76,14 +73,10 @@ export function UserProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const [user, setUser] =
-    useState<User>(defaultUser);
-
-  const [loading, setLoading] =
-    useState(true);
+  const [user, setUser] = useState<User>(defaultUser);
+  const [loading, setLoading] = useState(true);
 
   // Load saved user data
-
   useEffect(() => {
     const loadUser = async () => {
       try {
@@ -104,7 +97,6 @@ export function UserProvider({
   }, []);
 
   // Save user whenever it changes
-
   useEffect(() => {
     if (loading) return;
 
@@ -125,16 +117,11 @@ export function UserProvider({
   }, [user, loading]);
 
   // Update selected fields only
-
-  const updateUser = (
-    updates: Partial<User>
-  ) => {
-    setUser(
-      (previousUser) => ({
-        ...previousUser,
-        ...updates,
-      })
-    );
+  const updateUser = (updates: Partial<User>) => {
+    setUser((previousUser) => ({
+      ...previousUser,
+      ...updates,
+    }));
   };
 
   return (
@@ -152,8 +139,7 @@ export function UserProvider({
 }
 
 export function useUser() {
-  const context =
-    useContext(UserContext);
+  const context = useContext(UserContext);
 
   if (!context) {
     throw new Error(

@@ -14,7 +14,8 @@ import { useUser } from "../context/UserContext";
 export default function CurrentPlanScreen() {
   const { user } = useUser();
 
-  const isPro = user?.active_profile ?? false;
+  const plan = user?.subscription_tier ?? "FREE";
+  const isActive = user?.is_active ?? false;
 
   return (
     <ScrollView
@@ -24,9 +25,9 @@ export default function CurrentPlanScreen() {
     >
       <TouchableOpacity onPress={() => router.back()}>
         <Ionicons
-          name="arrow-back"
-          size={24}
-          color="#C44736"
+          name="chevron-back"
+          size={26}
+          color="#111827"
         />
       </TouchableOpacity>
 
@@ -42,17 +43,17 @@ export default function CurrentPlanScreen() {
         <View style={styles.icon}>
           <Ionicons
             name="diamond-outline"
-            size={42}
+            size={28}
             color="#FFFFFF"
           />
         </View>
 
         <Text style={styles.plan}>
-          {isPro ? "ACTIVE" : "INACTIVE"}
+          {plan.charAt(0).toUpperCase() + plan.slice(1).toLowerCase()}
         </Text>
 
         <Text style={styles.status}>
-          Active Subscription
+          {isActive ? "Active Subscription" : "Free Subscription"}
         </Text>
       </View>
 
@@ -87,7 +88,7 @@ export default function CurrentPlanScreen() {
         </Text>
 
         <Text style={styles.infoValue}>
-          {isPro ? "Active" : "Free Plan"}
+          {isActive ? "Active" : "Free"}
         </Text>
       </View>
 
@@ -106,103 +107,118 @@ export default function CurrentPlanScreen() {
 }
 
 const styles = StyleSheet.create({
-  container:{
-    flex:1,
-    backgroundColor:"#FAFAFA",
-    padding:20,
-    paddingTop:55,
+  container: {
+    flex: 1,
+    backgroundColor: "#FAFAFA",
+    padding: 20,
+    paddingTop: 55,
   },
 
-  title:{
-    fontSize:30,
-    fontFamily:"Inter_700Bold",
-    color:"#111827",
-    marginTop:20,
+  title: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginTop: 20,
   },
 
-  subtitle:{
-    color:"#6B7280",
-    marginTop:6,
-    marginBottom:30,
-    fontFamily:"Inter_400Regular",
+  subtitle: {
+    color: "#6B7280",
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
+    marginBottom: 18,
+    fontFamily: "Inter_400Regular",
   },
 
-  card:{
-    backgroundColor:"#C44736",
-    borderRadius:20,
-    alignItems:"center",
-    padding:28,
-    marginBottom:30,
+  card: {
+    backgroundColor: "#C44736",
+    borderRadius: 16,
+    alignItems: "center",
+    padding: 22,
+    marginBottom: 30,
   },
 
-  icon:{
-    width:70,
-    height:70,
-    borderRadius:35,
-    backgroundColor:"rgba(255,255,255,0.2)",
-    justifyContent:"center",
-    alignItems:"center",
+  icon: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  plan:{
-    color:"#FFF",
-    fontSize:28,
-    fontFamily:"Inter_700Bold",
-    marginTop:18,
+  plan: {
+    color: "#FFF",
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    marginTop: 18,
   },
 
-  status:{
-    color:"#FDECEC",
-    marginTop:6,
+  status: {
+    color: "#FDECEC",
+    marginTop: 6,
   },
 
-  section:{
-    color:"#C44736",
-    fontFamily:"Inter_600SemiBold",
-    marginBottom:14,
+  section: {
+    color: "#C44736",
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    marginBottom: 14,
   },
 
-  feature:{
-    flexDirection:"row",
-    alignItems:"center",
-    marginBottom:16,
+  feature: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 12,
   },
 
-  featureText:{
-    marginLeft:10,
-    fontSize:15,
-    color:"#111827",
+  featureText: {
+    marginLeft: 10,
+    fontSize: 15,
+    color: "#111827",
   },
 
-  infoCard:{
-    backgroundColor:"#FFF",
-    borderRadius:18,
-    padding:20,
-    marginTop:20,
-    marginBottom:30,
+  infoCard: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 16,
+    marginTop: 20,
+    marginBottom: 30,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
   },
 
-  infoTitle:{
-    color:"#6B7280",
+  infoTitle: {
+    color: "#6B7280",
   },
 
-  infoValue:{
-    marginTop:8,
-    fontSize:20,
-    fontFamily:"Inter_700Bold",
-    color:"#34A853",
+  infoValue: {
+    marginTop: 8,
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: "#34A853",
   },
 
-  button:{
-    backgroundColor:"#C44736",
-    borderRadius:14,
-    padding:18,
-    alignItems:"center",
+  button: {
+    backgroundColor: "#C44736",
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: "center",
   },
 
-  buttonText:{
-    color:"#FFF",
-    fontFamily:"Inter_600SemiBold",
-    fontSize:16,
+  buttonText: {
+    color: "#FFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
   },
 });

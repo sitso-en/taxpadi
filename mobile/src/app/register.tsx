@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useState } from "react";
+import { getUserFriendlyError } from "@/utils/error";
 import {
   ActivityIndicator,
   Alert,
@@ -45,6 +46,12 @@ const countryCodes = [
   { label: "🇰🇪 +254", value: "+254" },
 ];
 
+const taxpayerCategories = [
+  { label: "Individual", value: "INDIVIDUAL" },
+  { label: "Sole Trader", value: "SOLE_TRADER" },
+  { label: "Small Business", value: "SMALL_BUSINESS" },
+];
+
 export default function RegisterScreen() {
   const [step, setStep] = useState(1);
   const [fullName, setFullName] = useState("");
@@ -53,7 +60,7 @@ export default function RegisterScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [region, setRegion] = useState("Greater Accra");
-  const [category, setCategory] = useState("Individual");
+  const [category, setCategory] = useState("INDIVIDUAL");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -104,9 +111,33 @@ export default function RegisterScreen() {
     try {
       setLoading(true);
 
-      const cleanedPhone = phoneNumber.replace(/\s/g, "");
-      const fullPhone = `0${cleanedPhone}`;
+      const cleanedPhone = phoneNumber.replace(/\D/g, "");
 
+      const fullPhone =
+        countryCode === "+233"
+          ? `0${cleanedPhone}`
+          : `${countryCode}${cleanedPhone}`;
+
+      if (
+        email &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+      ) {
+        Alert.alert(
+          "Validation",
+          "Enter a valid email address."
+        );
+        return;
+      }
+      console.log("========== REGISTER PAYLOAD ==========");
+      console.log({
+        full_name: fullName,
+        phone: fullPhone,
+        email: email || undefined,
+        password,
+        region,
+        taxpayer_category: category,
+      });
+      console.log("======================================");
       const response = await register({
         full_name: fullName,
         phone: fullPhone,
@@ -121,11 +152,21 @@ export default function RegisterScreen() {
         return;
       }
 
-      router.push("/otp-verification");
+      router.push({
+        pathname: "/otp-verification",
+        params: {
+          phone: fullPhone,
+          purpose: "REGISTER",
+        },
+      });
     } catch (error: any) {
+      console.log("REGISTER ERROR:", error?.response?.status);
+      console.log("REGISTER DATA:", error?.response?.data);
+      console.log("REGISTER HEADERS:", error?.response?.headers);
+
       Alert.alert(
-        "Registration Failed",
-        error?.response?.data?.message ?? "Unable to register."
+        "Registration Unsuccessful",
+        getUserFriendlyError(error)
       );
     } finally {
       setLoading(false);
@@ -262,14 +303,22 @@ export default function RegisterScreen() {
 
             <Text style={styles.label}>TAXPAYER CATEGORY</Text>
             <View style={styles.categoryContainer}>
-              {["Individual", "Sole Trader", "Small Business"].map((item) => (
+              {taxpayerCategories.map((item) => (
                 <TouchableOpacity
-                  key={item}
-                  style={[styles.categoryButton, category === item && styles.selectedCategory]}
-                  onPress={() => setCategory(item)}
+                  key={item.value}
+                  style={[
+                    styles.categoryButton,
+                    category === item.value && styles.selectedCategory,
+                  ]}
+                  onPress={() => setCategory(item.value)}
                 >
-                  <Text style={[styles.categoryText, category === item && styles.selectedCategoryText]}>
-                    {item}
+                  <Text
+                    style={[
+                      styles.categoryText,
+                      category === item.value && styles.selectedCategoryText,
+                    ]}
+                  >
+                    {item.label}
                   </Text>
                 </TouchableOpacity>
               ))}
@@ -308,7 +357,9 @@ export default function RegisterScreen() {
               </View>
               <View style={styles.reviewRow}>
                 <Text style={styles.reviewLabel}>Category</Text>
-                <Text style={styles.reviewValue}>{category}</Text>
+                <Text style={styles.reviewValue}>
+                  {taxpayerCategories.find((c) => c.value === category)?.label || category}
+                </Text>
               </View>
             </View>
 

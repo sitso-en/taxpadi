@@ -18,6 +18,7 @@ import { useUser } from "../context/UserContext";
 import { useTransactions } from "../context/TransactionContext";
 import { usePayments } from "../context/PaymentContext";
 import { useDeadlines } from "../context/DeadlineContext";
+import { getUserFriendlyError } from "@/utils/error";
 
 export default function ComplianceCertificateScreen() {
   const { user } = useUser();
@@ -183,12 +184,16 @@ export default function ComplianceCertificateScreen() {
         );
       }
     } catch (error) {
+      Alert.alert(
+  "Certificate Download Unsuccessful",
+  getUserFriendlyError(error)
+);
       console.log(error);
 
       Alert.alert(
-        "Error",
-        "Unable to generate certificate."
-      );
+  "Unable to Load Certificate",
+  getUserFriendlyError(error)
+);
     }
   };
 
@@ -204,11 +209,11 @@ export default function ComplianceCertificateScreen() {
               : "NOT VALID"
           }`,
         });
-      } catch {
+      } catch(error) {
         Alert.alert(
-          "Error",
-          "Unable to share certificate."
-        );
+  "Unable to Share Certificate",
+  getUserFriendlyError(error)
+);
       }
     };
 

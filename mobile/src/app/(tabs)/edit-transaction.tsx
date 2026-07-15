@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, router } from "expo-router";
 import { useState, useEffect } from "react";
 import { Dropdown } from "react-native-element-dropdown";
+import { getUserFriendlyError } from "@/utils/error";
 import {
   Alert,
   Modal,
@@ -64,7 +65,10 @@ export default function EditTransactionScreen() {
       setDate(new Date(t.transaction_date));
     } catch (error) {
       console.log(error);
-      Alert.alert("Error", "Failed to load transaction.");
+    Alert.alert(
+  "Unable to Update Transaction",
+  getUserFriendlyError(error)
+);
     } finally {
       setLoading(false);
     }

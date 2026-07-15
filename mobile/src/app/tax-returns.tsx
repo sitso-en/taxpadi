@@ -15,6 +15,7 @@ import {
 import { useTaxReturns } from "../context/TaxReturnsContext";
 import { generateTaxReturn } from "@/services/taxReturns.service";
 import Card from "../components/Card";
+import { getUserFriendlyError } from "@/utils/error";
 
 export default function TaxReturnsScreen() {
   const {
@@ -26,9 +27,17 @@ export default function TaxReturnsScreen() {
 
   const currentYear = new Date().getFullYear();
 
-  const currentTaxYear = `FY ${currentYear}/${currentYear + 1}`;
+  const currentTaxYear = currentYear.toString();
 
-  const dueDate = `Apr 30, ${currentYear + 1}`;
+  const dueDate = new Date(
+    currentYear,
+    3,
+    30
+  ).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
 
   const allStepsCompleted = filingSteps.every((step) => step.completed);
 
@@ -56,7 +65,7 @@ export default function TaxReturnsScreen() {
         new Date().getMonth() + 1
       );
 
-      const returnId = generated.data.return_id;
+      const returnId = generated.data?.return_id ?? generated.return_id;
 
       router.push({
         pathname: "/tax-return-review",
@@ -64,13 +73,13 @@ export default function TaxReturnsScreen() {
           returnId,
         },
       });
-    } catch (error) {
+    } catch (error: any) {
       console.log(error);
 
       Alert.alert(
-        "Error",
-        "Unable to submit tax return."
-      );
+  "Tax Return Submission Unsuccessful",
+  getUserFriendlyError(error)
+);
     }
   };
 
@@ -99,12 +108,16 @@ export default function TaxReturnsScreen() {
 
             <p>
               <strong>Filed Date:</strong>
-              ${new Date(filedDate).toLocaleDateString()}
+              ${new Date(filedDate).toLocaleDateString("en-US", {
+                month: "long",
+                day: "numeric",
+                year: "numeric",
+              })}
             </p>
 
             <p>
               <strong>Generated:</strong>
-              ${new Date().toLocaleString()}
+              ${new Date().toLocaleString("en-US")}
             </p>
 
             <br />
@@ -194,7 +207,7 @@ export default function TaxReturnsScreen() {
             </Text>
           </View>
 
-          <Text style={styles.dueDate}>Due: {dueDate}</Text>
+          <Text style={styles.dueDate}>Due Date • {dueDate}</Text>
         </View>
       </View>
 
@@ -202,15 +215,19 @@ export default function TaxReturnsScreen() {
       <TouchableOpacity
         style={[
           styles.fileButton,
-          currentReturnFiled && {
+          (currentReturnFiled || !allStepsCompleted) && {
             backgroundColor: "#9CA3AF",
           },
         ]}
-        disabled={currentReturnFiled}
+        disabled={currentReturnFiled || !allStepsCompleted}
         onPress={handleFileReturn}
       >
         <Text style={styles.fileButtonText}>
-          {currentReturnFiled ? "Return Filed" : "File Return Now"}
+          {currentReturnFiled
+            ? "Return Filed"
+            : allStepsCompleted
+            ? "File Return"
+            : "Complete Filing Steps"}
         </Text>
       </TouchableOpacity>
 
@@ -226,7 +243,11 @@ export default function TaxReturnsScreen() {
               key={item.step}
               style={[styles.stepRow, !isLastItem && styles.stepDivider]}
               activeOpacity={0.8}
-              onPress={() => toggleStep(item.step)}
+              onPress={() => {
+                if (!currentReturnFiled) {
+                  toggleStep(item.step);
+                }
+              }}
             >
               <View
                 style={[
@@ -287,7 +308,11 @@ export default function TaxReturnsScreen() {
                 <View>
                   <Text style={styles.previousYear}>{item.tax_year}</Text>
                   <Text style={styles.previousDate}>
-                    Filed: {new Date(item.submitted_at).toLocaleDateString()}
+                    Filed {new Date(item.submitted_at).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
                   </Text>
                 </View>
               </View>
@@ -341,15 +366,16 @@ const styles = StyleSheet.create({
 
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: "Inter_400Regular",
-    marginTop: -8,
-    marginBottom: 28,
+    marginTop: 2,
+    marginBottom: 18,
   },
 
   returnCard: {
     backgroundColor: "#C44736",
-    borderRadius: 18,
+    borderRadius: 16,
     paddingVertical: 30,
     paddingHorizontal: 24,
     marginBottom: 16,
@@ -364,7 +390,9 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 18,
@@ -378,7 +406,7 @@ const styles = StyleSheet.create({
 
   returnTitle: {
     color: "#FFFFFF",
-    fontSize: 24,
+    fontSize: 22,
     fontFamily: "Inter_700Bold",
     marginVertical: 6,
   },
@@ -571,7 +599,7 @@ const styles = StyleSheet.create({
     borderColor: "#F3C5BE",
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 20,
+    borderRadius: 16,
     marginTop: 10,
   },
 

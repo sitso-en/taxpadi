@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useState } from "react";
+import { getUserFriendlyError } from "@/utils/error";
 import {
   ActivityIndicator,
   Alert,
@@ -74,7 +75,8 @@ export default function OTPVerificationScreen() {
 
       const response = await verifyOTP(
         phone,
-        otp
+        otp,
+        purpose
       );
 
       if (!response.success) {
@@ -85,13 +87,30 @@ export default function OTPVerificationScreen() {
         return;
       }
 
-      router.replace("/(tabs)/dashboard");
+      if (purpose === "REGISTER") {
+        Alert.alert(
+          "Verification Successful",
+          "Your account has been verified. Please sign in."
+        );
+
+        router.replace("/login");
+        return;
+      }
+
+      if (purpose === "LOGIN") {
+        Alert.alert(
+          "Verification Successful",
+          "Your sign-in has been verified."
+        );
+
+        router.back();
+        return;
+      }
     } catch (error: any) {
       Alert.alert(
-        "Verification Failed",
-        error?.response?.data?.message ??
-          "Unable to verify OTP."
-      );
+  "Verification Unsuccessful",
+  getUserFriendlyError(error)
+);
     } finally {
       setLoading(false);
     }
@@ -99,7 +118,10 @@ export default function OTPVerificationScreen() {
 
   const handleResendOTP = async () => {
     try {
-      await resendOTP(phone);
+      await resendOTP(
+        phone,
+        purpose
+      );
       setSeconds(42);
 
       Alert.alert(
@@ -107,12 +129,11 @@ export default function OTPVerificationScreen() {
         "A new verification code has been sent."
       );
     } catch (error: any) {
-      Alert.alert(
-        "Failed",
-        error?.response?.data?.message ??
-          "Unable to resend OTP."
-      );
-    }
+  Alert.alert(
+    "Unable to Resend Code",
+    getUserFriendlyError(error)
+  );
+}
   };
 
   return (

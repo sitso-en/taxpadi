@@ -1,4 +1,5 @@
 import { resetPassword } from "@/services/auth.service";
+import { getUserFriendlyError } from "@/utils/error";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
@@ -32,6 +33,16 @@ export default function ResetPasswordScreen() {
   const [loading, setLoading] = useState(false);
 
   const handleResetPassword = async () => {
+    if (!resetToken) {
+      Alert.alert(
+        "Invalid Request",
+        "Your password reset session has expired. Please request another OTP."
+      );
+
+      router.replace("/forgot-password");
+      return;
+    }
+
     if (!newPassword.trim()) {
       Alert.alert(
         "Validation",
@@ -96,10 +107,9 @@ export default function ResetPasswordScreen() {
       );
     } catch (error: any) {
       Alert.alert(
-        "Reset Failed",
-        error?.response?.data?.message ??
-          "Unable to reset password."
-      );
+    "Password Reset Unsuccessful",
+    getUserFriendlyError(error)
+  );
     } finally {
       setLoading(false);
     }

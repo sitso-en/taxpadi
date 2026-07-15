@@ -1,8 +1,46 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { clearTokens, getRefreshToken } from "@/utils/storage";
+import { logout } from "@/services/auth.service";
+import { useUser } from "../context/UserContext";
 
 export default function LogoutConfirmationScreen() {
+  const { setUser } = useUser();
+
+  const handleLogout = async () => {
+    try {
+      const refreshToken = await getRefreshToken();
+
+      if (refreshToken) {
+        try {
+          await logout(refreshToken);
+        } catch {
+        }
+      }
+
+      await clearTokens();
+
+      setUser({
+        fullName: "User",
+        phoneNumber: "",
+        email: "",
+        region: "",
+        category: "",
+        subscription_tier: "FREE",
+        is_active: false,
+        label: "",
+        tin: "",
+        taxpayer_category: "",
+        active_profile: false,
+      });
+
+      router.replace("/login");
+    } catch {
+      router.replace("/login");
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}>
@@ -17,7 +55,7 @@ export default function LogoutConfirmationScreen() {
 
       <TouchableOpacity
         style={styles.logoutButton}
-        onPress={() => router.replace("/login")}
+        onPress={handleLogout}
       >
         <Text style={styles.logoutButtonText}>Log Out</Text>
       </TouchableOpacity>

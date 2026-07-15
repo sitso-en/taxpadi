@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React from "react";
+import { getUserFriendlyError } from "@/utils/error";
 import {
   Alert,
   ScrollView,
@@ -11,11 +12,10 @@ import {
 } from "react-native";
 
 export default function ManagePlanScreen() {
-
-  const selectPlan = (plan:string)=>{
+  const selectPlan = (plan: string) => {
     Alert.alert(
-      "Coming Soon",
-      `${plan} subscriptions will be available once backend payments are connected.`
+      "Unavailable",
+      "Subscription management is not yet available."
     );
   };
 
@@ -23,16 +23,16 @@ export default function ManagePlanScreen() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={{
-        paddingBottom:40,
+        paddingBottom: 40,
       }}
     >
       <TouchableOpacity
-        onPress={()=>router.back()}
+        onPress={() => router.back()}
       >
         <Ionicons
-          name="arrow-back"
-          size={24}
-          color="#C44736"
+          name="chevron-back"
+          size={26}
+          color="#111827"
         />
       </TouchableOpacity>
 
@@ -46,21 +46,21 @@ export default function ManagePlanScreen() {
 
       {[
         {
-          name:"FREE",
-          price:"GH¢0",
-          color:"#6B7280"
+          name: "FREE",
+          price: "GH¢0",
+          color: "#6B7280",
         },
         {
-          name:"PRO",
-          price:"GH¢99/month",
-          color:"#C44736"
+          name: "PRO",
+          price: "GH¢99/month",
+          color: "#C44736",
         },
         {
-          name:"BUSINESS",
-          price:"GH¢199/month",
-          color:"#34A853"
-        }
-      ].map(plan=>(
+          name: "BUSINESS",
+          price: "GH¢199/month",
+          color: "#34A853",
+        },
+      ].map((plan) => (
         <View
           key={plan.name}
           style={styles.card}
@@ -68,7 +68,7 @@ export default function ManagePlanScreen() {
           <Text
             style={[
               styles.plan,
-              {color:plan.color}
+              { color: plan.color },
             ]}
           >
             {plan.name}
@@ -78,9 +78,17 @@ export default function ManagePlanScreen() {
             {plan.price}
           </Text>
 
+          <Text style={styles.description}>
+            {plan.name === "FREE"
+              ? "Basic tax management."
+              : plan.name === "PRO"
+              ? "Advanced tax tools for individuals."
+              : "Business features and team support."}
+          </Text>
+
           <TouchableOpacity
             style={styles.button}
-            onPress={()=>selectPlan(plan.name)}
+            onPress={() => selectPlan(plan.name)}
           >
             <Text style={styles.buttonText}>
               Select Plan
@@ -92,57 +100,79 @@ export default function ManagePlanScreen() {
   );
 }
 
-const styles=StyleSheet.create({
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: "#FAFAFA",
+    padding: 20,
+    paddingTop: 55,
+  },
 
-container:{
-flex:1,
-backgroundColor:"#FAFAFA",
-padding:20,
-paddingTop:55,
-},
+  title: {
+    fontSize: 28,
+    fontFamily: "Inter_700Bold",
+    marginTop: 20,
+    color: "#111827",
+  },
 
-title:{
-fontSize:30,
-fontFamily:"Inter_700Bold",
-marginTop:20,
-color:"#111827",
-},
+  subtitle: {
+    marginTop: 2,
+    marginBottom: 18,
+    color: "#6B7280",
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: "Inter_400Regular",
+  },
 
-subtitle:{
-marginTop:6,
-marginBottom:30,
-color:"#6B7280",
-},
+  card: {
+    backgroundColor: "#FFF",
+    borderRadius: 16,
+    padding: 18,
+    marginBottom: 18,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    elevation: 2,
+  },
 
-card:{
-backgroundColor:"#FFF",
-borderRadius:18,
-padding:22,
-marginBottom:18,
-},
+  plan: {
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+  },
 
-plan:{
-fontSize:24,
-fontFamily:"Inter_700Bold",
-},
+  price: {
+    marginTop: 8,
+    marginBottom: 20,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+  },
 
-price:{
-marginTop:8,
-marginBottom:20,
-fontSize:18,
-},
+  description: {
+    marginTop: -10,
+    marginBottom: 18,
+    color: "#6B7280",
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: "Inter_400Regular",
+  },
 
-button:{
-backgroundColor:"#C44736",
-borderRadius:12,
-padding:16,
-alignItems:"center",
-},
+  button: {
+    backgroundColor: "#C44736",
+    borderRadius: 16,
+    paddingVertical: 18,
+    alignItems: "center",
+  },
 
-buttonText:{
-color:"#FFF",
-fontSize:16,
-fontFamily:"Inter_600SemiBold",
-}
-
+  buttonText: {
+    color: "#FFF",
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
 });

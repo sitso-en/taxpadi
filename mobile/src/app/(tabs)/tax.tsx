@@ -72,8 +72,9 @@ export default function TaxScreen() {
 
         <View style={{ flex: 1 }}>
           <Text style={styles.taxLabel}>TOTAL TAX DUE</Text>
-          <Text style={styles.currencyLabel}>GH¢</Text>
-          <Text style={styles.taxAmount}>{totalTaxDue.toFixed(2)}</Text>
+          <Text style={styles.taxAmount}>
+            GH¢ {totalTaxDue.toFixed(2)}
+          </Text>
           <Text style={styles.taxSubText}>Total taxes currently payable</Text>
         </View>
       </View>
@@ -279,29 +280,30 @@ const styles = StyleSheet.create({
   },
 
   title: {
-    fontSize: 34,
+    fontSize: 28,
     color: "#111827",
     fontFamily: "Inter_700Bold",
-    marginBottom: 6,
+    marginBottom: 4,
   },
 
   // ⭐ Subtitle under page title
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
+    lineHeight: 18,
     fontFamily: "Inter_400Regular",
-    marginBottom: 28,
+    marginBottom: 18,
   },
 
   // ✅ #2 — Premium red card
   taxCard: {
     backgroundColor: "#C44736",
-    borderRadius: 28,
-    paddingVertical: 30,
-    paddingHorizontal: 24,
+    borderRadius: 20,
+    paddingVertical: 20,
+    paddingHorizontal: 18,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 32,
+    marginBottom: 18,
     shadowColor: "#000",
     shadowOpacity: 0.18,
     shadowRadius: 14,
@@ -314,51 +316,47 @@ const styles = StyleSheet.create({
 
   // ✅ #10 — Frosted circle with icon
   taxCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: "rgba(255,255,255,0.18)",
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 4,
+    borderColor: "#FFFFFF",
+    backgroundColor: "transparent",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 18,
+    marginRight: 14,
   },
 
   taxLabel: {
     color: "#FDECEC",
-    fontSize: 12,
+    fontSize: 10,
+    letterSpacing: 0.5,
     fontFamily: "Inter_600SemiBold",
-  },
-
-  // ✅ #3 — Currency label for hierarchy
-  currencyLabel: {
-    color: "#FDECEC",
-    fontSize: 14,
-    fontFamily: "Inter_600SemiBold",
-    marginTop: 8,
   },
 
   taxAmount: {
     color: "#FFFFFF",
-    fontSize: 32,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     marginTop: 2,
   },
 
   taxSubText: {
     color: "#FDECEC",
-    marginTop: 6,
+    marginTop: 4,
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
 
   tabsContainer: {
-    marginBottom: 32,
+    marginBottom: 18,
   },
 
   // ✅ #4 — Larger, easier to tap tabs
   tabButton: {
     backgroundColor: "#F3F4F6",
-    paddingHorizontal: 22,
-    paddingVertical: 12,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
     borderRadius: 24,
     marginRight: 10,
   },
@@ -377,23 +375,23 @@ const styles = StyleSheet.create({
   },
 
   sectionTitle: {
-    fontSize: 22,
+    fontSize: 16,
     color: "#111827",
     fontFamily: "Inter_700Bold",
-    marginBottom: 20,
+    marginBottom: 10,
   },
 
   // ✅ #5 — Larger breakdown card, more breathing room below
   breakdownCard: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 22,
-    marginBottom: 28,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 16,
   },
 
   taxItem: {
-    marginBottom: 20,
-    paddingBottom: 12,
+    marginBottom: 14,
+    paddingBottom: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#F3F4F6",
   },
@@ -401,7 +399,7 @@ const styles = StyleSheet.create({
   breakdownRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 12,
+    marginBottom: 8,
   },
 
   breakdownLabel: {
@@ -416,39 +414,39 @@ const styles = StyleSheet.create({
 
   // ✅ #6 — Thicker progress bars
   progressBackground: {
-    height: 10,
+    height: 8,
     backgroundColor: "#F3F4F6",
     borderRadius: 20,
   },
 
   progressFill: {
-    height: 10,
+    height: 8,
     backgroundColor: "#C44736",
     borderRadius: 20,
   },
 
   // ✅ #1 — Info panel instead of nested card
   summaryCard: {
-    marginTop: 14,
-    padding: 18,
-    borderRadius: 18,
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 14,
     backgroundColor: "#FAFAFA",
   },
 
   totalLabel: {
-    fontSize: 18,
+    fontSize: 15,
     color: "#111827",
     fontFamily: "Inter_700Bold",
   },
 
   totalAmount: {
     color: "#111827",
-    fontSize: 22,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
   },
 
   taxValue: {
-    fontSize: 32,
+    fontSize: 24,
     color: "#111827",
     fontFamily: "Inter_700Bold",
     marginBottom: 12,
@@ -457,7 +455,8 @@ const styles = StyleSheet.create({
   infoText: {
     color: "#6B7280",
     fontFamily: "Inter_400Regular",
-    lineHeight: 22,
+    lineHeight: 20,
+    fontSize: 13,
   },
 
   // ✅ #7 — Tinted warning cards with border
@@ -465,11 +464,11 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFF8F6",
     borderWidth: 1,
     borderColor: "#F4D7D2",
-    borderRadius: 18,
-    padding: 18,
+    borderRadius: 16,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 30,
+    marginBottom: 14,
   },
 
   warningTitle: {
@@ -486,8 +485,8 @@ const styles = StyleSheet.create({
   // ✅ #3 — Button
   button: {
     backgroundColor: "#C44736",
-    borderRadius: 16,
-    paddingVertical: 20,
+    borderRadius: 14,
+    paddingVertical: 16,
     alignItems: "center",
 
     shadowColor: "#000",

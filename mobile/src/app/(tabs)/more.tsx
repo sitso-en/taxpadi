@@ -140,29 +140,36 @@ export default function MoreScreen() {
         </View>
 
         <View style={{ flex: 1 }}>
-          <Text style={styles.profileName}>{user?.label ?? "Default Profile"}</Text>
-          <Text style={styles.profilePhone}>
-            TIN: {user?.tin ?? "Not Available"}
+          <Text style={styles.profileName}>
+            {user?.fullName ?? "TaxPadi User"}
           </Text>
-          <Text style={styles.profileEmail}>
-            {user?.taxpayer_category ?? "Taxpayer"}
-          </Text>
-        </View>
 
-        <View
-          style={[
-            styles.proBadge,
-            { backgroundColor: user?.active_profile ? "#F4B400" : "#FFFFFF" },
-          ]}
-        >
-          <Text
-            style={[
-              styles.proText,
-              { color: user?.active_profile ? "#FFFFFF" : "#C44736" },
-            ]}
-          >
-            {user?.active_profile ? "ACTIVE" : "INACTIVE"}
-          </Text>
+          <View style={styles.infoRow}>
+            <View style={styles.planRow}>
+              <Ionicons
+                name="star"
+                size={18}
+                color={
+                  user?.subscription_tier?.toLowerCase() === "business"
+                    ? "#7C3AED"
+                    : user?.subscription_tier?.toLowerCase() === "pro"
+                    ? "#F4B400"
+                    : user?.subscription_tier?.toLowerCase() === "starter"
+                    ? "#2563EB"
+                    : "#9CA3AF"
+                }
+                style={{ marginRight: 8 }}
+              />
+
+              <Text style={styles.planText}>
+                {(user?.subscription_tier ?? "Free").toUpperCase()} PLAN
+              </Text>
+            </View>
+
+            <Text style={styles.profileTin}>
+              TIN: {user?.tin?.trim() ? user.tin : "TIN not assigned"}
+            </Text>
+          </View>
         </View>
       </TouchableOpacity>
 
@@ -249,29 +256,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  profilePhone: {
-    color: "#FDECEC",
-    marginTop: 4,
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
+  infoRow: {
+    marginTop: 8,
   },
 
-  profileEmail: {
-    color: "#FDECEC",
-    marginTop: 2,
-    fontFamily: "Inter_400Regular",
-    fontSize: 12,
+  planRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
   },
 
-  proBadge: {
-    borderRadius: 20,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-
-  proText: {
+  planText: {
+    color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 11,
+    fontSize: 12,
+    letterSpacing: 0.5,
+  },
+
+  profileTin: {
+    color: "#FDECEC",
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
   },
 
   menuItem: {
