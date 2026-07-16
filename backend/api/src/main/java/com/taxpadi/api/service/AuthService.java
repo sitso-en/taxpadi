@@ -9,8 +9,11 @@ import java.util.HexFormat;
 import java.util.Optional;
 import java.util.UUID;
 
+import java.time.Duration;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -33,9 +36,10 @@ import com.taxpadi.api.dto.auth.UserSummary;
 import com.taxpadi.api.dto.auth.VerifyOtpRequest;
 import com.taxpadi.api.dto.auth.VerifyOtpResponse;
 import com.taxpadi.api.dto.auth.VerifyResetOtpResponse;
-import com.taxpadi.api.exception.ConflictException;
 import com.taxpadi.api.exception.BadRequestException;
+import com.taxpadi.api.exception.ConflictException;
 import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.exception.TooManyRequestsException;
 import com.taxpadi.api.util.PhoneUtil;
 import com.taxpadi.api.model.DeviceToken;
 import com.taxpadi.api.model.OtpPurpose;
@@ -60,6 +64,10 @@ import io.jsonwebtoken.Claims;
 public class AuthService {
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
     private static final SecureRandom secureRandom = new SecureRandom();
+    private static final int MAX_LOGIN_ATTEMPTS = 5;
+    private static final int MAX_OTP_ATTEMPTS   = 5;
+    private static final int LOCK_MINUTES       = 30;
+    private static final int OTP_RESEND_COOLDOWN_SECONDS = 60;
 
     private final UserTaxProfileRepository userTaxProfileRepository;
     private final TaxProfileRepository taxProfileRepository;
@@ -73,6 +81,7 @@ public class AuthService {
     private final JwtService jwtService;
     private final AuditLogService auditLogService;
     private final EmailService emailService;
+    private final StringRedisTemplate redis;
 
     public AuthService(UserRepository userRepository, OtpVerificationRepository otpVerificationRepository,
         UserTaxProfileRepository userTaxProfileRepository, TaxProfileRepository taxProfileRepository,
@@ -80,7 +89,8 @@ public class AuthService {
         DeviceTokenRepository deviceTokenRepository,
         SubscriptionRepository subscriptionRepository,
         BCryptPasswordEncoder bCryptPasswordEncoder, SmsService smsService, JwtService jwtService,
-        AuditLogService auditLogService, EmailService emailService
+        AuditLogService auditLogService, EmailService emailService,
+        StringRedisTemplate redis
     ){
         this.userRepository = userRepository;
         this.userTaxProfileRepository = userTaxProfileRepository;
@@ -94,6 +104,7 @@ public class AuthService {
         this.jwtService = jwtService;
         this.auditLogService = auditLogService;
         this.emailService = emailService;
+        this.redis = redis;
     }
 
 
@@ -103,14 +114,50 @@ public class AuthService {
         String email = request.getEmail();
         log.info("Registration attempt for phone={}", phone);
 
-        if(userRepository.findByPhone(phone).isPresent()){
-            log.warn("Registration failed — phone already taken: {}", phone);
-            throw new ConflictException("Phone number is already taken");
+        // If phone already exists but account is unverified, resume registration
+        // by updating details and resending a fresh OTP — don't block the user.
+        var existingByPhone = userRepository.findByPhone(phone);
+        if (existingByPhone.isPresent()) {
+            User existing = existingByPhone.get();
+            if (existing.isVerified()) {
+                log.warn("Registration failed — phone already taken: {}", phone);
+                throw new ConflictException("Phone number is already taken");
+            }
+            // Unverified account — update their details in case they changed anything
+            // and resend a fresh OTP so they can continue.
+            String cooldownKey = "otp:resend:" + existing.getUserId() + ":" + OtpPurpose.REGISTER.name();
+            if (Boolean.TRUE.equals(redis.hasKey(cooldownKey))) {
+                log.warn("Resume registration rate-limited for userId={}", existing.getUserId());
+                throw new TooManyRequestsException("Please wait " + OTP_RESEND_COOLDOWN_SECONDS + " seconds before requesting another OTP");
+            }
+            redis.opsForValue().set(cooldownKey, "1", Duration.ofSeconds(OTP_RESEND_COOLDOWN_SECONDS));
+
+            existing.setFullName(request.getFullName());
+            existing.setEmail(request.getEmail());
+            existing.setRegion(request.getRegion());
+            existing.setTaxpayerCategory(request.getTaxpayerCategory());
+            existing.setPasswordHash(passwordEncoder.encode(request.getPassword()));
+            userRepository.save(existing);
+            otpVerificationRepository.invalidateActiveOtps(existing, OtpPurpose.REGISTER);
+            String otpCode = String.valueOf(100000 + secureRandom.nextInt(900000));
+            OtpVerification otp = new OtpVerification();
+            otp.setUser(existing);
+            otp.setOtpCode(otpCode);
+            otp.setPurpose(OtpPurpose.REGISTER);
+            otp.setExpiresAt(LocalDateTime.now().plusMinutes(10));
+            otpVerificationRepository.save(otp);
+            smsService.sendOtp(phone, otpCode);
+            log.info("Resumed registration for userId={}, fresh OTP sent", existing.getUserId());
+            return new RegisterResponse(existing.getUserId(), existing.getPhone(), "OTP sent to your phone number");
         }
 
-        if(email != null && userRepository.findByEmail(email).isPresent()){
-            log.warn("Registration failed — email already taken: {}", email);
-            throw new ConflictException("Email is already taken");
+        if (email != null) {
+            var existingByEmail = userRepository.findByEmail(email);
+            if (existingByEmail.isPresent() && existingByEmail.get().isVerified()) {
+                log.warn("Registration failed — email already taken: {}", email);
+                throw new ConflictException("Email is already taken");
+            }
+            // If email belongs to an unverified account it will be overwritten below — that's fine.
         }
 
         String hashedPassword = passwordEncoder.encode(request.getPassword());
@@ -161,6 +208,7 @@ public class AuthService {
         );
     }
 
+    @Transactional
     public VerifyOtpResponse verifyOtp(VerifyOtpRequest request) {
         String phone = PhoneUtil.normalize(request.getPhone());
         OtpPurpose purpose = request.getPurpose();
@@ -179,8 +227,17 @@ public class AuthService {
         }
 
         if (!otp.getOtpCode().equals(request.getOtpCode())) {
-            log.warn("Invalid OTP code submitted for userId={}", user.getUserId());
-            throw new IllegalArgumentException("Invalid OTP code");
+            int attempts = otp.getAttemptCount() + 1;
+            otp.setAttemptCount(attempts);
+            if (attempts >= MAX_OTP_ATTEMPTS) {
+                otp.setUsed(true); // burn the OTP — user must request a new one
+                otpVerificationRepository.save(otp);
+                log.warn("OTP burned after {} failed attempts for userId={}", attempts, user.getUserId());
+                throw new IllegalArgumentException("Too many incorrect attempts. Please request a new OTP");
+            }
+            otpVerificationRepository.save(otp);
+            log.warn("Invalid OTP code submitted for userId={}, attempt {}/{}", user.getUserId(), attempts, MAX_OTP_ATTEMPTS);
+            throw new IllegalArgumentException("Invalid OTP code. " + (MAX_OTP_ATTEMPTS - attempts) + " attempt(s) remaining");
         }
 
         otp.setUsed(true);
@@ -212,6 +269,13 @@ public class AuthService {
             log.warn("Resend OTP for already-verified userId={}", user.getUserId());
             throw new ConflictException("Account is already verified");
         }
+
+        String cooldownKey = "otp:resend:" + user.getUserId() + ":" + purpose.name();
+        if (Boolean.TRUE.equals(redis.hasKey(cooldownKey))) {
+            log.warn("Resend OTP rate-limited for userId={}, purpose={}", user.getUserId(), purpose);
+            throw new TooManyRequestsException("Please wait " + OTP_RESEND_COOLDOWN_SECONDS + " seconds before requesting another OTP");
+        }
+        redis.opsForValue().set(cooldownKey, "1", Duration.ofSeconds(OTP_RESEND_COOLDOWN_SECONDS));
 
         otpVerificationRepository.invalidateActiveOtps(user, purpose);
         log.debug("Invalidated active OTPs for userId={}, purpose={}", user.getUserId(), purpose);
@@ -250,10 +314,28 @@ public class AuthService {
             throw new IllegalStateException("Account is not verified. Please verify your phone number first");
         }
 
+        if (user.getLockedUntil() != null && user.getLockedUntil().isAfter(LocalDateTime.now())) {
+            log.warn("Login blocked — account locked until {} for userId={}", user.getLockedUntil(), user.getUserId());
+            throw new IllegalStateException("Account is temporarily locked due to too many failed attempts. Please try again in " + LOCK_MINUTES + " minutes");
+        }
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
-            log.warn("Invalid password for userId={}", user.getUserId());
+            int attempts = user.getFailedLoginAttempts() + 1;
+            user.setFailedLoginAttempts(attempts);
+            if (attempts >= MAX_LOGIN_ATTEMPTS) {
+                user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCK_MINUTES));
+                log.warn("Account locked for userId={} after {} failed attempts", user.getUserId(), attempts);
+            }
+            userRepository.save(user);
             auditLogService.log(user, "LOGIN_FAILED", "Invalid password attempt", ipAddress);
             throw new IllegalArgumentException("Invalid phone number or password");
+        }
+
+        // Successful login — clear any lockout state
+        if (user.getFailedLoginAttempts() > 0 || user.getLockedUntil() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockedUntil(null);
+            userRepository.save(user);
         }
 
         
@@ -362,6 +444,11 @@ public class AuthService {
             throw new IllegalStateException("Account is deactivated. Please contact support");
         }
 
+        if (!user.isVerified()) {
+            log.warn("Biometric login on unverified account userId={}", user.getUserId());
+            throw new IllegalStateException("Account is not verified. Please verify your phone number first");
+        }
+
         
         String rawRefreshToken = UUID.randomUUID().toString();
         RefreshToken refreshToken = new RefreshToken();
@@ -408,11 +495,16 @@ public class AuthService {
         OtpPurpose purpose = OtpPurpose.PASSWORD_RESET;
 
         Optional<User> userOpt = userRepository.findByPhone(phone);
-        
+
         if(userOpt.isEmpty()){
             log.warn("User not found for this phone number={}: ", phone);
         }else{
             User user=userOpt.get();
+
+            if (!user.isVerified()) {
+                log.warn("Password reset requested for unverified account userId={}", user.getUserId());
+                return; // silently ignore — unverified accounts cannot reset password
+            }
 
             otpVerificationRepository.invalidateActiveOtps(user, purpose);
             log.debug("Invalidated active OTPs for userId={}, purpose={}", user.getUserId(), purpose);

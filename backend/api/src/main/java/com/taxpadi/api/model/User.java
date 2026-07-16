@@ -70,6 +70,12 @@ public class User {
     @Column(name = "is_verified")
     private Boolean isVerified = false;
 
+    @Column(name = "failed_login_attempts", nullable = false)
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "locked_until")
+    private LocalDateTime lockedUntil;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "notification_preferences", columnDefinition = "jsonb")
     private Map<String, Boolean> notificationPreferences = Map.of(
@@ -209,6 +215,12 @@ public class User {
     public void setVerified(Boolean isVerified) {
         this.isVerified = isVerified;
     }
+
+    public int getFailedLoginAttempts() { return failedLoginAttempts; }
+    public void setFailedLoginAttempts(int failedLoginAttempts) { this.failedLoginAttempts = failedLoginAttempts; }
+
+    public LocalDateTime getLockedUntil() { return lockedUntil; }
+    public void setLockedUntil(LocalDateTime lockedUntil) { this.lockedUntil = lockedUntil; }
 
 
     //notifitcation preferences

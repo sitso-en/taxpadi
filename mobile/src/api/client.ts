@@ -36,8 +36,7 @@ client.interceptors.response.use(
     const originalRequest: any = error.config;
 
     if (
-      error.response?.status === 401 ||
-error.response?.status === 403 &&
+      (error.response?.status === 401 || error.response?.status === 403) &&
       !originalRequest._retry
     ) {
       originalRequest._retry = true;

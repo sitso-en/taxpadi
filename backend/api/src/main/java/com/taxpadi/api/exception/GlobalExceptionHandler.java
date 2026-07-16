@@ -189,6 +189,14 @@ public class GlobalExceptionHandler {
                 .body(new ApiResponse<>(false, null, ex.getMessage()));
     }
 
+    // Rate limiting (e.g. OTP resend cooldown) — 429
+    @ExceptionHandler(TooManyRequestsException.class)
+    public ResponseEntity<ApiResponse<Void>> handleTooManyRequests(TooManyRequestsException ex) {
+        log.warn("Rate limited: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .body(new ApiResponse<>(false, null, ex.getMessage()));
+    }
+
     // Forbidden actions (e.g. revoking own session) — 403
     @ExceptionHandler(ForbiddenException.class)
     public ResponseEntity<ApiResponse<Void>> handleForbidden(ForbiddenException ex) {
