@@ -36,31 +36,29 @@ import com.taxpadi.api.model.Invoice;
 public class PdfService {
 
     private static final DeviceRgb BRAND_RED = new DeviceRgb(184, 55, 41);
-    private static final DeviceRgb TEAL      = new DeviceRgb(13, 99, 104);   // header bg
-    private static final DeviceRgb TEAL_DARK = new DeviceRgb(9,  72,  76);   // items header bg
-    private static final DeviceRgb DARK      = new DeviceRgb(30, 30, 40);    // body text
-    private static final DeviceRgb MUTED     = new DeviceRgb(100, 110, 120); // secondary text
-    private static final DeviceRgb PALE      = new DeviceRgb(245, 248, 248); // card bg (slight teal tint)
-    private static final DeviceRgb DIVIDER   = new DeviceRgb(210, 222, 222); // borders
+    private static final DeviceRgb TEAL      = new DeviceRgb(13, 99, 104);
+    private static final DeviceRgb TEAL_DARK = new DeviceRgb(9, 72, 76);
+    private static final DeviceRgb DARK      = new DeviceRgb(30, 30, 40);
+    private static final DeviceRgb MUTED     = new DeviceRgb(100, 110, 120);
+    private static final DeviceRgb PALE      = new DeviceRgb(245, 248, 248);
+    private static final DeviceRgb DIVIDER   = new DeviceRgb(210, 222, 222);
     private static final float H_PAD = 50f;
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("d MMM yyyy");
 
     public byte[] generateInvoicePdf(Invoice invoice) {
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         PdfDocument pdfDoc = new PdfDocument(new PdfWriter(out));
-        // Footer bars drawn at absolute page bottom via event handler
         pdfDoc.addEventHandler(PdfDocumentEvent.END_PAGE, new FooterBarHandler());
 
         Document doc = new Document(pdfDoc, PageSize.A4);
-        // Side margins set upfront so ALL body content inherits them automatically.
-        // Full-bleed header/bars compensate with negative margins + fixed page width.
         float pageWidth = PageSize.A4.getWidth();
+        // Side margins set upfront — all body content inherits them automatically.
+        // Full-bleed elements compensate with negative margins + fixed page width.
         doc.setMargins(0, H_PAD, 30, H_PAD);
 
         // ── FULL-BLEED TEAL HEADER ────────────────────────────────────────────
         Table header = new Table(new float[]{1, 1})
-                .setWidth(pageWidth)
-                .setMarginLeft(-H_PAD).setMarginRight(-H_PAD)
+                .setWidth(pageWidth).setMarginLeft(-H_PAD).setMarginRight(-H_PAD)
                 .setBorder(Border.NO_BORDER);
 
         Cell logoCell = new Cell().setBackgroundColor(TEAL).setBorder(Border.NO_BORDER)
@@ -93,22 +91,22 @@ public class PdfService {
         header.addCell(titleCell);
         doc.add(header);
 
-        // Accent bar — full bleed, same negative-margin trick
+        // Brand red accent bar — full bleed
         doc.add(new Table(1).setWidth(pageWidth).setMarginLeft(-H_PAD).setMarginRight(-H_PAD)
                 .setBorder(Border.NO_BORDER)
                 .addCell(new Cell().setBackgroundColor(BRAND_RED).setHeight(6).setBorder(Border.NO_BORDER)));
 
-        // ── BODY — all content inherits H_PAD side margins from doc ───────────
+        // ── BODY ──────────────────────────────────────────────────────────────
         doc.add(new Paragraph(" ").setMarginBottom(18));
 
-        // Status dot + label
+        // Status
         String status = invoice.getStatus() != null ? invoice.getStatus().toUpperCase() : "UNPAID";
         DeviceRgb statusColor = "PAID".equals(status) ? new DeviceRgb(39, 174, 96)
                 : ("CANCELLED".equals(status) ? new DeviceRgb(140, 140, 140) : BRAND_RED);
         doc.add(new Paragraph("● " + status)
                 .setFontColor(statusColor).setBold().setFontSize(12).setMarginBottom(22));
 
-        // ── FROM / BILL TO cards ──────────────────────────────────────────────
+        // ── FROM / BILL TO ────────────────────────────────────────────────────
         Table parties = new Table(new float[]{1, 1})
                 .setWidth(UnitValue.createPercentValue(100))
                 .setBorder(Border.NO_BORDER).setMarginBottom(32);
@@ -138,7 +136,7 @@ public class PdfService {
         parties.addCell(toCell);
         doc.add(parties);
 
-        // ── LINE ITEMS TABLE ──────────────────────────────────────────────────
+        // ── LINE ITEMS ────────────────────────────────────────────────────────
         Table items = new Table(new float[]{5, 2})
                 .setWidth(UnitValue.createPercentValue(100)).setMarginBottom(2);
 
@@ -149,7 +147,6 @@ public class PdfService {
                 .add(new Paragraph("AMOUNT (GHS)").setBold().setFontSize(9)
                         .setFontColor(ColorConstants.WHITE).setTextAlignment(TextAlignment.RIGHT))
                 .setBackgroundColor(TEAL_DARK).setBorder(Border.NO_BORDER).setPadding(16));
-
         items.addCell(new Cell()
                 .add(new Paragraph(invoice.getDescription() != null ? invoice.getDescription() : "")
                         .setFontColor(DARK).setFontSize(11.5f))
@@ -171,13 +168,11 @@ public class PdfService {
         if (invoice.getVatAmount() != null && invoice.getVatAmount().compareTo(BigDecimal.ZERO) > 0) {
             addTotalRow(totals, "VAT", "GHS " + fmt(invoice.getVatAmount()), false);
         }
-        // Red divider before total
         totals.addCell(new Cell(1, 2).setBackgroundColor(BRAND_RED)
                 .setHeight(2).setBorder(Border.NO_BORDER).setPadding(0));
         addTotalRow(totals, "TOTAL DUE", "GHS " + fmt(invoice.getTotalAmount()), true);
         doc.add(totals);
 
-        // Thank you note
         doc.add(new Paragraph("Thank you for your business.")
                 .setFontColor(MUTED).setFontSize(10.5f).setItalic());
 
@@ -204,7 +199,7 @@ public class PdfService {
         return amount != null ? String.format("%,.2f", amount) : "0.00";
     }
 
-    /** Draws teal + brand-red bars pinned to the absolute bottom of every page. */
+    /** Teal base + brand-red stripe pinned to the absolute bottom of every page. */
     private static class FooterBarHandler implements IEventHandler {
         @Override
         public void handleEvent(Event event) {
@@ -213,9 +208,9 @@ public class PdfService {
             float w = page.getPageSize().getWidth();
             PdfCanvas canvas = new PdfCanvas(page);
             canvas.saveState()
-                    .setFillColor(new DeviceRgb(9, 72, 76))   // teal base
+                    .setFillColor(new DeviceRgb(9, 72, 76))
                     .rectangle(0, 0, w, 10).fill()
-                    .setFillColor(new DeviceRgb(184, 55, 41))  // brand red accent
+                    .setFillColor(new DeviceRgb(184, 55, 41))
                     .rectangle(0, 10, w, 5).fill()
                     .restoreState();
         }

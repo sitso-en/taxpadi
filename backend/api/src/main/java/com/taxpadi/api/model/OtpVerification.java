@@ -44,6 +44,9 @@ public class OtpVerification {
     @Column(name = "used", nullable = false)
     private Boolean used = false;
 
+    @Column(name = "attempt_count", nullable = false)
+    private int attemptCount = 0;
+
     @Column(name="reset_token_hash", length = 64)
     private String resetTokenHash;
 
@@ -105,6 +108,9 @@ public class OtpVerification {
     public void setUsed(Boolean used) {
         this.used = used;
     }
+
+    public int getAttemptCount() { return attemptCount; }
+    public void setAttemptCount(int attemptCount) { this.attemptCount = attemptCount; }
 
     public String getResetTokenHash(){
         return resetTokenHash;
