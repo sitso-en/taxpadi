@@ -78,14 +78,17 @@ public class User {
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "notification_preferences", columnDefinition = "jsonb")
-    private Map<String, Boolean> notificationPreferences = Map.of(
+    private Map<String, Boolean> notificationPreferences = new java.util.HashMap<>(Map.of(
+        "push_notifications", true,
+        "email_notifications", true,
+        "sms_notifications", false,
         "deadline_reminders", true,
         "penalty_alerts", true,
         "vault_suggestions", true,
         "referral_offers", true,
         "payment_confirmations", true,
         "system_updates", true
-    );
+    ));
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

@@ -1,9 +1,11 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useRef, useState } from "react";
+import { RefreshControl } from "react-native";
 import {
   ActivityIndicator,
-  Alert,
+  Animated,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,195 +13,315 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useTransactions } from "../../context/TransactionContext";
+import { useToast } from "@/context/ToastContext";
+import { getTransactions, deleteTransaction as deleteTransactionApi } from "@/services/transaction.service";
 import Card from "../../components/Card";
+import ErrorState from "@/components/ErrorState";
+
+const LIMIT = 20;
 
 export default function TransactionsScreen() {
-  const { transactions, loading, deleteTransaction } = useTransactions();
+  const { showToast } = useToast();
+
+  const [localTransactions, setLocalTransactions] = useState<any[]>([]);
+  const [localLoading, setLocalLoading] = useState(false);
+  const [localError, setLocalError] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(false);
+
   const [selectedFilter, setSelectedFilter] = useState("All");
   const [search, setSearch] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const searchAnim = useRef(new Animated.Value(0)).current;
+  const searchInputRef = useRef<TextInput>(null);
 
-  const filteredTransactions = transactions.filter((transaction) => {
-    const matchesFilter =
-      selectedFilter === "All"
-        ? true
-        : transaction.type?.toLowerCase() === selectedFilter.toLowerCase();
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
-    const transactionTitle = transaction.title ?? "";
-
-    const matchesSearch = transactionTitle
-      .toLowerCase()
-      .includes(search.toLowerCase());
-
-    return matchesFilter && matchesSearch;
-  });
-
-  const handleDelete = async (id: number) => {
-    Alert.alert("Delete Transaction", "Are you sure?", [
-      {
-        text: "Cancel",
-        style: "cancel",
-      },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: async () => {
-          await deleteTransaction(id.toString());
-        },
-      },
-    ]);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setPage(1);
+    setLocalError(false);
+    await fetchTransactions(selectedFilter, 1, false);
+    setRefreshing(false);
   };
+
+  const fetchTransactions = useCallback(
+    async (typeFilter: string, pageNum: number, append = false) => {
+      if (append) setLoadingMore(true);
+      else { setLocalLoading(true); setLocalError(false); }
+      try {
+        const params: Record<string, any> = { page: pageNum, limit: LIMIT };
+        if (typeFilter !== "All") params.type = typeFilter.toLowerCase();
+        const response = await getTransactions(params);
+        const fetched = response.data?.transactions ?? response.transactions ?? [];
+        if (append) {
+          setLocalTransactions((prev) => [...prev, ...fetched]);
+        } else {
+          setLocalTransactions(fetched);
+        }
+        setHasMore(fetched.length === LIMIT);
+      } catch {
+        if (!append) setLocalError(true);
+      } finally {
+        if (append) setLoadingMore(false);
+        else setLocalLoading(false);
+      }
+    },
+    []
+  );
+
+  // Refresh on screen focus (picks up edits / new transactions from other screens)
+  useFocusEffect(
+    useCallback(() => {
+      setPage(1);
+      fetchTransactions(selectedFilter, 1, false);
+    }, [selectedFilter])
+  );
+
+  const handleFilterChange = (filter: string) => {
+    setSelectedFilter(filter);
+    setPage(1);
+    // fetchTransactions is triggered by useFocusEffect/useEffect via selectedFilter change
+    // but since useFocusEffect won't re-fire on state change, call directly:
+    fetchTransactions(filter, 1, false);
+  };
+
+  const handleLoadMore = () => {
+    const next = page + 1;
+    setPage(next);
+    fetchTransactions(selectedFilter, next, true);
+  };
+
+  const handleDeleteConfirmed = async () => {
+    if (!deleteConfirmId || deleting) return;
+    setDeleting(true);
+    try {
+      await deleteTransactionApi(deleteConfirmId);
+      setDeleteConfirmId(null);
+      setPage(1);
+      fetchTransactions(selectedFilter, 1, false);
+      showToast("Transaction deleted.", "success");
+    } catch {
+      showToast("Failed to delete transaction.", "error");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const openSearch = () => {
+    setSearchOpen(true);
+    Animated.timing(searchAnim, { toValue: 1, duration: 220, useNativeDriver: false }).start(
+      () => searchInputRef.current?.focus()
+    );
+  };
+
+  const closeSearch = () => {
+    setSearch("");
+    Animated.timing(searchAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start(() =>
+      setSearchOpen(false)
+    );
+  };
+
+  const displayTransactions = localTransactions.filter((t) =>
+    (t.description ?? "").toLowerCase().includes(search.toLowerCase())
+  );
 
   return (
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 120 }}
+        contentContainerStyle={{ paddingBottom: 100 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={["#C44736"]} tintColor="#C44736" />
+        }
       >
-        <Text style={styles.title}>Transactions</Text>
-        <Text style={styles.subtitle}>
-          Track your income and expenses in one place.
-        </Text>
+        {/* Header */}
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1, marginRight: 8 }}>
+            <Text style={styles.title}>Transactions</Text>
+            <Text style={styles.subtitle}>Track your income and expenses.</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.importButton}
+            onPress={() => router.push("/import-transactions")}
+          >
+            <Ionicons name="cloud-upload-outline" size={18} color="#C44736" />
+            <Text style={styles.importText}>Import</Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.transactionCount}>
-          {filteredTransactions.length} transaction
-          {filteredTransactions.length !== 1 ? "s" : ""}
+          {displayTransactions.length} transaction
+          {displayTransactions.length !== 1 ? "s" : ""}
+          {selectedFilter !== "All" ? ` · ${selectedFilter}` : ""}
         </Text>
 
-        {/* Filters */}
-        <View style={styles.filterContainer}>
+        {/* Filters + search toggle */}
+        <View style={styles.filterRow}>
           {["All", "Income", "Expense"].map((item) => (
             <TouchableOpacity
               key={item}
-              style={[
-                styles.filterButton,
-                selectedFilter === item && styles.selectedFilter,
-              ]}
-              onPress={() => setSelectedFilter(item)}
+              style={[styles.filterButton, selectedFilter === item && styles.selectedFilter]}
+              onPress={() => handleFilterChange(item)}
             >
-              <Text
-                style={[
-                  styles.filterText,
-                  selectedFilter === item && styles.selectedFilterText,
-                ]}
-              >
+              <Text style={[styles.filterText, selectedFilter === item && styles.selectedFilterText]}>
                 {item}
               </Text>
             </TouchableOpacity>
           ))}
+          <View style={{ flex: 1 }} />
+          <TouchableOpacity
+            style={[styles.searchToggle, searchOpen && styles.searchToggleActive]}
+            onPress={searchOpen ? closeSearch : openSearch}
+          >
+            <Ionicons
+              name="search-outline"
+              size={16}
+              color={searchOpen ? "#FFFFFF" : "#6B7280"}
+            />
+          </TouchableOpacity>
         </View>
 
-        {/* Search */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={20} color="#9CA3AF" />
+        {/* Animated search bar */}
+        <Animated.View
+          style={{
+            height: searchAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 48] }),
+            opacity: searchAnim,
+            marginBottom: searchAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 16] }),
+            overflow: "hidden",
+          }}
+        >
+          <View style={styles.searchBar}>
+            <Ionicons name="search-outline" size={18} color="#9CA3AF" />
+            <TextInput
+              ref={searchInputRef}
+              style={styles.searchInput}
+              placeholder="Search transactions..."
+              placeholderTextColor="#9CA3AF"
+              value={search}
+              onChangeText={setSearch}
+            />
+            <TouchableOpacity
+              onPress={() => (search ? setSearch("") : closeSearch())}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="close-circle" size={18} color="#9CA3AF" />
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
 
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search transactions..."
-            placeholderTextColor="#9CA3AF"
-            value={search}
-            onChangeText={setSearch}
-          />
-        </View>
-
-        {/* Transactions list layout */}
-        {loading ? (
+        {/* List */}
+        {localLoading ? (
           <View style={styles.emptyState}>
             <ActivityIndicator size="large" color="#C44736" />
           </View>
-        ) : filteredTransactions.length === 0 ? (
+        ) : localError ? (
+          <ErrorState onRetry={() => fetchTransactions(selectedFilter, 1, false)} />
+        ) : displayTransactions.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="wallet-outline" size={60} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>No Transactions</Text>
-            <Text style={styles.emptyText}>
-              Start by adding your first transaction.
-            </Text>
+            <Text style={styles.emptyText}>Start by adding your first transaction.</Text>
           </View>
         ) : (
-          filteredTransactions.filter(Boolean).map((transaction) => {
-            console.log("Rendering transaction:", transaction.transaction_id);
-            const currentId = transaction.transaction_id;
-            return (
-              <Card key={currentId} style={styles.transactionCard}>
-                <TouchableOpacity
-                  style={styles.transactionItem}
-                  onPress={() =>
-                    router.push(`/edit-transaction?id=${currentId}`)
-                  }
-                  onLongPress={() => handleDelete(currentId)}
-                >
-                  <View>
-                    <Text style={styles.transactionTitle}>
-                      {transaction.description}
-                    </Text>
-
-                    <View
-                      style={[
-                        styles.typeBadge,
-                        transaction.type === "income"
-                          ? styles.incomeBadge
-                          : styles.expenseBadge,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.typeBadgeText,
-                          transaction.type === "income"
-                            ? styles.incomeBadgeText
-                            : styles.expenseBadgeText,
-                        ]}
-                      >
-                        {transaction.type}
+          <>
+            {displayTransactions.map((transaction) => {
+              const id = transaction.transaction_id;
+              const isIncome = transaction.type === "income";
+              return (
+                <Card key={id} style={styles.transactionCard}>
+                  <TouchableOpacity
+                    style={styles.transactionItem}
+                    onPress={() => router.push(`/transaction-detail?id=${id}`)}
+                    onLongPress={() => setDeleteConfirmId(id)}
+                    delayLongPress={500}
+                  >
+                    <View style={{ flex: 1, marginRight: 10 }}>
+                      <Text style={styles.transactionTitle} numberOfLines={2}>
+                        {transaction.description}
+                      </Text>
+                      <Text style={styles.transactionMeta} numberOfLines={1}>
+                        {[
+                          transaction.category,
+                          transaction.tax_deductible ? "Deductible" : null,
+                          transaction.withholding_applicable ? "WHT" : null,
+                        ]
+                          .filter(Boolean)
+                          .join("  ·  ")}
                       </Text>
                     </View>
 
-                    <Text style={styles.transactionCategory}>
-                      {transaction.category}
-                    </Text>
-                  </View>
-
-                  <View style={{ alignItems: "flex-end" }}>
-                    <Text
-                      style={[
-                        styles.amount,
-                        {
-                          color:
-                            transaction.type === "income"
-                              ? "#22C55E"
-                              : "#C44736",
-                        },
-                      ]}
-                    >
-                      {transaction.type === "income" ? "+ " : "- "}
-                      GH¢ {Number(transaction.amount).toFixed(2)}
-                    </Text>
-
-                    <Text style={styles.date}>
-                      {transaction.date
-                        ? new Date(transaction.transaction_date).toLocaleDateString(
-                            "en-US",
-                            {
+                    <View style={{ alignItems: "flex-end", flexShrink: 0 }}>
+                      <Text style={[styles.amount, { color: isIncome ? "#22C55E" : "#C44736" }]}>
+                        {isIncome ? "+ " : "- "}GH¢ {Number(transaction.amount).toFixed(2)}
+                      </Text>
+                      <Text style={styles.date}>
+                        {transaction.transaction_date
+                          ? new Date(transaction.transaction_date).toLocaleDateString("en-US", {
                               month: "short",
                               day: "numeric",
                               year: "numeric",
-                            },
-                          )
-                        : "No Date"}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              </Card>
-            );
-          })
+                            })
+                          : "No Date"}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </Card>
+              );
+            })}
+
+            {/* Load more */}
+            {hasMore && (
+              <TouchableOpacity style={styles.loadMoreBtn} onPress={handleLoadMore} disabled={loadingMore}>
+                {loadingMore ? (
+                  <ActivityIndicator size="small" color="#C44736" />
+                ) : (
+                  <Text style={styles.loadMoreText}>Load more</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </>
         )}
       </ScrollView>
 
-      {/* Floating Button */}
+      {/* FAB */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => router.push("/add-transaction")}
       >
-        <Ionicons name="add" size={32} color="#FFFFFF" />
+        <Ionicons name="add" size={24} color="#FFFFFF" />
       </TouchableOpacity>
+
+      {/* Delete confirmation modal */}
+      <Modal visible={!!deleteConfirmId} transparent animationType="fade" onRequestClose={() => setDeleteConfirmId(null)}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.modalIconBox}>
+              <Ionicons name="trash-outline" size={24} color="#C44736" />
+            </View>
+            <Text style={styles.modalTitle}>Delete Transaction?</Text>
+            <Text style={styles.modalText}>This action cannot be undone.</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={() => setDeleteConfirmId(null)}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.confirmDeleteButton}
+                onPress={handleDeleteConfirmed}
+                disabled={deleting}
+              >
+                <Text style={styles.confirmDeleteText}>{deleting ? "Deleting…" : "Delete"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -207,49 +329,70 @@ export default function TransactionsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     paddingHorizontal: 16,
     paddingTop: 44,
+  },
+
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 6,
   },
 
   title: {
     fontSize: 34,
     fontFamily: "Inter_700Bold",
     color: "#111827",
-    marginBottom: 6,
   },
 
   subtitle: {
     color: "#6B7280",
-    fontSize: 15,
+    fontSize: 13,
     fontFamily: "Inter_400Regular",
-    marginBottom: 28,
+    marginTop: 2,
+  },
+
+  importButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FCE8E6",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    marginTop: 9,
+  },
+
+  importText: {
+    color: "#C44736",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    marginLeft: 4,
   },
 
   transactionCount: {
     color: "#9CA3AF",
     fontSize: 13,
     fontFamily: "Inter_500Medium",
-    marginTop: -18,
-    marginBottom: 22,
+    marginBottom: 16,
   },
 
-  filterContainer: {
+  filterRow: {
     flexDirection: "row",
-    marginBottom: 18,
+    alignItems: "center",
+    marginBottom: 12,
   },
 
   filterButton: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     paddingHorizontal: 20,
     paddingVertical: 11,
     borderRadius: 24,
     marginRight: 8,
   },
 
-  selectedFilter: {
-    backgroundColor: "#C44736",
-  },
+  selectedFilter: { backgroundColor: "#C44736" },
 
   filterText: {
     color: "#111827",
@@ -257,42 +400,42 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
-  selectedFilterText: {
-    color: "#FFFFFF",
+  selectedFilterText: { color: "#FFFFFF" },
+
+  searchToggle: {
+    backgroundColor: "#ede8e3",
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    justifyContent: "center",
+    alignItems: "center",
   },
 
-  searchContainer: {
+  searchToggleActive: { backgroundColor: "#C44736" },
+
+  searchBar: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    paddingHorizontal: 18,
-    height: 56,
-    marginBottom: 24,
-
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    height: 48,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 6,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
 
   searchInput: {
     flex: 1,
     marginLeft: 8,
+    marginRight: 4,
     fontFamily: "Inter_400Regular",
-
-    ...(require("react-native").Platform.OS === "web"
-      ? { outlineWidth: 0 }
-      : {}),
+    fontSize: 14,
   },
 
-  transactionCard: {
-    marginBottom: 16,
-  },
+  transactionCard: { marginBottom: 10 },
 
   transactionItem: {
     flexDirection: "row",
@@ -301,45 +444,14 @@ const styles = StyleSheet.create({
   },
 
   transactionTitle: {
-    fontSize: 12,
-    fontWeight: "600",
+    fontSize: 14,
     color: "#111827",
     fontFamily: "Inter_600SemiBold",
   },
 
-  typeBadge: {
-    alignSelf: "flex-start",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    marginTop: 8,
-  },
-
-  incomeBadge: {
-    backgroundColor: "#DCFCE7",
-  },
-
-  expenseBadge: {
-    backgroundColor: "#FEE2E2",
-  },
-
-  typeBadgeText: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    textTransform: "capitalize",
-  },
-
-  incomeBadgeText: {
-    color: "#15803D",
-  },
-
-  expenseBadgeText: {
-    color: "#B91C1C",
-  },
-
-  transactionCategory: {
+  transactionMeta: {
     color: "#9CA3AF",
-    marginTop: 4,
+    marginTop: 5,
     fontSize: 12,
     fontFamily: "Inter_400Regular",
   },
@@ -354,6 +466,18 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 4,
     fontFamily: "Inter_400Regular",
+  },
+
+  loadMoreBtn: {
+    alignItems: "center",
+    paddingVertical: 14,
+    marginBottom: 8,
+  },
+
+  loadMoreText: {
+    color: "#C44736",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
 
   emptyState: {
@@ -377,22 +501,94 @@ const styles = StyleSheet.create({
 
   fab: {
     position: "absolute",
-    right: 25,
-    bottom: 25,
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    right: 20,
+    bottom: 20,
+    width: 52,
+    height: 52,
+    borderRadius: 26,
     backgroundColor: "#C44736",
     justifyContent: "center",
     alignItems: "center",
-
     shadowColor: "#000",
     shadowOpacity: 0.15,
     shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 5,
-    },
+    shadowOffset: { width: 0, height: 5 },
     elevation: 6,
+  },
+
+  // Delete modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    alignItems: "center",
+  },
+
+  modalIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 6,
+  },
+
+  modalText: {
+    color: "#6B7280",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+
+  cancelButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#EDE8E3",
+    alignItems: "center",
+  },
+
+  cancelText: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    fontSize: 14,
+  },
+
+  confirmDeleteButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#C44736",
+    alignItems: "center",
+  },
+
+  confirmDeleteText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
 });

@@ -1,88 +1,107 @@
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  getVault,
+  getVaultTransactions,
+  getVaultSuggestion,
+  contributeToVault,
+  linkMomo as linkMomoService,
+} from "@/services/vault.service";
+import { readCache, writeCache } from "@/utils/cache";
 
-type Saving = {
-  id: number;
-  amount: number;
-  date: string;
-};
+const CACHE_KEY = "taxpadi:savings";
+const CACHE_TTL = 5 * 60 * 1000;
+
+type CacheShape = { vault: any; transactions: any[]; suggestion: any };
 
 type SavingsContextType = {
-  savings: Saving[];
+  vault: any;
   totalSaved: number;
+  transactions: any[];
+  suggestion: any;
   loading: boolean;
-  refreshSavings: () => Promise<void>;
-  addSaving: (amount: number) => Promise<void>;
-  deleteSaving: (id: number) => Promise<void>;
+  error: boolean;
+  refreshVault: (showLoader?: boolean) => Promise<void>;
+  contribute: (amount: number, trigger: "manual" | "suggested") => Promise<any>;
+  linkMomo: (data: { momo_number: string; momo_provider: "mtn" | "telecel" | "airteltigo" }) => Promise<any>;
 };
 
-const SavingsContext =
-  createContext({} as SavingsContextType);
+const SavingsContext = createContext({} as SavingsContextType);
 
-export function SavingsProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [savings, setSavings] = useState<Saving[]>([]);
-  const [loading, setLoading] = useState(false);
+export function SavingsProvider({ children }: { children: React.ReactNode }) {
+  const [vault, setVault] = useState<any>(null);
+  const [transactions, setTransactions] = useState<any[]>([]);
+  const [suggestion, setSuggestion] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-  const refreshSavings = async () => {
-    setLoading(false);
+  const doFetch = async (silent = false) => {
+    if (!silent) setError(false);
+    try {
+      const [vaultRes, txRes] = await Promise.all([getVault(), getVaultTransactions()]);
+      const freshVault = vaultRes.data ?? null;
+      const freshTx = txRes.data?.transactions ?? [];
+      setVault(freshVault);
+      setTransactions(freshTx);
+      setError(false);
 
-    // TODO: Replace when Savings endpoints exist
-    setSavings([]);
+      let freshSuggestion = null;
+      try {
+        const sugRes = await getVaultSuggestion();
+        freshSuggestion = sugRes.data ?? null;
+      } catch {}
+      setSuggestion(freshSuggestion);
 
-    setLoading(false);
+      writeCache<CacheShape>(CACHE_KEY, { vault: freshVault, transactions: freshTx, suggestion: freshSuggestion });
+    } catch {
+      if (!silent) setError(true);
+    }
+  };
+
+  const refreshVault = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    await doFetch(false);
+    if (showLoader) setLoading(false);
   };
 
   useEffect(() => {
-    refreshSavings();
+    readCache<CacheShape>(CACHE_KEY, CACHE_TTL).then(async (cached) => {
+      if (cached) {
+        setVault(cached.data.vault);
+        setTransactions(cached.data.transactions);
+        setSuggestion(cached.data.suggestion);
+        setLoading(false);
+        if (cached.isStale) doFetch(true);
+      } else {
+        await doFetch(false);
+        setLoading(false);
+      }
+    });
   }, []);
 
-  const addSaving = async (amount: number) => {
-    // TODO: Call backend when endpoint is available
-
-    const saving: Saving = {
-      id: Date.now(),
-      amount,
-      date: new Date().toISOString(),
-    };
-
-    setSavings((prev) => [...prev, saving]);
+  const contribute = async (amount: number, trigger: "manual" | "suggested") => {
+    const res = await contributeToVault({ amount, trigger });
+    await refreshVault();
+    return res;
   };
 
-  const deleteSaving = async (id: number) => {
-    // TODO: Call backend when endpoint is available
-
-    setSavings((prev) =>
-      prev.filter((item) => item.id !== id)
-    );
+  const linkMomo = async (data: { momo_number: string; momo_provider: "mtn" | "telecel" | "airteltigo" }) => {
+    const res = await linkMomoService(data);
+    await refreshVault();
+    return res;
   };
-
-  const totalSaved = useMemo(
-    () =>
-      savings.reduce(
-        (sum, item) => sum + item.amount,
-        0
-      ),
-    [savings]
-  );
 
   return (
     <SavingsContext.Provider
       value={{
-        savings,
-        totalSaved,
+        vault,
+        totalSaved: vault?.balance ?? 0,
+        transactions,
+        suggestion,
         loading,
-        refreshSavings,
-        addSaving,
-        deleteSaving,
+        error,
+        refreshVault,
+        contribute,
+        linkMomo,
       }}
     >
       {children}

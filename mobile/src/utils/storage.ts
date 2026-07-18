@@ -46,3 +46,31 @@ export const clearTokens = async () => {
   await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
   await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
 };
+
+const BIOMETRIC_TOKEN_KEY = "biometric_token";
+const BIOMETRIC_ENABLED_KEY = "biometric_enabled";
+
+export const getBiometricToken = async (): Promise<string | null> => {
+  if (isWeb) return null;
+  return SecureStore.getItemAsync(BIOMETRIC_TOKEN_KEY);
+};
+
+export const saveBiometricToken = async (token: string): Promise<void> => {
+  if (isWeb) return;
+  await SecureStore.setItemAsync(BIOMETRIC_TOKEN_KEY, token);
+};
+
+export const setBiometricEnabled = async (enabled: boolean): Promise<void> => {
+  if (isWeb) return;
+  if (enabled) {
+    await SecureStore.setItemAsync(BIOMETRIC_ENABLED_KEY, "true");
+  } else {
+    await SecureStore.deleteItemAsync(BIOMETRIC_ENABLED_KEY);
+  }
+};
+
+export const isBiometricEnabled = async (): Promise<boolean> => {
+  if (isWeb) return false;
+  const val = await SecureStore.getItemAsync(BIOMETRIC_ENABLED_KEY);
+  return val === "true";
+};

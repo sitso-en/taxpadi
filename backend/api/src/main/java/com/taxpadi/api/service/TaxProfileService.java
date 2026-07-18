@@ -30,9 +30,22 @@ public class TaxProfileService {
     }
 
     public TaxProfileDto getProfile(User user) {
-        UserTaxProfile profile = profileRepository.findByUser(user)
-                .orElseThrow(() -> new NotFoundException("Tax profile not found for this user"));
-        return toDto(profile);
+        return profileRepository.findByUser(user)
+                .map(this::toDto)
+                .orElseGet(() -> {
+                    TaxProfileDto dto = new TaxProfileDto();
+                    dto.setUserId(user.getUserId());
+                    dto.setFullName(user.getFullName());
+                    dto.setTin(user.getTin());
+                    dto.setTaxpayerType(user.getTaxpayerCategory() != null ? user.getTaxpayerCategory().name() : null);
+                    dto.setRegion(user.getRegion());
+                    dto.setRegistrationDate(user.getCreatedAt());
+                    dto.setVatRegistered(false);
+                    dto.setPayeRegistered(false);
+                    dto.setNhilRegistered(false);
+                    dto.setOnboardingComplete(false);
+                    return dto;
+                });
     }
 
     @Transactional
@@ -101,13 +114,18 @@ public class TaxProfileService {
     private TaxProfileDto toDto(UserTaxProfile p) {
         TaxProfileDto dto = new TaxProfileDto();
         dto.setProfileId(p.getProfileId());
-        dto.setUserId(p.getUser().getUserId());
+        User user = p.getUser();
+        dto.setUserId(user.getUserId());
+        dto.setFullName(user.getFullName());
+        dto.setTin(user.getTin());
+        dto.setTaxpayerType(user.getTaxpayerCategory() != null ? user.getTaxpayerCategory().name() : null);
+        dto.setRegion(user.getRegion());
+        dto.setRegistrationDate(user.getCreatedAt());
         dto.setVatRegistered(p.getVatRegistered());
         dto.setVatRegistrationNo(p.getVatRegistrationNo());
         dto.setPayeRegistered(p.getPayeRegistered());
         dto.setNhilRegistered(p.getNhilRegistered());
         dto.setTaxYearStart(p.getTaxYearStart());
-        User user = p.getUser();
         boolean onboardingComplete = Boolean.TRUE.equals(p.getOnboardingComplete())
                 || (user.getTin() != null && !user.getTin().isBlank() && p.getTaxYearStart() != null);
         dto.setOnboardingComplete(onboardingComplete);

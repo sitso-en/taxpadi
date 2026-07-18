@@ -13,6 +13,21 @@ public class TaxProfileDto {
     @JsonProperty("user_id")
     private UUID userId;
 
+    @JsonProperty("full_name")
+    private String fullName;
+
+    @JsonProperty("tin")
+    private String tin;
+
+    @JsonProperty("taxpayer_type")
+    private String taxpayerType;
+
+    @JsonProperty("region")
+    private String region;
+
+    @JsonProperty("registration_date")
+    private LocalDateTime registrationDate;
+
     @JsonProperty("vat_registered")
     private Boolean vatRegistered;
 
@@ -42,6 +57,21 @@ public class TaxProfileDto {
 
     public UUID getUserId() { return userId; }
     public void setUserId(UUID v) { this.userId = v; }
+
+    public String getFullName() { return fullName; }
+    public void setFullName(String v) { this.fullName = v; }
+
+    public String getTin() { return tin; }
+    public void setTin(String v) { this.tin = v; }
+
+    public String getTaxpayerType() { return taxpayerType; }
+    public void setTaxpayerType(String v) { this.taxpayerType = v; }
+
+    public String getRegion() { return region; }
+    public void setRegion(String v) { this.region = v; }
+
+    public LocalDateTime getRegistrationDate() { return registrationDate; }
+    public void setRegistrationDate(LocalDateTime v) { this.registrationDate = v; }
 
     public Boolean getVatRegistered() { return vatRegistered; }
     public void setVatRegistered(Boolean v) { this.vatRegistered = v; }

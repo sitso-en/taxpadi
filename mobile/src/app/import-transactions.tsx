@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { Dropdown } from "react-native-element-dropdown";
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Platform,
   StyleSheet,
@@ -21,6 +20,10 @@ import {
 } from "@/services/transaction.service";
 import { useTransactions } from "@/context/TransactionContext";
 import { getUserFriendlyError } from "@/utils/error";
+import { useToast } from "@/context/ToastContext";
+import { useNetwork } from "@/context/NetworkContext";
+import SubscriptionGate from "@/components/SubscriptionGate";
+import { useSubscription } from "@/context/SubscriptionContext";
 
 const providers = [
   { label: "MTN MoMo", value: "mtn" },
@@ -29,10 +32,18 @@ const providers = [
   { label: "Ecobank", value: "ecobank" },
   { label: "GCB Bank", value: "gcb" },
   { label: "Fidelity Bank", value: "fidelity" },
+  { label: "Absa", value: "absa" },
+  { label: "CBG", value: "cbg" },
+  { label: "MiWay Insurance", value: "miway" },
+  { label: "PWC", value: "pwc" },
+  { label: "Other", value: "other" },
 ];
 
 export default function TransactionImportScreen() {
+  const { isPro } = useSubscription();
   const { refreshTransactions } = useTransactions();
+  const { showToast } = useToast();
+  const { isOnline } = useNetwork();
 
   const [provider, setProvider] = useState("mtn");
   const [statementFrom, setStatementFrom] = useState(new Date());
@@ -42,22 +53,32 @@ export default function TransactionImportScreen() {
 
   const [uploading, setUploading] = useState(false);
   const [validating, setValidating] = useState(false);
+  const [errors, setErrors] = useState<{file?: string; dateRange?: string}>({});
 
   const [showFromPicker, setShowFromPicker] = useState(false);
   const [showToPicker, setShowToPicker] = useState(false);
+
+  // FIX: Shifted function declaration up here so it's fully allocated before mount hooks or early returns
+  const loadHistory = async () => {
+    try {
+      const response = await getTransactionImportHistory();
+      setHistory(response.data?.imports ?? response.imports ?? []);
+    } catch {
+      // Gracefully silence fetch failures on mount
+    }
+  };
 
   useEffect(() => {
     loadHistory();
   }, []);
 
-  const loadHistory = async () => {
-    try {
-      const response = await getTransactionImportHistory();
-      setHistory(response.data?.imports ?? response.imports ?? []);
-    } catch (error) {
-      console.log("Error loading history:", error);
-    }
-  };
+  if (!isPro) return (
+    <SubscriptionGate
+      feature="Import Transactions"
+      description="Bulk import transactions from CSV files or bank statements to save time on data entry."
+      icon="cloud-upload-outline"
+    />
+  );
 
   const pickFile = async () => {
     try {
@@ -68,15 +89,19 @@ export default function TransactionImportScreen() {
 
       if (!result.canceled) {
         setFile(result.assets[0]);
+        setErrors(e => ({ ...e, file: undefined }));
       }
-    } catch (error) {
-      console.log("File pick error:", error);
+    } catch {
     }
   };
 
   const validate = async () => {
+    if (!isOnline) {
+      showToast("You're offline. Connect to the internet to validate this statement.", "info");
+      return;
+    }
     if (!file) {
-      Alert.alert("Missing File", "Please select a statement file first.");
+      setErrors(e => ({ ...e, file: "Select a statement file first." }));
       return;
     }
 
@@ -85,34 +110,30 @@ export default function TransactionImportScreen() {
     setValidating(true);
 
     try {
-      const response = await validateTransactionImport(provider, file.uri);
+      const response = await validateTransactionImport(provider, file.uri, file.name, file.mimeType ?? "application/octet-stream");
       const isSafe = response.data?.safe_to_import ?? response.safe_to_import;
 
-      Alert.alert(
-        "Validation Result",
-        isSafe ? "Statement is safe to import." : "Warning: Import contains overlapping date ranges."
+      showToast(
+        isSafe ? "Statement is safe to import." : "Warning: Import contains overlapping date ranges.",
+        isSafe ? "success" : "info"
       );
     } catch (error: any) {
-      Alert.alert(
-  "Validation Unsuccessful",
-  getUserFriendlyError(error)
-);
+      showToast(getUserFriendlyError(error), "error");
     } finally {
       setValidating(false);
     }
   };
 
   const importStatement = async () => {
-    if (statementFrom > statementTo) {
-      Alert.alert(
-        "Invalid Date Range",
-        "The start date cannot be after the end date."
-      );
+    if (!isOnline) {
+      showToast("You're offline. Connect to the internet to import this statement.", "info");
       return;
     }
-
-    if (!file) {
-      Alert.alert("Missing File", "Please select a statement file first.");
+    const newErrors: typeof errors = {};
+    if (statementFrom > statementTo) newErrors.dateRange = "The start date cannot be after the end date.";
+    if (!file) newErrors.file = "Select a statement file first.";
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
@@ -128,24 +149,20 @@ export default function TransactionImportScreen() {
         provider,
         fromStr,
         toStr,
-        file.uri
+        file.uri,
+        file.name,
+        file.mimeType ?? "application/octet-stream"
       );
 
       const count = response.data?.transactions_imported ?? response.transactions_imported ?? 0;
 
-      Alert.alert(
-        "Import Complete",
-        `${count} transactions imported successfully.\nYour tax calculations have also been updated.`
-      );
+      showToast(`${count} transactions imported successfully. Tax calculations updated.`, "success");
 
       setFile(null);
       await loadHistory();
       await refreshTransactions();
     } catch (error: any) {
-      Alert.alert(
-  "Import Unsuccessful",
-  getUserFriendlyError(error)
-);
+      showToast(getUserFriendlyError(error), "error");
     } finally {
       setUploading(false);
     }
@@ -176,19 +193,17 @@ export default function TransactionImportScreen() {
       }
       renderItem={renderHistoryItem}
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{ paddingBottom: 48 }}
       ListHeaderComponent={
         <>
           {/* Header */}
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()}>
-              <Ionicons name="arrow-back" size={24} color="#111827" />
+              <Ionicons name="chevron-back" size={26} color="#111827" />
             </TouchableOpacity>
-            <View style={{ marginLeft: 10 }}>
-              <Text style={styles.title}>Import Statements</Text>
-              <Text style={styles.subtitle}>Parse bank or mobile money statements directly.</Text>
-            </View>
+            <Text style={styles.title}>Import Statements</Text>
           </View>
+          <Text style={styles.subtitle}>Parse bank or mobile money statements directly.</Text>
 
           {/* Form Card */}
           <View style={styles.card}>
@@ -201,24 +216,37 @@ export default function TransactionImportScreen() {
               value={provider}
               onChange={(item) => setProvider(item.value)}
               placeholder="Select Provider"
+              placeholderStyle={styles.dropdownPlaceholder}
+              selectedTextStyle={styles.dropdownSelected}
+              itemTextStyle={styles.dropdownSelected}
+              containerStyle={styles.dropdownContainer}
+              activeColor="#F2EDE8"
+              iconColor="#9CA3AF"
             />
 
             {/* Date Range Selection */}
             <View style={styles.row}>
               <View style={{ flex: 1, marginRight: 8 }}>
                 <Text style={styles.label}>FROM</Text>
-                <TouchableOpacity style={styles.dateSelector} onPress={() => setShowFromPicker(true)}>
+                <TouchableOpacity
+                  style={[styles.dateSelector, errors.dateRange && styles.inputError]}
+                  onPress={() => { setShowFromPicker(true); if (errors.dateRange) setErrors(e => ({ ...e, dateRange: undefined })); }}
+                >
                   <Text style={styles.dateText}>{statementFrom.toLocaleDateString()}</Text>
                 </TouchableOpacity>
               </View>
 
               <View style={{ flex: 1, marginLeft: 8 }}>
                 <Text style={styles.label}>TO</Text>
-                <TouchableOpacity style={styles.dateSelector} onPress={() => setShowToPicker(true)}>
+                <TouchableOpacity
+                  style={[styles.dateSelector, errors.dateRange && styles.inputError]}
+                  onPress={() => { setShowToPicker(true); if (errors.dateRange) setErrors(e => ({ ...e, dateRange: undefined })); }}
+                >
                   <Text style={styles.dateText}>{statementTo.toLocaleDateString()}</Text>
                 </TouchableOpacity>
               </View>
             </View>
+            {errors.dateRange ? <Text style={styles.fieldError}>{errors.dateRange}</Text> : null}
 
             {showFromPicker && (
               <DateTimePicker
@@ -246,43 +274,45 @@ export default function TransactionImportScreen() {
 
             {/* Document Picker */}
             <Text style={styles.label}>STATEMENT FILE</Text>
-            <TouchableOpacity style={styles.fileButton} onPress={pickFile}>
+            <TouchableOpacity
+              style={[styles.fileButton, errors.file && styles.inputError, !!errors.file && { marginBottom: 4 }]}
+              onPress={() => { pickFile(); if (errors.file) setErrors(e => ({ ...e, file: undefined })); }}
+            >
               <Ionicons name="document-attach-outline" size={20} color="#6B7280" />
               <Text style={styles.fileButtonText} numberOfLines={1}>
                 {file ? file.name : "Choose Statement File (CSV/PDF)"}
               </Text>
             </TouchableOpacity>
+            {errors.file ? <Text style={styles.fieldError}>{errors.file}</Text> : null}
 
             {/* Actions Block */}
-            {uploading || validating ? (
-              <ActivityIndicator size="large" color="#C44736" style={{ marginVertical: 16 }} />
-            ) : (
-              <View style={[styles.row, { marginTop: 8 }]}>
-                <TouchableOpacity
-                  style={styles.validateButton}
-                  onPress={validate}
-                  disabled={validating}
-                >
-                  <Text style={styles.validateButtonText}>
-                    {validating ? "Validating..." : "Validate"}
-                  </Text>
-                </TouchableOpacity>
+            <View style={[styles.row, { marginTop: 8 }]}>
+              <TouchableOpacity
+                style={styles.validateButton}
+                onPress={validate}
+              >
+                {validating ? (
+                  <ActivityIndicator size="small" color="#111827" />
+                ) : (
+                  <Text style={styles.validateButtonText}>Validate</Text>
+                )}
+              </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.importButton}
-                  onPress={importStatement}
-                  disabled={uploading}
-                >
-                  <Text style={styles.importButtonText}>
-                    {uploading ? "Importing..." : "Import"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              <TouchableOpacity
+                style={styles.importButton}
+                onPress={importStatement}
+              >
+                {uploading ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.importButtonText}>Import</Text>
+                )}
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* History Header */}
-          <Text style={styles.sectionHeading}>IMPORT HISTORY</Text>
+          <Text style={styles.sectionHeading}>Import History</Text>
         </>
       }
       ListEmptyComponent={
@@ -298,45 +328,68 @@ export default function TransactionImportScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     paddingHorizontal: 16,
     paddingTop: 44,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
+    marginBottom: 20,
   },
   title: {
-    fontSize: 26,
+    fontSize: 23,
     fontFamily: "Inter_700Bold",
     color: "#111827",
+    marginLeft: 10,
   },
   subtitle: {
     color: "#6B7280",
     fontSize: 13,
-    marginTop: 2,
+    marginBottom: 16,
+    fontFamily: "Inter_400Regular",
   },
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 18,
-    marginBottom: 28,
+    padding: 16,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: "#E5E7EB",
   },
   label: {
-    color: "#C44736",
+    color: "#9CA3AF",
     fontSize: 11,
     marginBottom: 8,
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
     letterSpacing: 0.5,
   },
   dropdown: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
+  },
+  dropdownPlaceholder: {
+    color: "#9CA3AF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+  },
+  dropdownSelected: {
+    color: "#111827",
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+  },
+  dropdownContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    overflow: "hidden",
+    marginTop: 2,
   },
   row: {
     flexDirection: "row",
@@ -344,17 +397,18 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dateSelector: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     borderRadius: 12,
     padding: 14,
     alignItems: "center",
   },
   dateText: {
     color: "#111827",
+    fontFamily: "Inter_500Medium",
   },
   fileButton: {
     flexDirection: "row",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     borderRadius: 12,
     padding: 16,
     alignItems: "center",
@@ -367,18 +421,21 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     color: "#374151",
     flex: 1,
+    fontFamily: "Inter_400Regular",
   },
   validateButton: {
     flex: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
+    justifyContent: "center",
     marginRight: 8,
   },
   validateButtonText: {
     color: "#111827",
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
   importButton: {
     flex: 1,
@@ -386,15 +443,17 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     paddingVertical: 16,
     alignItems: "center",
+    justifyContent: "center",
     marginLeft: 8,
   },
   importButtonText: {
     color: "#FFFFFF",
-    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
   sectionHeading: {
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
     color: "#4B5563",
     marginBottom: 12,
     letterSpacing: 0.5,
@@ -414,17 +473,18 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   historyProvider: {
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
     color: "#111827",
   },
   historyCount: {
     color: "#10B981",
-    fontWeight: "700",
+    fontFamily: "Inter_700Bold",
   },
   historyMeta: {
     fontSize: 12,
     color: "#6B7280",
     marginTop: 2,
+    fontFamily: "Inter_400Regular",
   },
   emptyContainer: {
     alignItems: "center",
@@ -434,5 +494,16 @@ const styles = StyleSheet.create({
   emptyText: {
     color: "#6B7280",
     marginTop: 10,
+    fontFamily: "Inter_400Regular",
+  },
+  fieldError: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginBottom: 12,
+  },
+  inputError: {
+    borderWidth: 1.5,
+    borderColor: "#EF4444",
   },
 });

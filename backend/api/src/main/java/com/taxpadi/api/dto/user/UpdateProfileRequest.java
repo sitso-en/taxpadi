@@ -1,5 +1,6 @@
 package com.taxpadi.api.dto.user;
 
+import com.taxpadi.api.model.TaxpayerCategory;
 import jakarta.validation.constraints.Email;
 
 public class UpdateProfileRequest {
@@ -12,6 +13,8 @@ public class UpdateProfileRequest {
     private String region;
 
     private String tin;
+
+    private TaxpayerCategory taxpayerCategory;
 
 
     public String getFullName() {
@@ -44,5 +47,13 @@ public class UpdateProfileRequest {
 
     public void setTin(String tin) {
         this.tin = tin;
+    }
+
+    public TaxpayerCategory getTaxpayerCategory() {
+        return taxpayerCategory;
+    }
+
+    public void setTaxpayerCategory(TaxpayerCategory taxpayerCategory) {
+        this.taxpayerCategory = taxpayerCategory;
     }
 }

@@ -92,12 +92,17 @@ public class UserService {
             user.setTin(request.getTin());
         }
 
+        if (request.getTaxpayerCategory() != null) {
+            user.setTaxpayerCategory(request.getTaxpayerCategory());
+        }
+
         userRepository.save(user);
         auditLogService.log(user, "PROFILE_UPDATED", "Profile fields updated", ipAddress);
         log.info("Profile updated for userId={}", user.getUserId());
+        String categoryName = user.getTaxpayerCategory() != null ? user.getTaxpayerCategory().name() : null;
         return new UpdateProfileResponse(
             user.getUserId(), user.getFullName(), user.getEmail(),
-            user.getTin(), user.getRegion(), user.getUpdatedAt()
+            user.getTin(), user.getRegion(), categoryName, user.getUpdatedAt()
         );
     }
 
@@ -148,6 +153,7 @@ public class UserService {
                 t.getDeviceInfo(),
                 t.getIpAddress(),
                 t.getCreatedAt(),
+                t.getLastUsedAt(),
                 t.getExpiresAt(),
                 t.getTokenId().equals(currentTokenId)
             ))

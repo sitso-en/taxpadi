@@ -15,6 +15,7 @@ export type User = {
   
   subscription_tier: string;
   is_active: boolean;
+  is_verified: boolean;
 
   label: string;
   tin: string;
@@ -39,6 +40,7 @@ const defaultUser: User = {
   category: "",
   subscription_tier: "FREE",
   is_active: false,
+  is_verified: false,
   label: "",
   tin: "",
   taxpayer_category: "",
@@ -61,6 +63,7 @@ const normalizeStoredUser = (storedUser: Record<string, any> | null | undefined)
     category: storedUser.category ?? "",
     subscription_tier: storedUser.subscription_tier ?? "FREE",
     is_active: storedUser.is_active ?? false,
+    is_verified: storedUser.is_verified ?? false,
     label: storedUser.label ?? "",
     tin: storedUser.tin ?? "",
     taxpayer_category: storedUser.taxpayer_category ?? "",
@@ -86,8 +89,7 @@ export function UserProvider({
           const parsedUser = JSON.parse(storedUser);
           setUser(normalizeStoredUser(parsedUser));
         }
-      } catch (error) {
-        console.log("Failed to load user:", error);
+      } catch {
       } finally {
         setLoading(false);
       }
@@ -108,8 +110,7 @@ export function UserProvider({
           "user",
           JSON.stringify({ ...rest, full_name: fullName })
         );
-      } catch (error) {
-        console.log("Failed to save user:", error);
+      } catch {
       }
     };
 

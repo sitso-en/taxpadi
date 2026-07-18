@@ -12,6 +12,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 
 @Entity
@@ -48,11 +49,20 @@ public class RefreshToken {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(name = "last_used_at")
+    private LocalDateTime lastUsedAt;
+
     // --- JPA Lifecycle Callbacks ---
-    
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+        lastUsedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        lastUsedAt = LocalDateTime.now();
     }
 
 
@@ -129,5 +139,12 @@ public class RefreshToken {
 
     public LocalDateTime getCreatedAt() {
         return createdAt;
+    }
+
+    public LocalDateTime getLastUsedAt() {
+        return lastUsedAt;
+    }
+    public void setLastUsedAt(LocalDateTime lastUsedAt) {
+        this.lastUsedAt = lastUsedAt;
     }
 }

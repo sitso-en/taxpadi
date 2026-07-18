@@ -21,7 +21,7 @@ export const getUnreadCount = async () => {
 };
 
 export const markNotificationAsRead = async (id: string) => {
-  const response = await client.patch(
+  const response = await client.put(
     ENDPOINTS.NOTIFICATIONS.MARK_READ(id)
   );
 
@@ -29,7 +29,7 @@ export const markNotificationAsRead = async (id: string) => {
 };
 
 export const markAllNotificationsAsRead = async () => {
-  const response = await client.patch(
+  const response = await client.put(
     ENDPOINTS.NOTIFICATIONS.MARK_ALL_READ
   );
 
@@ -49,6 +49,26 @@ export const deleteAllNotifications = async () => {
     ENDPOINTS.NOTIFICATIONS.DELETE_ALL
   );
 
+  return response.data;
+};
+
+export const getNotificationPreferences = async () => {
+  const response = await client.get(ENDPOINTS.NOTIFICATIONS.GET_PREFERENCES);
+  return response.data;
+};
+
+export const updateNotificationPreferences = async (prefs: {
+  push_notifications?: boolean;
+  email_notifications?: boolean;
+  sms_notifications?: boolean;
+  deadline_reminders?: boolean;
+  penalty_alerts?: boolean;
+  vault_suggestions?: boolean;
+  referral_offers?: boolean;
+  payment_confirmations?: boolean;
+  system_updates?: boolean;
+}) => {
+  const response = await client.put(ENDPOINTS.NOTIFICATIONS.UPDATE_PREFERENCES, prefs);
   return response.data;
 };
 

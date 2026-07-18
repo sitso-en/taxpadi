@@ -5,6 +5,10 @@ import com.taxpadi.api.dto.taxbot.TaxbotConversationItem;
 import com.taxpadi.api.dto.taxbot.TaxbotHistoryResponse;
 import com.taxpadi.api.exception.BadRequestException;
 import com.taxpadi.api.exception.TooManyRequestsException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import com.taxpadi.api.model.TaxbotConversation;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.repository.TaxbotConversationRepository;
@@ -21,6 +25,7 @@ import java.util.Map;
 @Service
 public class TaxbotService {
 
+    private static final Logger log = LoggerFactory.getLogger(TaxbotService.class);
     private static final int RATE_LIMIT = 50;
     private static final String MODEL = "claude-haiku-4-5-20251001";
     private static final String SYSTEM_PROMPT = """
@@ -58,6 +63,11 @@ public class TaxbotService {
             throw new TooManyRequestsException("Daily TaxBot limit of " + RATE_LIMIT + " questions reached.");
         }
 
+        if (apiKey == null || apiKey.isBlank()) {
+            log.error("ANTHROPIC_API_KEY is not configured — TaxBot cannot function.");
+            throw new BadRequestException("TaxBot is not available right now. Please try again later.");
+        }
+
         Map<String, Object> requestBody = Map.of(
             "model", MODEL,
             "max_tokens", 1024,
@@ -65,15 +75,25 @@ public class TaxbotService {
             "messages", List.of(Map.of("role", "user", "content", question))
         );
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> response = restClient.post()
-            .uri("https://api.anthropic.com/v1/messages")
-            .header("x-api-key", apiKey)
-            .header("anthropic-version", "2023-06-01")
-            .header("Content-Type", "application/json")
-            .body(requestBody)
-            .retrieve()
-            .body(Map.class);
+        Map<String, Object> response;
+        try {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> raw = restClient.post()
+                .uri("https://api.anthropic.com/v1/messages")
+                .header("x-api-key", apiKey)
+                .header("anthropic-version", "2023-06-01")
+                .header("Content-Type", "application/json")
+                .body(requestBody)
+                .retrieve()
+                .body(Map.class);
+            response = raw;
+        } catch (HttpClientErrorException e) {
+            log.error("Anthropic API error {} — body: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            throw new BadRequestException("TaxBot is temporarily unavailable. Please try again shortly.");
+        } catch (RestClientException e) {
+            log.error("Anthropic connection failed: {}", e.getMessage());
+            throw new BadRequestException("TaxBot is temporarily unavailable. Please try again shortly.");
+        }
 
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> content = (List<Map<String, Object>>) response.get("content");

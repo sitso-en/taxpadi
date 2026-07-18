@@ -8,6 +8,7 @@ import {
 } from "@expo-google-fonts/inter";
 import { StatusBar } from "expo-status-bar";
 
+import { ToastProvider } from "../context/ToastContext";
 import { UserProvider } from "../context/UserContext";
 import { InvoiceProvider } from "../context/InvoiceContext";
 import { PaymentProvider } from "../context/PaymentContext";
@@ -19,6 +20,11 @@ import { SavingsProvider } from "../context/SavingsContext";
 import { ReferralProvider } from "../context/ReferralContext";
 import { CertificateProvider } from "../context/CertificateContext";
 import { TaxReturnsProvider } from "../context/TaxReturnsContext";
+import { TaxLiabilityProvider } from "../context/TaxLiabilityContext";
+import { NetworkProvider } from "../context/NetworkContext";
+import { PrivacyProvider } from "../context/PrivacyContext";
+import { SubscriptionProvider } from "../context/SubscriptionContext";
+import OfflineBanner from "../components/OfflineBanner";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -35,8 +41,12 @@ export default function RootLayout() {
   return (
     <>
       <StatusBar style="dark" />
+      <NetworkProvider>
+      <PrivacyProvider>
+      <ToastProvider>
       <UserProvider>
         <TransactionProvider>
+          <TaxLiabilityProvider>
           <PaymentProvider>
             <ReturnProvider>
               <InvoiceProvider>
@@ -46,6 +56,8 @@ export default function RootLayout() {
                       <SavingsProvider>
                         <CertificateProvider>
                           <TaxReturnsProvider>
+                          <SubscriptionProvider>
+                            <OfflineBanner />
                             <Stack
                               screenOptions={{
                                 headerShown: false,
@@ -64,6 +76,7 @@ export default function RootLayout() {
                               <Stack.Screen name="manage-plan" />
                               <Stack.Screen name="(tabs)" />
                             </Stack>
+                          </SubscriptionProvider>
                           </TaxReturnsProvider>
                         </CertificateProvider>
                       </SavingsProvider>
@@ -73,8 +86,12 @@ export default function RootLayout() {
               </InvoiceProvider>
             </ReturnProvider>
           </PaymentProvider>
+          </TaxLiabilityProvider>
         </TransactionProvider>
       </UserProvider>
+      </ToastProvider>
+      </PrivacyProvider>
+      </NetworkProvider>
     </>
   );
 }

@@ -1,5 +1,6 @@
 import client from "@/api/client";
 import { ENDPOINTS } from "@/api/endpoints";
+import { Platform } from "react-native";
 
 export const getTransactions = async (params?: {
   type?: string;
@@ -7,28 +8,8 @@ export const getTransactions = async (params?: {
   page?: number;
   limit?: number;
 }) => {
-  try {
-    console.log(
-      "GET URL:",
-      client.defaults.baseURL + ENDPOINTS.TRANSACTIONS.LIST
-    );
-
-    const response = await client.get(
-      ENDPOINTS.TRANSACTIONS.LIST,
-      {
-        params,
-      }
-    );
-
-    return response.data;
-  } catch (error: any) {
-    console.log("TRANSACTION ERROR:", error.message);
-    console.log("STATUS:", error.response?.status);
-    console.log("DATA:", error.response?.data);
-    console.log("REQUEST URL:", error.config?.url);
-    console.log("METHOD:", error.config?.method);
-    throw error;
-  }
+  const response = await client.get(ENDPOINTS.TRANSACTIONS.LIST, { params });
+  return response.data;
 };
 
 export const getTransaction = async (id: string) => {
@@ -88,14 +69,15 @@ export const uploadVoiceTransaction = async (
 ) => {
   const formData = new FormData();
 
+  const isAndroid = Platform.OS === "android";
   formData.append("audio", {
     uri: audioUri,
-    name: "voice.m4a",
-    type: "audio/m4a",
+    name: isAndroid ? "voice.mp4" : "voice.m4a",
+    type: isAndroid ? "audio/mp4" : "audio/m4a",
   } as any);
 
   const response = await client.post(
-    "/api/v1/transactions/voice?language=en",
+    `${ENDPOINTS.TRANSACTIONS.VOICE}?language=en`,
     formData,
     {
       headers: {
@@ -125,13 +107,17 @@ export const importTransactions = async (
   provider: string,
   statementFrom: string,
   statementTo: string,
-  file: string
+  fileUri: string,
+  fileName: string,
+  mimeType: string
 ) => {
+  const formData = new FormData();
+  formData.append("file", { uri: fileUri, name: fileName, type: mimeType } as any);
+
   const response = await client.post(
     `${ENDPOINTS.TRANSACTIONS.IMPORT}?provider=${provider}&statement_from=${statementFrom}&statement_to=${statementTo}`,
-    {
-      file,
-    }
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
 
   return response.data;
@@ -139,13 +125,17 @@ export const importTransactions = async (
 
 export const validateTransactionImport = async (
   provider: string,
-  file: string
+  fileUri: string,
+  fileName: string,
+  mimeType: string
 ) => {
+  const formData = new FormData();
+  formData.append("file", { uri: fileUri, name: fileName, type: mimeType } as any);
+
   const response = await client.post(
     `${ENDPOINTS.TRANSACTIONS.IMPORT_VALIDATE}?provider=${provider}`,
-    {
-      file,
-    }
+    formData,
+    { headers: { "Content-Type": "multipart/form-data" } }
   );
 
   return response.data;

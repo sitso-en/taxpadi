@@ -1,4 +1,5 @@
 import axios from "axios";
+import { router } from "expo-router";
 import {
   getAccessToken,
   getRefreshToken,
@@ -69,7 +70,7 @@ client.interceptors.response.use(
         return client(originalRequest);
       } catch (refreshError) {
         await clearTokens();
-
+        router.replace("/login");
         return Promise.reject(refreshError);
       }
     }

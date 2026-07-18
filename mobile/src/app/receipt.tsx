@@ -212,7 +212,7 @@ export default function ReceiptScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     paddingHorizontal: 16,
     paddingTop: 44,
   },
@@ -227,7 +227,7 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: 24,
-    fontSize: 30,
+    fontSize: 28,
     color: "#111827",
     fontFamily: "Inter_700Bold",
     textAlign: "center",
@@ -254,7 +254,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     marginVertical: 16,
   },
   label: {

@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { getUserFriendlyError } from "@/utils/error";
 import {
   ActivityIndicator,
-  Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -12,21 +12,27 @@ import {
   TextInput,
   TouchableOpacity,
 } from "react-native";
+import { useAuthAnimation } from "@/hooks/useAuthAnimation";
+import { AuthArcs } from "@/components/AuthArcs";
+import { useToast } from "@/context/ToastContext";
 
 export default function ForgotPasswordScreen() {
+  const { logoScale, logoOpacity, items } = useAuthAnimation(3);
+  const { showToast } = useToast();
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
+  const [phoneError, setPhoneError] = useState("");
 
   const handleSendCode = async () => {
+    const cleanedPhone = phone.replace(/\D/g, "");
+
     if (!phone.trim()) {
-      Alert.alert("Validation", "Enter your phone number.");
+      setPhoneError("Enter your phone number.");
       return;
     }
 
-    const cleanedPhone = phone.replace(/\D/g, "");
-
     if (cleanedPhone.length !== 9) {
-      Alert.alert("Validation", "Enter a valid Ghana phone number.");
+      setPhoneError("Enter a valid phone number.");
       return;
     }
 
@@ -40,32 +46,20 @@ export default function ForgotPasswordScreen() {
       const response = await forgotPassword(fullPhone);
 
       if (!response.success) {
-        Alert.alert("Failed", response.message);
+        showToast(response.message, "error");
         return;
       }
 
-      Alert.alert(
-        "OTP Sent",
-        "A password reset code has been sent to your phone.",
-        [
-          {
-            text: "Continue",
-            onPress: () =>
-              router.push({
-                pathname: "/otp-verification",
-                params: {
-                  phone: fullPhone,
-                  purpose: "PASSWORD_RESET",
-                },
-              }),
-          },
-        ]
-      );
+      showToast("OTP sent. Enter it below.", "success");
+      router.push({
+        pathname: "/otp-verification",
+        params: {
+          phone: fullPhone,
+          purpose: "PASSWORD_RESET",
+        },
+      });
     } catch (error: any) {
-      Alert.alert(
-  "Request Unsuccessful",
-  getUserFriendlyError(error)
-);
+      showToast(getUserFriendlyError(error), "error");
     } finally {
       setLoading(false);
     }
@@ -74,57 +68,93 @@ export default function ForgotPasswordScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      behavior="padding"
     >
-      <Text style={styles.title}>Forgot Password</Text>
+      <AuthArcs />
 
-      <Text style={styles.subtitle}>
-        Enter your phone number to receive a reset code.
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="24 123 4567"
-        placeholderTextColor="#6B7280"
-        keyboardType="phone-pad"
-        value={phone}
-        onChangeText={(text) => {
-          const cleaned = text.replace(/\D/g, "");
-
-          let formatted = cleaned;
-
-          if (cleaned.length > 2) {
-            formatted = cleaned.replace(
-              /(\d{2})(\d{0,3})(\d{0,4})/,
-              (_, p1, p2, p3) =>
-                [p1, p2, p3].filter(Boolean).join(" ")
-            );
-          }
-
-          setPhone(formatted);
-        }}
+      <Animated.Image
+        source={require("@/assets/images/logoA4.png")}
+        style={[
+          styles.logo,
+          {
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+          },
+        ]}
+        resizeMode="contain"
       />
 
-      <TouchableOpacity
-        style={[
-          styles.button,
-          loading && { opacity: 0.7 },
-        ]}
-        disabled={loading}
-        onPress={handleSendCode}
+      <Animated.View
+        style={{
+          opacity: items[0].opacity,
+          transform: [{ translateY: items[0].translateY }],
+        }}
       >
-        <Text style={styles.buttonText}>
-          {loading ? "Sending..." : "Send OTP"}
-        </Text>
-      </TouchableOpacity>
+        <Text style={styles.title}>Forgot Password</Text>
 
-      <TouchableOpacity
-        onPress={() => router.replace("/login")}
-      >
-        <Text style={styles.link}>
-          Back to Login
+        <Text style={styles.subtitle}>
+          Enter your phone number to receive a reset code.
         </Text>
-      </TouchableOpacity>
+      </Animated.View>
+
+      <Animated.View
+        style={{
+          opacity: items[1].opacity,
+          transform: [{ translateY: items[1].translateY }],
+        }}
+      >
+        <TextInput
+          style={[styles.input, phoneError ? styles.inputError : undefined, phoneError ? { marginBottom: 4 } : undefined]}
+          placeholder="024 123 4567"
+          placeholderTextColor="#6B7280"
+          keyboardType="phone-pad"
+          value={phone}
+          onChangeText={(text) => {
+            const cleaned = text.replace(/\D/g, "");
+
+            let formatted = cleaned;
+
+            if (cleaned.length > 2) {
+              formatted = cleaned.replace(
+                /(\d{2})(\d{0,3})(\d{0,4})/,
+                (_, p1, p2, p3) =>
+                  [p1, p2, p3].filter(Boolean).join(" ")
+              );
+            }
+
+            setPhone(formatted);
+            if (phoneError) setPhoneError("");
+          }}
+        />
+        {phoneError ? <Text style={styles.fieldError}>{phoneError}</Text> : null}
+      </Animated.View>
+
+      <Animated.View
+        style={{
+          opacity: items[2].opacity,
+          transform: [{ translateY: items[2].translateY }],
+        }}
+      >
+        <TouchableOpacity
+          style={[
+            styles.button,
+            loading && { opacity: 0.7 },
+          ]}
+          onPress={handleSendCode}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Sending..." : "Send OTP"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.replace("/login")}
+        >
+          <Text style={styles.link}>
+            Back to Login
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
@@ -132,9 +162,16 @@ export default function ForgotPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
-    padding: 16,
+    backgroundColor: "#F2EDE8",
+    paddingHorizontal: 24,
     justifyContent: "center",
+  },
+
+  logo: {
+    width: 64,
+    height: 64,
+    alignSelf: "center",
+    marginBottom: 20,
   },
 
   title: {
@@ -155,7 +192,7 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    backgroundColor: "#F1F5F9",
+    backgroundColor: "#EDE8E3",
     borderRadius: 16,
     paddingHorizontal: 16,
     paddingVertical: 16,
@@ -189,5 +226,16 @@ const styles = StyleSheet.create({
     marginTop: 20,
     color: "#C44736",
     fontFamily: "Inter_500Medium",
+  },
+  fieldError: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  inputError: {
+    borderWidth: 1.5,
+    borderColor: "#EF4444",
   },
 });

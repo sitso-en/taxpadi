@@ -1,437 +1,524 @@
-import React from "react";
-import { usePayments } from "../context/PaymentContext";
-import { useTransactions } from "../context/TransactionContext";
+import React, { useState } from "react";
+import ErrorState from "@/components/ErrorState";
 import { useDeadlines } from "../context/DeadlineContext";
-import { useNotifications } from "../context/NotificationContext";
-
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-
 import {
-  Alert,
+  ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
-import Card from "../components/Card";
-
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat("en-GH", {
-    style: "currency",
-    currency: "GHS",
-  }).format(value);
+const TAX_TYPE_LABEL: Record<string, string> = {
+  income_tax: "Income Tax",
+  vat: "VAT",
+  paye: "PAYE",
+  withholding: "Withholding Tax",
+  corporate_tax: "Corporate Tax",
 };
 
+const fmt = (n: number) =>
+  `GH¢ ${n.toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 export default function DeadlinesScreen() {
-  const { transactions } = useTransactions();
-  const { payments } = usePayments();
-  const { deadlines, toggleDeadline } = useDeadlines();
+  const { deadlines, penalties, loading, error, toggleDeadline, refreshDeadlines, upcomingCount, overdueCount } =
+    useDeadlines();
+  const [refreshing, setRefreshing] = useState(false);
 
-  const totalIncome = transactions
-    .filter((t) => t.type === "income")
-    .reduce((sum, t) => sum + t.amount, 0);
-
-  const payeDue = totalIncome * 0.055;
-
-  const overdueDeadlines = deadlines.filter(
-    (deadline) =>
-      !deadline.completed && new Date(deadline.dueDate) < new Date()
-  );
-
-  const lateFee = overdueDeadlines.length > 0 ? payeDue * 0.2 : 0;
-
-  const totalPenalty = overdueDeadlines.length > 0 ? payeDue + lateFee : 0;
-
-  const calculateDaysLeft = (date: string) => {
-    const today = new Date();
-    const difference = new Date(date).getTime() - today.getTime();
-    return Math.ceil(difference / (1000 * 60 * 60 * 24));
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshDeadlines(false);
+    setRefreshing(false);
   };
 
-  const dates = Array.from({ length: 7 }, (_, index) => {
-    const date = new Date();
-    date.setDate(date.getDate() - 3 + index);
-
+  const dates = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - 3 + i);
     return {
-      day: date.getDate().toString(),
-      week: date
-        .toLocaleDateString("en-US", { weekday: "short" })
-        .toUpperCase(),
-      active: date.toDateString() === new Date().toDateString(),
+      day: d.getDate().toString(),
+      week: d.toLocaleDateString("en-US", { weekday: "short" }),
+      active: d.toDateString() === new Date().toDateString(),
     };
   });
 
-  const handleDeadlinePress = (
-    id: number,
-    title: string,
-    completed: boolean
-  ) => {
-    toggleDeadline(id);
-  };
-
-  const handlePayPenalty = () => {
-    if (totalPenalty <= 0) {
-      Alert.alert(
-        "No Penalties",
-        "You currently have no penalties to pay."
-      );
-      return;
-    }
-
-    Alert.alert(
-      "Redirecting",
-      "You will be redirected to the Payments screen."
-    );
-
-    router.push("/payments");
-  };
+  const activePenalties = penalties.filter((p) => p.penalty_active);
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        paddingBottom: 40,
-      }}
-    >
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      {/* ── Header ── */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace("/dashboard");
-            }
-          }}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/dashboard"))}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
           <Ionicons name="chevron-back" size={26} color="#111827" />
         </TouchableOpacity>
-
         <Text style={styles.title}>Deadlines</Text>
+        <View style={{ width: 26 }} />
       </View>
 
-      <Text style={styles.subtitle}>
-        Keep track of filing deadlines and avoid penalties.
-      </Text>
-
-      <View style={styles.dateContainer}>
-        {dates.map((item) => (
-          <View
-            key={`${item.day}${item.week}`}
-            style={[
-              styles.dateCard,
-              item.active && styles.activeDateCard,
-            ]}
-          >
-            <Text
-              style={[
-                styles.dateNumber,
-                item.active && styles.activeDateText,
-              ]}
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={["#C44736"]} tintColor="#C44736" />
+        }
+      >
+        {/* ── Date strip ── */}
+        <View style={styles.dateStrip}>
+          {dates.map((item) => (
+            <View
+              key={item.day + item.week}
+              style={[styles.dateCell, item.active && styles.dateCellActive]}
             >
-              {item.day}
+              <Text style={[styles.dateDayNum, item.active && styles.dateTxtActive]}>
+                {item.day}
+              </Text>
+              <Text style={[styles.dateWeekLabel, item.active && styles.dateTxtActive]}>
+                {item.week}
+              </Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Stats row ── */}
+        <View style={styles.statsRow}>
+          <View style={[styles.statPill, { backgroundColor: "#DCFCE7" }]}>
+            <Text style={[styles.statNum, { color: "#16A34A" }]}>{upcomingCount}</Text>
+            <Text style={[styles.statLabel, { color: "#16A34A" }]}>Upcoming</Text>
+          </View>
+          <View style={[styles.statPill, { backgroundColor: overdueCount > 0 ? "#FEE2E2" : "#F3F4F6" }]}>
+            <Text style={[styles.statNum, { color: overdueCount > 0 ? "#DC2626" : "#9CA3AF" }]}>
+              {overdueCount}
             </Text>
-
-            <Text
-              style={[
-                styles.dateWeek,
-                item.active && styles.activeDateText,
-              ]}
-            >
-              {item.week}
+            <Text style={[styles.statLabel, { color: overdueCount > 0 ? "#DC2626" : "#9CA3AF" }]}>
+              Overdue
             </Text>
           </View>
-        ))}
-      </View>
+          {activePenalties.length > 0 && (
+            <View style={[styles.statPill, { backgroundColor: "#FEF3C7" }]}>
+              <Text style={[styles.statNum, { color: "#D97706" }]}>{activePenalties.length}</Text>
+              <Text style={[styles.statLabel, { color: "#D97706" }]}>
+                {activePenalties.length === 1 ? "Penalty" : "Penalties"}
+              </Text>
+            </View>
+          )}
+        </View>
 
-      <Text style={styles.sectionTitle}>UPCOMING DEADLINES</Text>
+        {loading ? (
+          <ActivityIndicator size="large" color="#C44736" style={{ marginTop: 40 }} />
+        ) : error ? (
+          <ErrorState onRetry={refreshDeadlines} />
+        ) : deadlines.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconBox}>
+              <Ionicons name="checkmark-circle-outline" size={30} color="#16A34A" />
+            </View>
+            <Text style={styles.emptyTitle}>All clear</Text>
+            <Text style={styles.emptySub}>No upcoming tax deadlines right now.</Text>
+          </View>
+        ) : (
+          <>
+            {deadlines.map((item) => {
+              const overdue = !item.completed && item.daysUntilDue < 0;
+              const dueSoon = !item.completed && !overdue && item.daysUntilDue <= 7;
 
-      {deadlines.length === 0 ? (
-        <Card style={styles.emptyStateCard}>
-          <Ionicons
-            name="calendar-outline"
-            size={48}
-            color="#9CA3AF"
-            style={{ marginBottom: 12 }}
-          />
-          <Text style={styles.emptyStateTitle}>No Deadlines</Text>
-          <Text style={styles.emptyStateSubtitle}>
-            You're all caught up.
-          </Text>
-        </Card>
-      ) : (
-        deadlines.map((item) => {
-          const daysLeft = calculateDaysLeft(item.dueDate);
+              let badgeBg = "#DCFCE7";
+              let badgeColor = "#16A34A";
+              let badgeLabel = "On time";
 
-          return (
-            <Card key={item.id} style={styles.card}>
-              <View style={styles.cardContent}>
-                <View style={styles.leftSection}>
-                  <View style={styles.calendarIcon}>
-                    <Ionicons
-                      name="calendar-outline"
-                      size={22}
-                      color="#C44736"
-                    />
+              if (item.completed) {
+                badgeBg = "#F3F4F6";
+                badgeColor = "#6B7280";
+                badgeLabel = "Done";
+              } else if (overdue) {
+                badgeBg = "#FEE2E2";
+                badgeColor = "#DC2626";
+                badgeLabel = "Overdue";
+              } else if (dueSoon) {
+                badgeBg = "#FEF3C7";
+                badgeColor = "#D97706";
+                badgeLabel = "Due soon";
+              }
+
+              const daysLabel = overdue
+                ? `${Math.abs(item.daysUntilDue)}d overdue`
+                : item.daysUntilDue === 0
+                ? "Due today"
+                : `${item.daysUntilDue}d left`;
+
+              return (
+                <View key={item.id} style={styles.card}>
+                  <View style={styles.cardTop}>
+                    <View style={styles.cardIconBox}>
+                      <Ionicons name="calendar-outline" size={18} color="#C44736" />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: 12 }}>
+                      <Text style={styles.cardTitle}>{item.title}</Text>
+                      <Text style={styles.cardAuthority}>{item.authority}</Text>
+                    </View>
+                    <View style={[styles.badge, { backgroundColor: badgeBg }]}>
+                      <Text style={[styles.badgeText, { color: badgeColor }]}>{badgeLabel}</Text>
+                    </View>
                   </View>
 
-                  <View>
-                    <Text style={styles.cardTitle}>{item.title}</Text>
-                    <Text style={styles.subText}>{item.authority}</Text>
-                    <Text style={styles.dateText}>
-                      {new Date(item.dueDate).toLocaleDateString("en-US", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </Text>
+                  <View style={styles.cardMeta}>
+                    <View style={styles.metaItem}>
+                      <Ionicons name="time-outline" size={13} color="#9CA3AF" />
+                      <Text style={styles.metaText}>
+                        {new Date(item.dueDate).toLocaleDateString("en-GH", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </Text>
+                    </View>
+                    {!item.completed && (
+                      <Text
+                        style={[
+                          styles.daysLabel,
+                          { color: overdue ? "#DC2626" : dueSoon ? "#D97706" : "#9CA3AF" },
+                        ]}
+                      >
+                        {daysLabel}
+                      </Text>
+                    )}
                   </View>
-                </View>
-
-                <View style={{ alignItems: "flex-end" }}>
-                  <Text
-                    style={[
-                      styles.statusText,
-                      {
-                        color: item.completed
-                          ? "#16A34A"
-                          : daysLeft >= 0
-                          ? "#16A34A"
-                          : "#C44736",
-                        marginBottom: !item.completed ? 8 : 0,
-                      },
-                    ]}
-                  >
-                    {item.completed
-                      ? "✓ Completed"
-                      : daysLeft >= 0
-                      ? `Upcoming\n(${daysLeft} days left)`
-                      : "⚠ Overdue"}
-                  </Text>
 
                   {!item.completed && (
                     <TouchableOpacity
-                      style={styles.markCompleteButton}
-                      onPress={() =>
-                        handleDeadlinePress(item.id, item.title, item.completed)
-                      }
+                      style={styles.markBtn}
+                      onPress={() => toggleDeadline(item.id)}
+                      activeOpacity={0.85}
                     >
-                      <Text style={styles.markCompleteText}>Mark Complete</Text>
+                      <Ionicons name="checkmark" size={14} color="#16A34A" />
+                      <Text style={styles.markBtnText}>Mark Complete</Text>
                     </TouchableOpacity>
                   )}
                 </View>
-              </View>
-            </Card>
-          );
-        })
-      )}
+              );
+            })}
 
-      <Text style={styles.sectionTitle}>OUTSTANDING PENALTIES</Text>
+            {/* ── Penalties ── */}
+            {activePenalties.length > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>Outstanding Penalties</Text>
+                {activePenalties.map((p, i) => (
+                  <View key={p.existing_penalty_id || i} style={styles.penaltyCard}>
+                    <View style={styles.penaltyTop}>
+                      <View style={styles.penaltyIconBox}>
+                        <Ionicons name="warning-outline" size={16} color="#DC2626" />
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.penaltyTaxType}>
+                          {TAX_TYPE_LABEL[p.tax_type] ?? p.tax_type}
+                        </Text>
+                        <Text style={styles.penaltyMeta}>
+                          {p.days_late}d late · due{" "}
+                          {new Date(p.deadline_date).toLocaleDateString("en-GH", {
+                            day: "numeric",
+                            month: "short",
+                          })}
+                        </Text>
+                      </View>
+                      <Text style={styles.penaltyTotal}>{fmt(p.total_penalty)}</Text>
+                    </View>
 
-      {totalPenalty > 0 ? (
-        <>
-          <View style={styles.penaltyCard}>
-            <View style={styles.penaltyHeaderRow}>
-              <Ionicons
-                name="warning-outline"
-                size={20}
-                color="#C44736"
-                style={{ marginRight: 6 }}
-              />
-              <Text style={styles.penaltyTitle}>Late Filing Penalty</Text>
-            </View>
+                    <View style={styles.penaltyBreakdown}>
+                      <View style={styles.penaltyRow}>
+                        <Text style={styles.penaltyRowLabel}>Base penalty</Text>
+                        <Text style={styles.penaltyRowVal}>{fmt(p.base_penalty)}</Text>
+                      </View>
+                      <View style={styles.penaltyRow}>
+                        <Text style={styles.penaltyRowLabel}>Daily penalty</Text>
+                        <Text style={styles.penaltyRowVal}>{fmt(p.daily_penalty)}/day</Text>
+                      </View>
+                      {p.interest_amount > 0 && (
+                        <View style={styles.penaltyRow}>
+                          <Text style={styles.penaltyRowLabel}>Interest</Text>
+                          <Text style={styles.penaltyRowVal}>{fmt(p.interest_amount)}</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </>
+            )}
+          </>
+        )}
 
-            <Text style={styles.penaltyInfo}>
-              Original: {formatCurrency(payeDue)}
-              {"\n"}
-              Late Fee: {formatCurrency(lateFee)}
-            </Text>
-
-            <View style={styles.penaltyRow}>
-              <Text style={styles.totalLabel}>Total Due</Text>
-              <Text style={styles.totalAmount}>
-                {formatCurrency(totalPenalty)}
-              </Text>
-            </View>
-          </View>
-
-          <TouchableOpacity
-            style={styles.payButton}
-            onPress={handlePayPenalty}
-          >
-            <Text style={styles.payButtonText}>Pay Penalties</Text>
-          </TouchableOpacity>
-        </>
-      ) : (
-        <View style={styles.penaltyCard}>
-          <Text style={styles.penaltyInfo}>No outstanding penalties.</Text>
-        </View>
-      )}
-
-      <Text style={styles.footerText}>
-        Filing on time saves you from penalties and surcharges.
-      </Text>
-    </ScrollView>
+        <Text style={styles.footer}>Filing on time saves you from penalties and surcharges.</Text>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FAFAFA",
-    paddingHorizontal: 20,
-    paddingTop: 55,
-  },
+  safe: { flex: 1, backgroundColor: "#F2EDE8" },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
   },
 
-  title: {
-    fontSize: 28,
-    fontFamily: "Inter_700Bold",
-    marginLeft: 10,
-    color: "#111827",
-  },
+  title: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#111827" },
 
-  subtitle: {
-    color: "#6B7280",
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-    marginTop: 0,
-    marginBottom: 18,
-    lineHeight: 18,
-  },
+  scroll: { paddingHorizontal: 20, paddingBottom: 48 },
 
-  dateContainer: {
+  // ── Date strip ──
+  dateStrip: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 25,
+    marginBottom: 20,
   },
 
-  dateCard: {
+  dateCell: {
     alignItems: "center",
-    padding: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 8,
     borderRadius: 12,
+    minWidth: 40,
   },
 
-  activeDateCard: {
+  dateCellActive: {
     backgroundColor: "#C44736",
-    width: 46,
-    height: 58,
-    justifyContent: "center",
   },
 
-  dateNumber: {
-    fontSize: 22,
+  dateDayNum: {
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
     color: "#111827",
   },
 
-  dateWeek: {
-    fontSize: 11,
-    fontFamily: "Inter_600SemiBold",
-    color: "#6B7280",
+  dateWeekLabel: {
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+    color: "#9CA3AF",
+    marginTop: 2,
   },
 
-  activeDateText: {
+  dateTxtActive: {
     color: "#FFFFFF",
   },
 
-  sectionTitle: {
-    fontSize: 16,
-    color: "#C44736",
-    fontFamily: "Inter_700Bold",
-    marginBottom: 10,
-    marginTop: 10,
+  // ── Stats row ──
+  statsRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 20,
   },
 
+  statPill: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+
+  statNum: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+  },
+
+  statLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    marginTop: 2,
+  },
+
+  // ── Empty ──
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 32,
+    alignItems: "center",
+  },
+
+  emptyIconBox: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: "#DCFCE7",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+
+  emptyTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 6,
+  },
+
+  emptySub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+    textAlign: "center",
+  },
+
+  // ── Section title ──
+  sectionTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#C44736",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginTop: 8,
+    marginBottom: 12,
+  },
+
+  // ── Deadline card ──
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: "#ECECEC",
+    padding: 14,
+    marginBottom: 10,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    elevation: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  cardIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   cardTitle: {
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
-    fontSize: 16,
     color: "#111827",
+    marginBottom: 2,
   },
 
-  subText: {
-    color: "#888",
+  cardAuthority: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    marginTop: 3,
+    color: "#9CA3AF",
   },
 
-  dateText: {
-    color: "#111827",
-    fontSize: 14,
-    fontFamily: "Inter_500Medium",
-    marginTop: 6,
+  badge: {
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
   },
 
-  statusText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-    textAlign: "right",
-  },
-
-  markCompleteButton: {
-    backgroundColor: "#FCE8E6",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-
-  markCompleteText: {
-    color: "#C44736",
-    fontSize: 12,
+  badgeText: {
+    fontSize: 11,
     fontFamily: "Inter_600SemiBold",
   },
 
+  cardMeta: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+
+  metaText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+  },
+
+  daysLabel: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  markBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#DCFCE7",
+    borderRadius: 10,
+    paddingVertical: 9,
+  },
+
+  markBtnText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#16A34A",
+  },
+
+  // ── Penalty card ──
   penaltyCard: {
     backgroundColor: "#FFF8F6",
     borderWidth: 1,
-    borderColor: "#F4D7D2",
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 10,
+    borderColor: "#FECACA",
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
   },
 
-  penaltyHeaderRow: {
+  penaltyTop: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
-  },
-
-  penaltyTitle: {
-    color: "#C44736",
-    fontFamily: "Inter_600SemiBold",
-  },
-
-  penaltyInfo: {
-    color: "#666",
-    fontFamily: "Inter_400Regular",
     marginBottom: 12,
+  },
+
+  penaltyIconBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: "#FEE2E2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  penaltyTaxType: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    marginBottom: 2,
+  },
+
+  penaltyMeta: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
+  },
+
+  penaltyTotal: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "#DC2626",
+  },
+
+  penaltyBreakdown: {
+    borderTopWidth: 1,
+    borderTopColor: "#FECACA",
+    paddingTop: 10,
+    gap: 6,
   },
 
   penaltyRow: {
@@ -439,90 +526,24 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
 
-  totalLabel: {
-    fontFamily: "Inter_600SemiBold",
-  },
-
-  totalAmount: {
-    color: "#C44736",
-    fontFamily: "Inter_700Bold",
-    fontSize: 20,
-  },
-
-  payButton: {
-    backgroundColor: "#C44736",
-    paddingVertical: 20,
-    borderRadius: 16,
-    alignItems: "center",
-    marginTop: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 5,
-  },
-
-  payButtonText: {
-    color: "#FFFFFF",
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-  },
-
-  footerText: {
-    textAlign: "center",
-    color: "#6B7280",
-    marginTop: 8,
-    marginBottom: 10,
+  penaltyRowLabel: {
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-  },
-
-  cardContent: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  leftSection: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  calendarIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: "#FCE8E6",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-  },
-
-  emptyStateCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 36,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#ECECEC",
-  },
-
-  emptyStateTitle: {
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-    color: "#111827",
-    marginBottom: 4,
-  },
-
-  emptyStateSubtitle: {
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
     color: "#6B7280",
+  },
+
+  penaltyRowVal: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#374151",
+  },
+
+  // ── Footer ──
+  footer: {
     textAlign: "center",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
+    marginTop: 16,
   },
 });
-
