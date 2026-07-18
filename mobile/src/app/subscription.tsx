@@ -1,10 +1,9 @@
-import React from "react";
-
+import React, { useCallback, useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-
 import {
-  Alert,
+  ActivityIndicator,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -12,122 +11,142 @@ import {
   View,
 } from "react-native";
 
-import { useUser } from "../context/UserContext";
+import {
+  cancelSubscription,
+  getSubscriptionStatus,
+  subscribe,
+} from "../services/subscriptions.service";
+import { getUserFriendlyError } from "@/utils/error";
+import { useToast } from "@/context/ToastContext";
+import { useNetwork } from "@/context/NetworkContext";
+
+type SubscriptionStatus = {
+  plan: string;
+  status: string;
+  expires_at?: string;
+  renewal_date?: string;
+};
+
+const FREE_FEATURES = [
+  "Transaction Tracking",
+  "Tax Return Management",
+  "Payment Tracking",
+  "Reports & Analytics",
+  "Invoice Management",
+];
+
+const PRO_FEATURES = [
+  "Everything in Free",
+  "Unlimited Transactions",
+  "Advanced Reports",
+  "Priority Support",
+  "AI Tax Insights",
+  "Cloud Backup",
+  "Export to PDF & Excel",
+  "Premium Notifications",
+];
 
 export default function SubscriptionScreen() {
-  const { user, updateUser } = useUser();
+  const { showToast } = useToast();
+  const { isOnline } = useNetwork();
+  const [status, setStatus] = useState<SubscriptionStatus | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  const isPro = user.subscription_tier !== "FREE";
+  const load = useCallback(async () => {
+    try {
+      const res = await getSubscriptionStatus();
+      setStatus(res.data);
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-  const freeFeatures = [
-    "Transaction Tracking",
-    "Tax Return Management",
-    "Payment Tracking",
-    "Reports & Analytics",
-    "Invoice Management",
-  ];
+  useEffect(() => {
+    load();
+  }, [load]);
 
-  const proFeatures = [
-    "Everything in Free",
-    "Unlimited Transactions",
-    "Advanced Reports",
-    "Priority Support",
-    "AI Tax Insights",
-    "Cloud Backup",
-    "Export to PDF & CSV",
-    "Premium Notifications",
-  ];
+  const isPro = status?.plan !== "FREE" && status?.plan != null;
 
-  const handlePlanChange = () => {
-    if (isPro) {
-      Alert.alert(
-        "Downgrade Plan",
-        "Move back to the Free plan?",
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
-          {
-            text: "Downgrade",
-            onPress: () => {
-              updateUser({
-                subscription_tier: "FREE",
-              });
-
-              Alert.alert(
-                "Success",
-                "You are now on the Free Plan."
-              );
-            },
-          },
-        ]
-      );
-    } else {
-      Alert.alert(
-        "Upgrade Plan",
-        "Upgrade to the Pro plan?",
-        [
-          {
-            text: "Cancel",
-            style: "cancel",
-          },
-          {
-            text: "Upgrade",
-            onPress: () => {
-              updateUser({
-                subscription_tier: "PRO",
-              });
-
-              Alert.alert(
-                "Success",
-                "Welcome to TaxPadi Pro!"
-              );
-            },
-          },
-        ]
-      );
+  const handleUpgrade = async () => {
+    if (!isOnline) {
+      showToast("You're offline. Connect to the internet to upgrade your plan.", "info");
+      return;
+    }
+    if (actionLoading) return;
+    setActionLoading(true);
+    try {
+      const res = await subscribe("PRO");
+      const paymentUrl: string =
+        res.data?.payment_url ??
+        res.data?.authorization_url ??
+        res.data?.checkout_url;
+      if (paymentUrl) {
+        await Linking.openURL(paymentUrl);
+      } else {
+        // Subscription activated directly (e.g. free trial or admin grant)
+        await load();
+        showToast("Welcome to TaxPadi shnigger_muffin!", "success");
+      }
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setActionLoading(false);
     }
   };
+
+  const handleCancel = async () => {
+    if (!isOnline) {
+      showToast("You're offline. Connect to the internet to cancel your subscription.", "info");
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await cancelSubscription();
+      await load();
+      showToast("Your subscription has been cancelled.", "info");
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#C44736" />
+      </View>
+    );
+  }
+
+  const features = isPro ? PRO_FEATURES : FREE_FEATURES;
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{
-        paddingBottom: 40,
-      }}
+      contentContainerStyle={{ paddingBottom: 40 }}
       showsVerticalScrollIndicator={false}
     >
-      {/* Back */}
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={styles.backButton}
-      >
-        <Ionicons
-          name="arrow-back"
-          size={24}
-          color="#C44736"
-        />
-      </TouchableOpacity>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={26} color="#111827" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Subscription</Text>
+      </View>
 
-      <Text style={styles.title}>
-        Subscription
-      </Text>
-
-      {/* Current Plan */}
+      {/* Current Plan Card */}
       <View style={styles.planCard}>
         <Ionicons
-          name={
-            isPro
-              ? "rocket-outline"
-              : "card-outline"
-          }
+          name={isPro ? "rocket-outline" : "card-outline"}
           size={32}
           color="#C44736"
         />
 
         <Text style={styles.planName}>
-          {isPro ? "Pro Plan" : "Free Plan"}
+          {isPro ? `${status?.plan} Plan` : "Free Plan"}
         </Text>
 
         <Text style={styles.planDescription}>
@@ -136,53 +155,68 @@ export default function SubscriptionScreen() {
             : "Basic tax management features with transactions, tax returns, payments, invoices and reports."}
         </Text>
 
-        <View style={styles.statusBadge}>
-          <Text style={styles.statusText}>
-            CURRENT PLAN
+        {isPro && status?.expires_at && (
+          <Text style={styles.expiryText}>
+            Renews{" "}
+            {new Date(status.expires_at).toLocaleDateString("en-GB", {
+              day: "numeric",
+              month: "short",
+              year: "numeric",
+            })}
           </Text>
+        )}
+
+        <View style={styles.statusBadge}>
+          <Text style={styles.statusText}>CURRENT PLAN</Text>
         </View>
       </View>
 
       {/* Features */}
       <View style={styles.featuresCard}>
-        <Text style={styles.sectionTitle}>
-          Included Features
-        </Text>
+        <Text style={styles.sectionTitle}>Included Features</Text>
 
-        {(isPro ? proFeatures : freeFeatures).map((feature) => (
+        {features.map((feature) => (
           <View key={feature} style={styles.featureRow}>
-            <Ionicons
-              name="checkmark-circle"
-              size={18}
-              color="#34A853"
-            />
-
-            <Text style={styles.feature}>
-              {feature}
-            </Text>
+            <Ionicons name="checkmark-circle" size={18} color="#34A853" />
+            <Text style={styles.feature}>{feature}</Text>
           </View>
         ))}
       </View>
 
       {/* Action */}
-      <TouchableOpacity
-        style={styles.actionButton}
-        onPress={handlePlanChange}
-      >
-        <Ionicons
-          name={
-            isPro
-              ? "arrow-down-circle-outline"
-              : "rocket-outline"
-          }
-          size={20}
-          color="#FFFFFF"
-        />
-
-        <Text style={styles.actionButtonText}>
-          {isPro ? "Downgrade to Free" : "Upgrade to Pro"}
-        </Text>
-      </TouchableOpacity>
+      {isPro ? (
+        <TouchableOpacity
+          style={[styles.cancelButton, actionLoading && { opacity: 0.7 }]}
+          onPress={handleCancel}
+        >
+          {actionLoading ? (
+            <ActivityIndicator color="#C44736" />
+          ) : (
+            <>
+              <Ionicons
+                name="arrow-down-circle-outline"
+                size={20}
+                color="#C44736"
+              />
+              <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity
+          style={[styles.actionButton, actionLoading && { opacity: 0.7 }]}
+          onPress={handleUpgrade}
+        >
+          {actionLoading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="rocket-outline" size={20} color="#FFFFFF" />
+              <Text style={styles.actionButtonText}>Upgrade to Pro</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      )}
     </ScrollView>
   );
 }
@@ -190,20 +224,27 @@ export default function SubscriptionScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     padding: 20,
     paddingTop: 55,
   },
 
-  backButton: {
-    marginBottom: 15,
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
   },
 
   title: {
-    fontSize: 30,
+    fontSize: 24,
     color: "#111827",
     fontFamily: "Inter_700Bold",
-    marginBottom: 20,
+    marginLeft: 10,
   },
 
   planCard: {
@@ -226,6 +267,13 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 12,
     lineHeight: 22,
+    fontFamily: "Inter_400Regular",
+  },
+
+  expiryText: {
+    color: "#9CA3AF",
+    fontSize: 13,
+    marginTop: 8,
     fontFamily: "Inter_400Regular",
   },
 
@@ -280,6 +328,24 @@ const styles = StyleSheet.create({
 
   actionButtonText: {
     color: "#FFFFFF",
+    marginLeft: 8,
+    fontSize: 16,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  cancelButton: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 16,
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#C44736",
+  },
+
+  cancelButtonText: {
+    color: "#C44736",
     marginLeft: 8,
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",

@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { getUserFriendlyError } from "@/utils/error";
 import {
   ActivityIndicator,
-  Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -13,22 +13,30 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuthAnimation } from "@/hooks/useAuthAnimation";
+import { AuthArcs } from "@/components/AuthArcs";
 
 import {
   resendOTP,
   verifyOTP,
   verifyResetOTP,
 } from "@/services/auth.service";
+import { useToast } from "@/context/ToastContext";
+import { getDeviceInfo } from "@/utils/device";
 
 export default function OTPVerificationScreen() {
+  const { logoScale, logoOpacity, items } = useAuthAnimation(3);
+
   const { phone, purpose } = useLocalSearchParams<{
     phone: string;
     purpose: string;
   }>();
 
+  const { showToast } = useToast();
   const [otp, setOtp] = useState("");
   const [seconds, setSeconds] = useState(42);
   const [loading, setLoading] = useState(false);
+  const [otpError, setOtpError] = useState("");
 
   useEffect(() => {
     if (seconds === 0) return;
@@ -42,12 +50,12 @@ export default function OTPVerificationScreen() {
 
   const handleVerify = async () => {
     if (!otp.trim()) {
-      Alert.alert("Validation", "Enter the OTP.");
+      setOtpError("Enter the OTP.");
       return;
     }
 
     if (otp.length !== 6) {
-      Alert.alert("Validation", "OTP must be 6 digits.");
+      setOtpError("OTP must be 6 digits.");
       return;
     }
 
@@ -76,74 +84,54 @@ export default function OTPVerificationScreen() {
       const response = await verifyOTP(
         phone,
         otp,
-        purpose
+        purpose,
+        getDeviceInfo()
       );
 
       if (!response.success) {
-        Alert.alert(
-          "Verification Failed",
-          response.message
-        );
+        showToast(response.message, "error");
         return;
       }
 
       if (purpose === "REGISTER") {
-        Alert.alert(
-          "Verification Successful",
-          "Your account has been verified. Please sign in."
-        );
-
-        router.replace("/login");
+        showToast("Welcome to TaxPadi!", "success");
+        router.replace("/(tabs)/dashboard");
         return;
       }
 
       if (purpose === "LOGIN") {
-        Alert.alert(
-          "Verification Successful",
-          "Your sign-in has been verified."
-        );
-
+        showToast("Sign-in verified.", "success");
         router.back();
         return;
       }
     } catch (error: any) {
-      Alert.alert(
-  "Verification Unsuccessful",
-  getUserFriendlyError(error)
-);
+      showToast(getUserFriendlyError(error), "error");
     } finally {
       setLoading(false);
     }
   };
 
   const handleResendOTP = async () => {
+    if (seconds > 0) {
+      showToast(`Please wait ${seconds}s before resending.`, "info");
+      return;
+    }
     try {
       await resendOTP(
         phone,
         purpose
       );
       setSeconds(42);
-
-      Alert.alert(
-        "OTP Sent",
-        "A new verification code has been sent."
-      );
+      showToast("A new verification code has been sent.", "success");
     } catch (error: any) {
-  Alert.alert(
-    "Unable to Resend Code",
-    getUserFriendlyError(error)
-  );
-}
+      showToast(getUserFriendlyError(error), "error");
+    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={
-        Platform.OS === "ios"
-          ? "padding"
-          : "height"
-      }
+      behavior="padding"
     >
       <TouchableOpacity
         style={styles.backButton}
@@ -156,87 +144,121 @@ export default function OTPVerificationScreen() {
         />
       </TouchableOpacity>
 
-      <Text style={styles.title}>
-        Verify OTP
-      </Text>
+      <AuthArcs />
 
-      <Text style={styles.subtitle}>
-        Enter the 6-digit code sent to your
-        phone.
-      </Text>
-
-      <Text style={styles.label}>
-        ENTER OTP
-      </Text>
-
-      <TextInput
-        style={styles.input}
-        placeholder="123456"
-        placeholderTextColor="#9CA3AF"
-        keyboardType="number-pad"
-        maxLength={6}
-        value={otp}
-        onChangeText={setOtp}
+      <Animated.Image
+        source={require("@/assets/images/logoA4.png")}
+        style={[
+          styles.logo,
+          {
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+          },
+        ]}
+        resizeMode="contain"
       />
 
-      <Text style={styles.timerText}>
-        {seconds > 0
-          ? `Resend code in 0:${seconds
-              .toString()
-              .padStart(2, "0")}`
-          : "You can now resend the code"}
-      </Text>
-
-      <TouchableOpacity
-        style={[
-          styles.button,
-          loading && { opacity: 0.7 },
-        ]}
-        disabled={loading}
-        onPress={handleVerify}
+      <Animated.View
+        style={{
+          opacity: items[0].opacity,
+          transform: [{ translateY: items[0].translateY }],
+        }}
       >
-        <Text style={styles.buttonText}>
-          {loading ? "Verifying..." : "Verify OTP"}
-        </Text>
-      </TouchableOpacity>
-
-      <View style={styles.footer}>
-        <Text style={styles.footerText}>
-          Didn't receive anything?
+        <Text style={styles.title}>
+          Verify OTP
         </Text>
 
+        <Text style={styles.subtitle}>
+          Enter the 6-digit code sent to your
+          phone.
+        </Text>
+      </Animated.View>
+
+      <Animated.View
+        style={{
+          opacity: items[1].opacity,
+          transform: [{ translateY: items[1].translateY }],
+        }}
+      >
+        <Text style={styles.label}>
+          ENTER OTP
+        </Text>
+
+        <TextInput
+          style={[styles.input, otpError ? styles.inputError : undefined]}
+          placeholder="123456"
+          placeholderTextColor="#9CA3AF"
+          keyboardType="number-pad"
+          maxLength={6}
+          value={otp}
+          onChangeText={(text) => { setOtp(text); if (otpError) setOtpError(""); }}
+        />
+        {otpError ? <Text style={styles.fieldError}>{otpError}</Text> : null}
+
+        <Text style={styles.timerText}>
+          {seconds > 0
+            ? `Resend code in 0:${seconds
+                .toString()
+                .padStart(2, "0")}`
+            : "You can now resend the code"}
+        </Text>
+      </Animated.View>
+
+      <Animated.View
+        style={{
+          opacity: items[2].opacity,
+          transform: [{ translateY: items[2].translateY }],
+        }}
+      >
         <TouchableOpacity
-          disabled={seconds > 0}
-          onPress={handleResendOTP}
+          style={[
+            styles.button,
+            loading && { opacity: 0.7 },
+          ]}
+          onPress={handleVerify}
         >
-          <Text
-            style={[
-              styles.resend,
-              {
-                opacity:
-                  seconds > 0 ? 0.5 : 1,
-              },
-            ]}
-          >
-            Resend OTP
+          <Text style={styles.buttonText}>
+            {loading ? "Verifying..." : "Verify OTP"}
           </Text>
         </TouchableOpacity>
 
-        <View
-          style={styles.infoContainer}
-        >
-          <Ionicons
-            name="information-circle-outline"
-            size={16}
-            color="#C44736"
-          />
-
-          <Text style={styles.infoText}>
-            If you can't find the OTP,
-            check your SMS messages.
+        <View style={styles.footer}>
+          <Text style={styles.footerText}>
+            Didn't receive anything?
           </Text>
+
+          <TouchableOpacity
+            onPress={handleResendOTP}
+          >
+            <Text
+              style={[
+                styles.resend,
+                {
+                  opacity:
+                    seconds > 0 ? 0.5 : 1,
+                },
+              ]}
+            >
+              Resend OTP
+            </Text>
+          </TouchableOpacity>
+
+          <View
+            style={styles.infoContainer}
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={16}
+              color="#C44736"
+            />
+
+            <Text style={styles.infoText}>
+              If you can't find the OTP,
+              check your SMS messages.
+            </Text>
+          </View>
         </View>
-      </View>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
@@ -244,13 +266,23 @@ export default function OTPVerificationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
-    paddingHorizontal: 16,
-    paddingTop: 44,
+    backgroundColor: "#F2EDE8",
+    paddingHorizontal: 24,
+    justifyContent: "center",
   },
 
   backButton: {
-    marginBottom: 40,
+    position: "absolute",
+    top: 44,
+    left: 16,
+    zIndex: 1,
+  },
+
+  logo: {
+    width: 64,
+    height: 64,
+    alignSelf: "center",
+    marginBottom: 24,
   },
 
   title: {
@@ -276,7 +308,7 @@ const styles = StyleSheet.create({
   },
 
   input: {
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     borderRadius: 12,
     paddingVertical: 18,
     textAlign: "center",
@@ -339,5 +371,16 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: "center",
     fontFamily: "Inter_400Regular",
+  },
+  fieldError: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 6,
+    textAlign: "center",
+  },
+  inputError: {
+    borderWidth: 1.5,
+    borderColor: "#EF4444",
   },
 });

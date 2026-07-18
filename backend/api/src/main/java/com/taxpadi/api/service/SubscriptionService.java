@@ -96,6 +96,7 @@ public class SubscriptionService {
         if (activeOpt.isPresent()) {
             Subscription sub = activeOpt.get();
             dto.setSubscriptionTier("paid");
+            dto.setPlan(sub.getPlan());
             dto.setStatus(SubscriptionStatus.ACTIVE);
             dto.setStartedAt(sub.getStartedAt());
             dto.setExpiresAt(sub.getExpiresAt());
@@ -108,6 +109,7 @@ public class SubscriptionService {
                     cancelledOpt.get().getExpiresAt().isAfter(LocalDateTime.now())) {
                 Subscription sub = cancelledOpt.get();
                 dto.setSubscriptionTier("paid");
+                dto.setPlan(sub.getPlan());
                 dto.setStatus(SubscriptionStatus.CANCELLED);
                 dto.setStartedAt(sub.getStartedAt());
                 dto.setExpiresAt(sub.getExpiresAt());
@@ -139,6 +141,12 @@ public class SubscriptionService {
             List<String> validProviders = List.of("mtn", "telecel", "airteltigo");
             if (momoProvider == null || !validProviders.contains(momoProvider))
                 throw new BadRequestException("momo_provider must be one of: mtn, telecel, airteltigo");
+            // Map frontend provider names to Paystack's Ghana MoMo provider codes
+            momoProvider = switch (momoProvider) {
+                case "telecel"    -> "vod";
+                case "airteltigo" -> "atl";
+                default           -> momoProvider; // "mtn" stays as "mtn"
+            };
         }
 
         if (subscriptionRepository.existsByUserAndStatus(user, SubscriptionStatus.ACTIVE))
@@ -186,7 +194,10 @@ public class SubscriptionService {
         // Initiate payment via Paystack
         String authorizationUrl = null;
         if (PaymentMethod.MOMO.equals(paymentMethod)) {
-            paystackService.chargeMobileMoney(user.getEmail(), amount, paymentReference, momoNumber, momoProvider);
+            String billingEmail = (user.getEmail() != null && !user.getEmail().isBlank())
+                ? user.getEmail()
+                : user.getPhone().replaceAll("[^0-9]", "") + "@taxpadi.com";
+            paystackService.chargeMobileMoney(billingEmail, amount, paymentReference, momoNumber, momoProvider);
         } else {
             PaystackInitResult init = paystackService.initialize(
                 user.getEmail(), amount, paymentReference, List.of("card"));

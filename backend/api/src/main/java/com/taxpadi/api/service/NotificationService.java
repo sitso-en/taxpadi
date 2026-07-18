@@ -124,6 +124,9 @@ public class NotificationService {
     public NotificationPreferencesResponse updatePreferences(User user, NotificationPreferences request) {
         java.util.Map<String, Boolean> prefs = user.getNotificationPreferences();
         if (prefs == null) prefs = new java.util.HashMap<>();
+        if (request.getPushNotifications()    != null) prefs.put("push_notifications",    request.getPushNotifications());
+        if (request.getEmailNotifications()   != null) prefs.put("email_notifications",   request.getEmailNotifications());
+        if (request.getSmsNotifications()     != null) prefs.put("sms_notifications",     request.getSmsNotifications());
         if (request.getDeadlineReminders()    != null) prefs.put("deadline_reminders",    request.getDeadlineReminders());
         if (request.getPenaltyAlerts()        != null) prefs.put("penalty_alerts",        request.getPenaltyAlerts());
         if (request.getVaultSuggestions()     != null) prefs.put("vault_suggestions",     request.getVaultSuggestions());
@@ -138,6 +141,9 @@ public class NotificationService {
     private NotificationPreferences toPreferencesDto(java.util.Map<String, Boolean> prefs) {
         NotificationPreferences dto = new NotificationPreferences();
         if (prefs != null) {
+            dto.setPushNotifications(prefs.getOrDefault("push_notifications", true));
+            dto.setEmailNotifications(prefs.getOrDefault("email_notifications", true));
+            dto.setSmsNotifications(prefs.getOrDefault("sms_notifications", false));
             dto.setDeadlineReminders(prefs.getOrDefault("deadline_reminders", true));
             dto.setPenaltyAlerts(prefs.getOrDefault("penalty_alerts", true));
             dto.setVaultSuggestions(prefs.getOrDefault("vault_suggestions", true));
@@ -159,6 +165,9 @@ public class NotificationService {
         n.setType(type);
         n.setActionUrl(actionUrl);
         notificationRepository.save(n);
+
+        boolean pushEnabled = prefs == null || !Boolean.FALSE.equals(prefs.get("push_notifications"));
+        if (!pushEnabled) return;
 
         List<DeviceToken> tokens = deviceTokenRepository.findAll().stream()
             .filter(t -> t.getUser().getUserId().equals(user.getUserId())

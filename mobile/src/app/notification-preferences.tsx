@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
-  Alert,
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -10,294 +10,152 @@ import {
   View,
 } from "react-native";
 
+import Toggle from "@/components/Toggle";
 import {
-  getNotifications,
-  getUnreadCount,
-  markNotificationAsRead,
-  markAllNotificationsAsRead,
-  deleteNotification as deleteNotificationApi,
-  deleteAllNotifications,
+  getNotificationPreferences,
+  updateNotificationPreferences,
 } from "@/services/notification.service";
 import { getUserFriendlyError } from "@/utils/error";
+import { useToast } from "@/context/ToastContext";
+
+type Prefs = {
+  push_notifications: boolean;
+  email_notifications: boolean;
+  sms_notifications: boolean;
+  deadline_reminders: boolean;
+  penalty_alerts: boolean;
+  vault_suggestions: boolean;
+  referral_offers: boolean;
+  payment_confirmations: boolean;
+  system_updates: boolean;
+};
+
+const defaultPrefs: Prefs = {
+  push_notifications: true,
+  email_notifications: true,
+  sms_notifications: false,
+  deadline_reminders: true,
+  penalty_alerts: true,
+  vault_suggestions: true,
+  referral_offers: true,
+  payment_confirmations: true,
+  system_updates: true,
+};
+
+type Group = {
+  title: string;
+  subtitle: string;
+  items: { key: keyof Prefs; label: string; description: string; icon: string }[];
+};
+
+const groups: Group[] = [
+  {
+    title: "CHANNELS",
+    subtitle: "How you want to be notified",
+    items: [
+      { key: "push_notifications",  label: "Push Notifications", description: "Alerts sent directly to your device",     icon: "phone-portrait-outline" },
+      { key: "email_notifications", label: "Email Notifications", description: "Summaries sent to your email address",   icon: "mail-outline" },
+      { key: "sms_notifications",   label: "SMS Notifications",  description: "Text messages to your phone number",     icon: "chatbox-outline" },
+    ],
+  },
+  {
+    title: "ACTIVITY",
+    subtitle: "What you want to be notified about",
+    items: [
+      { key: "deadline_reminders",    label: "Tax Deadlines",    description: "Reminders before GRA filing dates",      icon: "calendar-outline" },
+      { key: "payment_confirmations", label: "Payment Updates",  description: "Confirmations and receipts",              icon: "card-outline" },
+      { key: "penalty_alerts",        label: "Penalty Alerts",   description: "Warnings when penalties are issued",     icon: "warning-outline" },
+      { key: "vault_suggestions",     label: "Savings Reminders", description: "Nudges to top up your savings vault",  icon: "wallet-outline" },
+      { key: "referral_offers",       label: "Referral Offers",  description: "New partner and referral opportunities", icon: "gift-outline" },
+      { key: "system_updates",        label: "System Updates",   description: "Important account and app notifications", icon: "megaphone-outline" },
+    ],
+  },
+];
 
 export default function NotificationPreferencesScreen() {
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  const [markingAll, setMarkingAll] = useState(false);
-  const [clearingAll, setClearingAll] = useState(false);
-
-  const loadNotifications = async () => {
-    try {
-      const notificationsResponse = await getNotifications();
-      const unreadResponse = await getUnreadCount();
-
-      setNotifications(
-        notificationsResponse.data.notifications
-      );
-
-      setUnreadCount(
-        unreadResponse.data.unread_count
-      );
-    } catch (error) {
-      console.log(error);
-     Alert.alert(
-  "Unable to Update Notification Preferences",
-  getUserFriendlyError(error)
-);
-    }
-  };
+  const { showToast } = useToast();
+  const [prefs, setPrefs] = useState<Prefs>(defaultPrefs);
+  const [loading, setLoading] = useState(true);
+  const saveTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    loadNotifications();
+    getNotificationPreferences()
+      .then((res) => {
+        const data = res.data?.preferences ?? res.data ?? {};
+        setPrefs({ ...defaultPrefs, ...data });
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
   }, []);
 
-  const getIconConfig = (title: string) => {
-    const text = title.toLowerCase();
+  const toggle = (key: keyof Prefs) => {
+    setPrefs((prev) => {
+      const next = { ...prev, [key]: !prev[key] };
 
-    if (text.includes("payment")) {
-      return { name: "checkmark-circle-outline", color: "#34A853", bg: "#E6F4EA" };
-    }
-    if (text.includes("deadline")) {
-      return { name: "calendar-outline", color: "#FBBC05", bg: "#FEF7E0" };
-    }
-    if (text.includes("vat")) {
-      return { name: "document-text-outline", color: "#4285F4", bg: "#E8F0FE" };
-    }
-    if (text.includes("savings")) {
-      return { name: "wallet-outline", color: "#A736C4", bg: "#F3E6F8" };
-    }
-    if (text.includes("penalty")) {
-      return { name: "warning-outline", color: "#EA4335", bg: "#FCE8E6" };
-    }
-    return { name: "notifications-outline", color: "#6B7280", bg: "#F3F4F6" };
-  };
+      // debounce — save 600ms after last toggle
+      if (saveTimeout.current) clearTimeout(saveTimeout.current);
+      saveTimeout.current = setTimeout(async () => {
+        try {
+          await updateNotificationPreferences(next);
+        } catch (error) {
+          showToast(getUserFriendlyError(error), "error");
+        }
+      }, 600);
 
-  const formatTime = (dateString: string) => {
-    const now = new Date();
-    const date = new Date(dateString);
-    const diff = now.getTime() - date.getTime();
-
-    const minutes = Math.floor(diff / (1000 * 60));
-    const hours = Math.floor(diff / (1000 * 60 * 60));
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (minutes < 1) return "Just now";
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days === 1) return "Yesterday";
-    if (days < 7) return `${days}d ago`;
-
-    return date.toLocaleDateString();
-  };
-
-  const handleDelete = (id: string) => {
-    Alert.alert(
-      "Delete Notification",
-      "Remove this notification?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await deleteNotificationApi(id);
-              await loadNotifications();
-            } catch (error) {
-              Alert.alert("Error", "Failed to delete notification.");
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const handleClearAll = () => {
-    Alert.alert(
-      "Clear Notifications",
-      "Delete all notifications?",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Clear",
-          style: "destructive",
-          onPress: async () => {
-            if (clearingAll) return;
-
-            setClearingAll(true);
-
-            try {
-              await deleteAllNotifications();
-              await loadNotifications();
-            } catch (error: any) {
-              Alert.alert(
-                "Error",
-                error?.response?.data?.message ??
-                  "Unable to clear notifications."
-              );
-            } finally {
-              setClearingAll(false);
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const handleMarkAllAsRead = async () => {
-    if (markingAll) return;
-
-    setMarkingAll(true);
-
-    try {
-      await markAllNotificationsAsRead();
-      await loadNotifications();
-    } catch (error: any) {
-      Alert.alert(
-        "Error",
-        error?.response?.data?.message ??
-          "Unable to mark notifications as read."
-      );
-    } finally {
-      setMarkingAll(false);
-    }
+      return next;
+    });
   };
 
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{
-        paddingBottom: 60,
-      }}
+      contentContainerStyle={{ paddingBottom: 60 }}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => {
-            if (router.canGoBack()) {
-              router.back();
-            } else {
-              router.replace("/dashboard");
-            }
-          }}
-        >
+        <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={26} color="#111827" />
         </TouchableOpacity>
-
         <Text style={styles.title}>Notifications</Text>
       </View>
 
       <Text style={styles.subtitle}>
-        Stay updated with payments, reminders and tax activity.
+        Choose what TaxPadi notifies you about. Changes sync to your account instantly.
       </Text>
 
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryIcon}>
-          <Ionicons name="notifications-outline" size={28} color="#FFFFFF" />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator color="#C44736" />
         </View>
-        <View>
-          <Text style={styles.summaryTitle}>Notifications</Text>
-          <Text style={styles.summarySubtitle}>
-            {unreadCount} unread • {notifications.length} total notifications
-          </Text>
-        </View>
-      </View>
-
-      {notifications.length > 0 && (
-        <View style={styles.topRow}>
-          <View style={styles.actionsRow}>
-            {unreadCount > 0 && (
-              <TouchableOpacity
-                style={styles.actionButton}
-                onPress={handleMarkAllAsRead}
-                disabled={markingAll}
-              >
-                <Text style={styles.actionText}>
-                  {markingAll ? "Marking..." : "Mark All Read"}
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={handleClearAll}
-              disabled={clearingAll}
-            >
-              <Text style={styles.actionText}>
-                {clearingAll ? "Clearing..." : "Clear All"}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-
-      {notifications.length === 0 && (
-        <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconCircle}>
-            <Ionicons name="notifications-off-outline" size={40} color="#C44736" />
-          </View>
-          <Text style={styles.emptyTitle}>You're all caught up</Text>
-          <Text style={styles.emptyText}>
-            New notifications will appear here.
-          </Text>
-        </View>
-      )}
-
-      {notifications.map((item) => {
-        const iconConfig = getIconConfig(item.title);
-
-        return (
-          <TouchableOpacity
-            key={item.notification_id}
-            style={[
-              styles.notificationCard,
-              !item.read && styles.unreadNotification,
-            ]}
-            onPress={async () => {
-              if (!item.read) {
-                try {
-                  await markNotificationAsRead(item.notification_id);
-                  await loadNotifications();
-                } catch (error) {
-                  console.log(error);
-                }
-              }
-            }}
-            onLongPress={() => handleDelete(item.notification_id)}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.iconCircle, { backgroundColor: iconConfig.bg }]}>
-              <Ionicons
-                name={iconConfig.name as any}
-                size={22}
-                color={iconConfig.color}
-              />
+      ) : (
+        groups.map((group) => (
+          <View key={group.title} style={styles.group}>
+            <Text style={styles.groupTitle}>{group.title}</Text>
+            <Text style={styles.groupSubtitle}>{group.subtitle}</Text>
+            <View style={styles.card}>
+              {group.items.map((item, index) => (
+                <View
+                  key={item.key}
+                  style={[styles.row, index < group.items.length - 1 && styles.rowBorder]}
+                >
+                  <View style={styles.iconWrap}>
+                    <Ionicons name={item.icon as any} size={18} color="#C44736" />
+                  </View>
+                  <View style={styles.labelWrap}>
+                    <Text style={styles.label}>{item.label}</Text>
+                    <Text style={styles.description}>{item.description}</Text>
+                  </View>
+                  <Toggle value={prefs[item.key]} onValueChange={() => toggle(item.key)} />
+                </View>
+              ))}
             </View>
-
-            <View style={styles.content}>
-              <View style={styles.notificationHeader}>
-                <Text style={styles.notificationTitle} numberOfLines={1}>
-                  {item.title}
-                </Text>
-                <Text style={styles.time}>
-                  {formatTime(item.created_at)}
-                </Text>
-              </View>
-
-              <Text style={styles.message}>{item.body}</Text>
-            </View>
-
-            {!item.read && <View style={styles.redDot} />}
-          </TouchableOpacity>
-        );
-      })}
-
-      {notifications.length > 0 && (
-        <Text style={styles.hintText}>
-          Long press a notification to delete it.
-        </Text>
+          </View>
+        ))
       )}
+
+      <Text style={styles.hint}>
+        Notifications are delivered as push alerts to your device. Delivery also depends on your phone's system notification settings.
+      </Text>
     </ScrollView>
   );
 }
@@ -305,210 +163,95 @@ export default function NotificationPreferencesScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     paddingHorizontal: 16,
     paddingTop: 44,
   },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
     marginBottom: 20,
   },
-
   title: {
-    fontSize: 28,
+    fontSize: 24,
     color: "#111827",
     fontFamily: "Inter_700Bold",
     marginLeft: 10,
   },
-
   subtitle: {
     color: "#6B7280",
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    marginTop: 0,
-    marginBottom: 18,
+    marginBottom: 24,
     lineHeight: 18,
   },
-
-  summaryCard: {
-    backgroundColor: "#C44736",
-    borderRadius: 18,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
+  loadingContainer: {
+    paddingTop: 60,
+    alignItems: "center",
+  },
+  group: {
+    marginBottom: 24,
+  },
+  groupTitle: {
+    color: "#C44736",
+    fontSize: 10,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 0.5,
+    marginBottom: 2,
+  },
+  groupSubtitle: {
+    color: "#9CA3AF",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginBottom: 10,
+  },
+  card: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#ECECEC",
+    overflow: "hidden",
+    marginBottom: 24,
+  },
+  row: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 24,
-    shadowColor: "#000",
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-
-  summaryIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 4,
-    borderColor: "#FFFFFF",
-    backgroundColor: "transparent",
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  iconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: "#FFF5F3",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 16,
+    marginRight: 12,
   },
-
-  summaryTitle: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
+  labelWrap: {
+    flex: 1,
   },
-
-  summarySubtitle: {
-    color: "#FDECEC",
-    fontSize: 13,
+  label: {
+    color: "#111827",
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
+  },
+  description: {
+    color: "#9CA3AF",
+    fontSize: 12,
     fontFamily: "Inter_400Regular",
     marginTop: 2,
   },
-
-  topRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-
-  actionsRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-
-  actionButton: {
-    backgroundColor: "#FFF5F3",
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 14,
-  },
-
-  actionText: {
-    color: "#C44736",
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-  },
-
-  notificationCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 10,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#ECECEC",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
-  },
-
-  unreadNotification: {
-    borderWidth: 1,
-    borderColor: "#FCE8E6",
-    borderLeftWidth: 4,
-    borderLeftColor: "#C44736",
-    backgroundColor: "#FFFDFC",
-  },
-
-  iconCircle: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  content: {
-    flex: 1,
-    marginLeft: 14,
-  },
-
-  notificationHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-
-  notificationTitle: {
-    color: "#111827",
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    flex: 1,
-    paddingRight: 8,
-  },
-
-  time: {
+  hint: {
     color: "#9CA3AF",
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    width: 65,
-    textAlign: "right",
-  },
-
-  message: {
-    color: "#6B7280",
+    textAlign: "center",
     lineHeight: 18,
-    fontSize: 13,
-    fontFamily: "Inter_400Regular",
-  },
-
-  redDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#C44736",
-    marginLeft: 10,
-    alignSelf: "center",
-  },
-
-  emptyContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 40,
-    paddingHorizontal: 30,
-  },
-
-  emptyIconCircle: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#FFF5F3",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 16,
-  },
-
-  emptyTitle: {
-    fontSize: 18,
-    color: "#111827",
-    fontFamily: "Inter_700Bold",
-    marginBottom: 6,
-  },
-
-  emptyText: {
-    color: "#6B7280",
-    textAlign: "center",
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-  },
-
-  hintText: {
-    textAlign: "center",
-    color: "#9CA3AF",
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-    marginTop: 12,
+    paddingHorizontal: 16,
   },
 });

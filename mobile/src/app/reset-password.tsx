@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
 import {
-  Alert,
+  Animated,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -13,8 +13,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { useAuthAnimation } from "@/hooks/useAuthAnimation";
+import { AuthArcs } from "@/components/AuthArcs";
+import { useToast } from "@/context/ToastContext";
 
 export default function ResetPasswordScreen() {
+  const { logoScale, logoOpacity, items } = useAuthAnimation(3);
+
   const { resetToken } = useLocalSearchParams<{
     resetToken: string;
   }>();
@@ -30,48 +35,30 @@ export default function ResetPasswordScreen() {
     setShowConfirmPassword,
   ] = useState(false);
 
+  const { showToast } = useToast();
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<{newPassword?: string; confirmPassword?: string}>({});
 
   const handleResetPassword = async () => {
     if (!resetToken) {
-      Alert.alert(
-        "Invalid Request",
-        "Your password reset session has expired. Please request another OTP."
-      );
-
+      showToast("Your password reset session has expired.", "error");
       router.replace("/forgot-password");
       return;
     }
 
+    const newErrors: {newPassword?: string; confirmPassword?: string} = {};
     if (!newPassword.trim()) {
-      Alert.alert(
-        "Validation",
-        "Enter a new password."
-      );
-      return;
+      newErrors.newPassword = "Enter a new password.";
+    } else if (newPassword.length < 8) {
+      newErrors.newPassword = "Password must be at least 8 characters.";
     }
-
-    if (newPassword.length < 8) {
-      Alert.alert(
-        "Validation",
-        "Password must be at least 8 characters."
-      );
-      return;
-    }
-
     if (!confirmPassword.trim()) {
-      Alert.alert(
-        "Validation",
-        "Please confirm your password."
-      );
-      return;
+      newErrors.confirmPassword = "Please confirm your password.";
+    } else if (newPassword !== confirmPassword) {
+      newErrors.confirmPassword = "Passwords do not match.";
     }
-
-    if (newPassword !== confirmPassword) {
-      Alert.alert(
-        "Validation",
-        "Passwords do not match."
-      );
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
@@ -87,29 +74,14 @@ export default function ResetPasswordScreen() {
       );
 
       if (!response.success) {
-        Alert.alert(
-          "Reset Failed",
-          response.message
-        );
+        showToast(response.message, "error");
         return;
       }
 
-      Alert.alert(
-        "Success",
-        "Password reset successfully.",
-        [
-          {
-            text: "Login",
-            onPress: () =>
-              router.replace("/login"),
-          },
-        ]
-      );
+      showToast("Password reset successfully.", "success");
+      router.replace("/login");
     } catch (error: any) {
-      Alert.alert(
-    "Password Reset Unsuccessful",
-    getUserFriendlyError(error)
-  );
+      showToast(getUserFriendlyError(error), "error");
     } finally {
       setLoading(false);
     }
@@ -118,112 +90,142 @@ export default function ResetPasswordScreen() {
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={
-        Platform.OS === "ios"
-          ? "padding"
-          : "height"
-      }
+      behavior="padding"
     >
-      <Text style={styles.title}>
-        Create New Password
-      </Text>
+      <AuthArcs />
 
-      <Text style={styles.subtitle}>
-        Enter your new password below.
-      </Text>
-
-      <Text style={styles.label}>
-        NEW PASSWORD
-      </Text>
-
-      <View style={styles.passwordContainer}>
-        <TextInput
-          style={styles.passwordInput}
-          placeholder="••••••••"
-          placeholderTextColor="#6B7280"
-          secureTextEntry={!showNewPassword}
-          value={newPassword}
-          onChangeText={setNewPassword}
-        />
-
-        <TouchableOpacity
-          onPress={() =>
-            setShowNewPassword(
-              !showNewPassword
-            )
-          }
-        >
-          <Ionicons
-            name={
-              showNewPassword
-                ? "eye-off-outline"
-                : "eye-outline"
-            }
-            size={22}
-            color="#6B7280"
-          />
-        </TouchableOpacity>
-      </View>
-
-      <Text style={styles.label}>
-        CONFIRM PASSWORD
-      </Text>
-
-      <View style={styles.passwordContainer}>
-        <TextInput
-          style={styles.passwordInput}
-          placeholder="••••••••"
-          placeholderTextColor="#6B7280"
-          secureTextEntry={
-            !showConfirmPassword
-          }
-          value={confirmPassword}
-          onChangeText={
-            setConfirmPassword
-          }
-        />
-
-        <TouchableOpacity
-          onPress={() =>
-            setShowConfirmPassword(
-              !showConfirmPassword
-            )
-          }
-        >
-          <Ionicons
-            name={
-              showConfirmPassword
-                ? "eye-off-outline"
-                : "eye-outline"
-            }
-            size={22}
-            color="#6B7280"
-          />
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity
+      <Animated.Image
+        source={require("@/assets/images/logoA4.png")}
         style={[
-          styles.button,
-          loading && { opacity: 0.7 },
+          styles.logo,
+          {
+            opacity: logoOpacity,
+            transform: [{ scale: logoScale }],
+          },
         ]}
-        disabled={loading}
-        onPress={handleResetPassword}
-      >
-        <Text style={styles.buttonText}>
-          {loading ? "Resetting..." : "Reset Password"}
-        </Text>
-      </TouchableOpacity>
+        resizeMode="contain"
+      />
 
-      <TouchableOpacity
-        onPress={() =>
-          router.replace("/login")
-        }
+      <Animated.View
+        style={{
+          opacity: items[0].opacity,
+          transform: [{ translateY: items[0].translateY }],
+        }}
       >
-        <Text style={styles.backText}>
-          Back to Login
+        <Text style={styles.title}>
+          Create New Password
         </Text>
-      </TouchableOpacity>
+
+        <Text style={styles.subtitle}>
+          Enter your new password below.
+        </Text>
+      </Animated.View>
+
+      <Animated.View
+        style={{
+          opacity: items[1].opacity,
+          transform: [{ translateY: items[1].translateY }],
+        }}
+      >
+        <Text style={styles.label}>
+          NEW PASSWORD
+        </Text>
+
+        <View style={[styles.passwordContainer, errors.newPassword && styles.inputError]}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="••••••••"
+            placeholderTextColor="#6B7280"
+            secureTextEntry={!showNewPassword}
+            value={newPassword}
+            onChangeText={(text) => { setNewPassword(text); if (errors.newPassword) setErrors(e => ({ ...e, newPassword: undefined })); }}
+          />
+
+          <TouchableOpacity
+            onPress={() =>
+              setShowNewPassword(
+                !showNewPassword
+              )
+            }
+          >
+            <Ionicons
+              name={
+                showNewPassword
+                  ? "eye-off-outline"
+                  : "eye-outline"
+              }
+              size={22}
+              color="#6B7280"
+            />
+          </TouchableOpacity>
+        </View>
+        {errors.newPassword ? <Text style={styles.fieldError}>{errors.newPassword}</Text> : null}
+
+        <Text style={styles.label}>
+          CONFIRM PASSWORD
+        </Text>
+
+        <View style={[styles.passwordContainer, errors.confirmPassword && styles.inputError]}>
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="••••••••"
+            placeholderTextColor="#6B7280"
+            secureTextEntry={
+              !showConfirmPassword
+            }
+            value={confirmPassword}
+            onChangeText={(text) => { setConfirmPassword(text); if (errors.confirmPassword) setErrors(e => ({ ...e, confirmPassword: undefined })); }}
+          />
+
+          <TouchableOpacity
+            onPress={() =>
+              setShowConfirmPassword(
+                !showConfirmPassword
+              )
+            }
+          >
+            <Ionicons
+              name={
+                showConfirmPassword
+                  ? "eye-off-outline"
+                  : "eye-outline"
+              }
+              size={22}
+              color="#6B7280"
+            />
+          </TouchableOpacity>
+        </View>
+        {errors.confirmPassword ? <Text style={styles.fieldError}>{errors.confirmPassword}</Text> : null}
+      </Animated.View>
+
+      <Animated.View
+        style={{
+          opacity: items[2].opacity,
+          transform: [{ translateY: items[2].translateY }],
+        }}
+      >
+        <TouchableOpacity
+          style={[
+            styles.button,
+            loading && { opacity: 0.7 },
+          ]}
+          onPress={handleResetPassword}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Resetting..." : "Reset Password"}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() =>
+            router.replace("/login")
+          }
+        >
+          <Text style={styles.backText}>
+            Back to Login
+          </Text>
+        </TouchableOpacity>
+      </Animated.View>
     </KeyboardAvoidingView>
   );
 }
@@ -231,9 +233,16 @@ export default function ResetPasswordScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     justifyContent: "center",
     paddingHorizontal: 24,
+  },
+
+  logo: {
+    width: 64,
+    height: 64,
+    alignSelf: "center",
+    marginBottom: 20,
   },
 
   title: {
@@ -263,7 +272,7 @@ const styles = StyleSheet.create({
   passwordContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     borderRadius: 12,
     paddingHorizontal: 16,
   },
@@ -299,5 +308,16 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#C44736",
     fontFamily: "Inter_500Medium",
+  },
+  fieldError: {
+    color: "#EF4444",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  inputError: {
+    borderWidth: 1.5,
+    borderColor: "#EF4444",
   },
 });

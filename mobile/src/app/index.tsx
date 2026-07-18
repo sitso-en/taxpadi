@@ -243,7 +243,7 @@ export default function SplashScreen() {
         ))}
       </View>
 
-      <Animated.Text
+      {/* <Animated.Text
         style={[
           styles.tagline,
           {
@@ -256,8 +256,8 @@ export default function SplashScreen() {
           },
         ]}
       >
-        Your tax, sorted.
-      </Animated.Text>
+        TRUSTED TAX MANAGEMENT • GHANA
+      </Animated.Text> */}
 
       <Animated.Text
         style={[
@@ -272,7 +272,7 @@ export default function SplashScreen() {
           },
         ]}
       >
-        TRUSTED TAX MANAGEMENT • GHANA
+        Your tax, sorted.
       </Animated.Text>
 
       <View style={styles.loader}>

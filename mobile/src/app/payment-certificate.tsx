@@ -3,21 +3,23 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   ActivityIndicator,
-  Alert,
-  Linking,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 
 import { usePayments } from "@/context/PaymentContext";
 import { getUserFriendlyError } from "@/utils/error";
+import { useToast } from "@/context/ToastContext";
 
 export default function PaymentCertificateScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { getCertificate } = usePayments();
+  const { showToast } = useToast();
 
   const [certificate, setCertificate] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -36,11 +38,7 @@ export default function PaymentCertificateScreen() {
         const response = await getCertificate(paymentId);
         setCertificate(response.data);
       } catch (error) {
-        console.log(error);
-       Alert.alert(
-  "Unable to Load Payment Certificate",
-  getUserFriendlyError(error)
-);
+        showToast(getUserFriendlyError(error), "error");
       } finally {
         setLoading(false);
       }
@@ -50,11 +48,18 @@ export default function PaymentCertificateScreen() {
   }, [id]);
 
   const downloadCertificate = async () => {
-    if (!certificate?.document_ref) {
-      Alert.alert("Unavailable", "Certificate PDF is not available yet.");
+    const url = certificate?.pdf_url;
+    if (!url) {
+      showToast("Certificate PDF is not available yet.", "info");
       return;
     }
-    await Linking.openURL(certificate.document_ref);
+    try {
+      const localUri = `${FileSystem.cacheDirectory}taxpadi_payment_cert_${Date.now()}.pdf`;
+      const { uri } = await FileSystem.downloadAsync(url, localUri);
+      await Sharing.shareAsync(uri, { mimeType: "application/pdf", dialogTitle: "Share Certificate" });
+    } catch (error) {
+      showToast(getUserFriendlyError(error), "error");
+    }
   };
 
   if (loading) {
@@ -74,7 +79,7 @@ export default function PaymentCertificateScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
+      contentContainerStyle={{ paddingBottom: 48 }}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.iconCircle}>
@@ -131,14 +136,14 @@ export default function PaymentCertificateScreen() {
         style={styles.downloadButton}
         onPress={downloadCertificate}
       >
-        <Ionicons name="download-outline" size={20} color="#FFFFFF" />
-        <Text style={styles.downloadText}>Download PDF</Text>
+        <Ionicons name="share-outline" size={20} color="#FFFFFF" />
+        <Text style={styles.downloadText}>Share PDF</Text>
       </TouchableOpacity>
 
-     <TouchableOpacity
-  style={styles.downloadButton}
-  onPress={() => router.push("/receipt")}
->
+      <TouchableOpacity
+        style={styles.backButton}
+        onPress={() => router.back()}
+      >
         <Text style={styles.backText}>Back</Text>
       </TouchableOpacity>
     </ScrollView>
@@ -148,7 +153,7 @@ export default function PaymentCertificateScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     paddingHorizontal: 16,
     paddingTop: 44,
   },
@@ -163,14 +168,14 @@ const styles = StyleSheet.create({
   },
   title: {
     marginTop: 24,
-    fontSize: 30,
+    fontSize: 24,
     color: "#111827",
     fontFamily: "Inter_700Bold",
     textAlign: "center",
   },
   subtitle: {
     marginTop: 8,
-    marginBottom: 30,
+    marginBottom: 20,
     textAlign: "center",
     color: "#6B7280",
     fontFamily: "Inter_400Regular",
@@ -178,10 +183,10 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 22,
+    padding: 16,
     borderWidth: 1,
     borderColor: "#ECECEC",
-    marginBottom: 28,
+    marginBottom: 16,
   },
   row: {
     flexDirection: "row",
@@ -190,7 +195,7 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: "#EDE8E3",
     marginVertical: 16,
   },
   label: {

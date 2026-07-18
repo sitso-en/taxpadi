@@ -1,525 +1,601 @@
-import React, {
-  useMemo,
-  useState,
-} from "react";
+import React, { useState } from "react";
 import { getUserFriendlyError } from "@/utils/error";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { Linking } from "react-native";
 import { useUser } from "../../context/UserContext";
-
 import {
-  Alert,
+  ActivityIndicator,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-
-import Card from "../../components/Card";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { LinearGradient } from "expo-linear-gradient";
+import { useToast } from "@/context/ToastContext";
+import { useNetwork } from "@/context/NetworkContext";
+import { usePrivacy } from "@/context/PrivacyContext";
+import ErrorState from "@/components/ErrorState";
 import { usePayments } from "../../context/PaymentContext";
-import { useTransactions } from "../../context/TransactionContext";
+import { useTaxLiability } from "@/context/TaxLiabilityContext";
 
-import { Transaction } from "../../data/transactions";
+const fmt = (n: number) =>
+  `GH¢ ${n.toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const METHOD_ICON: Record<string, any> = {
+  momo: "phone-portrait-outline",
+  bank: "card-outline",
+  vault: "lock-closed-outline",
+};
+
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+  SUCCESS: { label: "Paid",    color: "#16A34A", bg: "#DCFCE7" },
+  PAID:    { label: "Paid",    color: "#16A34A", bg: "#DCFCE7" },
+  PENDING: { label: "Pending", color: "#D97706", bg: "#FEF3C7" },
+  FAILED:  { label: "Failed",  color: "#DC2626", bg: "#FEE2E2" },
+};
 
 export default function PaymentsScreen() {
   const { user } = useUser();
-  const {
-    payments,
-    loading,
-    createPayment,
-    refreshPayments,
-  } = usePayments();
-  const { transactions } = useTransactions();
+  const { payments, loading, error, createPayment, refreshPayments } = usePayments();
+  const { showToast } = useToast();
+  const { isOnline } = useNetwork();
+  const { amountsHidden, toggleAmountsHidden } = usePrivacy();
+  const { liability } = useTaxLiability();
 
-  const [paymentMethod, setPaymentMethod] = useState<"momo" | "bank">("momo");
+  const [paymentMethod, setPaymentMethod] = useState<"momo" | "bank" | "vault">("momo");
   const [paying, setPaying] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const totalIncome = useMemo(
-    () =>
-      transactions
-        .filter((transaction: Transaction) => transaction.type === "income")
-        .reduce((sum: number, transaction: Transaction) => sum + transaction.amount, 0),
-    [transactions]
-  );
+  const netLiability = liability?.net_liability ?? 0;
 
-  const totalExpense = useMemo(
-    () =>
-      transactions
-        .filter((transaction: Transaction) => transaction.type === "expense")
-        .reduce((sum: number, transaction: Transaction) => sum + transaction.amount, 0),
-    [transactions]
-  );
-
-  const taxDue = Math.max(totalIncome - totalExpense, 0) * 0.1;
-  const penalties = taxDue * 0.15;
-  const totalOutstanding = taxDue + penalties;
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await refreshPayments(false);
+    setRefreshing(false);
+  };
 
   const totalPaid = payments
-    .filter(
-      (payment: any) =>
-        payment.status?.toUpperCase() === "SUCCESS" ||
-        payment.status?.toUpperCase() === "PAID"
-    )
-    .reduce(
-      (sum: number, payment: any) =>
-        sum + Number(payment.amount),
-      0
-    );
+    .filter((p: any) => ["SUCCESS", "PAID"].includes(p.status?.toUpperCase()))
+    .reduce((sum: number, p: any) => sum + Number(p.amount), 0);
 
-  const remainingBalance = Math.max(totalOutstanding - totalPaid, 0);
+  const remainingBalance = Math.max(netLiability - totalPaid, 0);
+  const paidPct = netLiability > 0 ? Math.min((totalPaid / netLiability) * 100, 100) : 0;
 
-  const handlePayment = () => {
+  const handlePayment = async () => {
+    if (!isOnline) {
+      showToast("You're offline. Connect to the internet to process a payment.", "info");
+      return;
+    }
     if (paying) return;
-
     if (remainingBalance <= 0) {
-      Alert.alert(
-        "No Outstanding Balance",
-        "You currently have no outstanding payments."
-      );
+      showToast("You have no outstanding payments.", "info");
       return;
     }
 
-    Alert.alert(
-      "Confirm Payment",
-      `Pay GH¢ ${remainingBalance.toFixed(2)} using ${
-        paymentMethod === "momo" ? "Mobile Money" : "Bank Transfer"
-      }?`,
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Pay",
-          onPress: async () => {
-            if (paying) return;
+    setPaying(true);
+    try {
+      const response = await createPayment({
+        amount: remainingBalance,
+        payment_method: paymentMethod === "momo" ? "momo" : paymentMethod === "vault" ? "vault" : "bank_card",
+        momo_number: paymentMethod === "momo" ? (user?.phoneNumber?.replace(/\s/g, "") ?? "") : undefined,
+        momo_provider: paymentMethod === "momo" ? "mtn" : undefined,
+      });
 
-            setPaying(true);
+      const url =
+        response.data?.authorization_url ??
+        response.data?.payment_url ??
+        response.data?.checkout_url;
 
-            try {
-              const response = await createPayment({
-                amount: remainingBalance,
-                payment_method:
-                  paymentMethod === "momo"
-                    ? "MOBILE_MONEY"
-                    : "BANK_TRANSFER",
-
-                momo_number: "",
-
-                momo_provider:
-                  paymentMethod === "momo"
-                    ? "MTN"
-                    : undefined,
-              });
-
-              await refreshPayments();
-
-              if (
-                response.data?.authorization_url
-              ) {
-                Alert.alert(
-                  "Continue Payment",
-                  response.data.authorization_url
-                );
-              }
-
-              router.push("/receipt");
-            } catch (error: any) {
-              console.log(error);
-
-Alert.alert(
-  "Payment Unsuccessful",
-  getUserFriendlyError(error)
-);
-            } finally {
-              setPaying(false);
-            }
-          },
-        },
-      ]
-    );
+      if (url) {
+        await Linking.openURL(url);
+        showToast("Complete your payment in the browser. Your history will update shortly.", "info");
+      } else {
+        showToast("Payment initiated. Your history will update shortly.", "success");
+      }
+    } catch (err: any) {
+      showToast(getUserFriendlyError(err), "error");
+    } finally {
+      setPaying(false);
+    }
   };
 
+  const methods: { key: "momo" | "bank" | "vault"; label: string; detail: string }[] = [
+    { key: "momo",  label: "Mobile Money", detail: user?.phoneNumber || "No phone number on file" },
+    { key: "bank",  label: "Bank Card",    detail: "You'll be redirected to complete payment" },
+    { key: "vault", label: "Savings Vault", detail: "Deducted directly from your vault balance" },
+  ];
+
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={{
-        paddingBottom: 120,
-      }}
-    >
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="chevron-back" size={26} color="#111827" />
-        </TouchableOpacity>
-
-        <Text style={styles.title}>Payments</Text>
-      </View>
-
-      <Text style={styles.subtitle}>
-        Manage your tax payments and payment history.
-      </Text>
-
-      <View style={styles.balanceCard}>
-        <View style={styles.balanceHeader}>
-          <View style={styles.balanceIcon}>
-            <Ionicons name="card-outline" size={32} color="#FFFFFF" />
-          </View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.balanceLabel}>TOTAL OUTSTANDING</Text>
-            <Text style={styles.balanceAmount}>
-              GH¢ {remainingBalance.toFixed(2)}
-            </Text>
-          </View>
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scroll}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} colors={["#C44736"]} tintColor="#C44736" />
+        }
+      >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back" size={26} color="#111827" />
+          </TouchableOpacity>
+          <Text style={styles.title}>Payments</Text>
+          <View style={{ width: 26 }} />
         </View>
 
-        <Text style={styles.balanceSubText}>
-          Tax: GH¢ {taxDue.toFixed(2)} • Penalties: GH¢ {penalties.toFixed(2)}
-        </Text>
-      </View>
-
-      <TouchableOpacity
-        disabled={paying || remainingBalance <= 0}
-        style={[
-          styles.payButton,
-          remainingBalance <= 0 && { backgroundColor: "#9CA3AF" },
-        ]}
-        onPress={handlePayment}
-      >
-        <Text style={styles.payButtonText}>
-          {paying
-            ? "Processing..."
-            : remainingBalance > 0
-            ? `Pay GH¢ ${remainingBalance.toFixed(2)}`
-            : "Nothing To Pay"}
-        </Text>
-      </TouchableOpacity>
-
-      <Text style={styles.sectionLabel}>PAYMENT METHOD</Text>
-
-      <View style={styles.methodContainer}>
-        <TouchableOpacity
-          style={[
-            styles.methodButton,
-            paymentMethod === "momo" && styles.selectedMethod,
-          ]}
-          onPress={() => setPaymentMethod("momo")}
+        {/* Hero card */}
+        <LinearGradient
+          colors={["#C44736", "#8B2318"]}
+          style={styles.hero}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
         >
-          <Ionicons
-            name="phone-portrait-outline"
-            size={18}
-            color={paymentMethod === "momo" ? "#C44736" : "#6B7280"}
-          />
-          <Text
-            style={
-              paymentMethod === "momo"
-                ? styles.selectedMethodText
-                : styles.methodText
-            }
-          >
-            Mobile Money
+          <View style={styles.heroArcOuter} pointerEvents="none" />
+          <View style={styles.heroArcInner} pointerEvents="none" />
+
+          <View style={styles.heroTop}>
+            <View style={styles.heroIconBox}>
+              <Ionicons name="receipt-outline" size={20} color="#FFFFFF" />
+            </View>
+            <TouchableOpacity onPress={toggleAmountsHidden} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+              <Ionicons
+                name={amountsHidden ? "eye-off-outline" : "eye-outline"}
+                size={20}
+                color="rgba(255,255,255,0.7)"
+              />
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.heroLabel}>OUTSTANDING BALANCE</Text>
+          <Text style={styles.heroAmount}>
+            {amountsHidden ? "GH¢ ••••••" : fmt(remainingBalance)}
           </Text>
+
+          {/* Progress bar */}
+          <View style={styles.progressWrap}>
+            <View style={styles.progressTrack}>
+              <View style={[styles.progressFill, { width: `${paidPct}%` as any }]} />
+            </View>
+            <Text style={styles.progressLabel}>{Math.round(paidPct)}% paid</Text>
+          </View>
+
+          {/* Stats row */}
+          <View style={styles.heroStats}>
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatVal}>{amountsHidden ? "••••" : fmt(netLiability)}</Text>
+              <Text style={styles.heroStatLabel}>Total Liability</Text>
+            </View>
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStat}>
+              <Text style={[styles.heroStatVal, { color: "#86EFAC" }]}>
+                {amountsHidden ? "••••" : fmt(totalPaid)}
+              </Text>
+              <Text style={styles.heroStatLabel}>Paid</Text>
+            </View>
+            <View style={styles.heroStatDivider} />
+            <View style={styles.heroStat}>
+              <Text style={styles.heroStatVal}>{amountsHidden ? "••••" : fmt(remainingBalance)}</Text>
+              <Text style={styles.heroStatLabel}>Remaining</Text>
+            </View>
+          </View>
+        </LinearGradient>
+
+        {/* Pay button */}
+        <TouchableOpacity
+          style={[styles.payBtn, (remainingBalance <= 0 || paying) && styles.payBtnDisabled]}
+          onPress={handlePayment}
+          activeOpacity={0.85}
+        >
+          {paying ? (
+            <ActivityIndicator color="#FFFFFF" size="small" />
+          ) : (
+            <>
+              <Ionicons name="arrow-forward-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.payBtnText}>
+                {remainingBalance > 0
+                  ? amountsHidden ? "Pay Now" : `Pay ${fmt(remainingBalance)}`
+                  : "Nothing to Pay"}
+              </Text>
+            </>
+          )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.methodButton,
-            paymentMethod === "bank" && styles.selectedMethod,
-          ]}
-          onPress={() => setPaymentMethod("bank")}
-        >
-          <Ionicons
-            name="business-outline"
-            size={18}
-            color={paymentMethod === "bank" ? "#C44736" : "#6B7280"}
-          />
-          <Text
-            style={
-              paymentMethod === "bank"
-                ? styles.selectedMethodText
-                : styles.methodText
-            }
-          >
-            Bank Transfer
-          </Text>
-        </TouchableOpacity>
-      </View>
+        {/* Payment Method */}
+        <Text style={styles.sectionTitle}>Payment Method</Text>
+        <View style={styles.methodList}>
+          {methods.map((m) => {
+            const active = paymentMethod === m.key;
+            return (
+              <TouchableOpacity
+                key={m.key}
+                style={[styles.methodCard, active && styles.methodCardActive]}
+                onPress={() => setPaymentMethod(m.key)}
+                activeOpacity={0.75}
+              >
+                <View style={[styles.methodIconBox, active && styles.methodIconBoxActive]}>
+                  <Ionicons name={METHOD_ICON[m.key]} size={18} color={active ? "#C44736" : "#6B7280"} />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={[styles.methodLabel, active && styles.methodLabelActive]}>{m.label}</Text>
+                  <Text style={styles.methodDetail} numberOfLines={1}>{m.detail}</Text>
+                </View>
+                <View style={[styles.radio, active && styles.radioActive]}>
+                  {active && <View style={styles.radioDot} />}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
 
-      <View style={styles.numberCard}>
-        <Text style={styles.numberLabel}>
-          {paymentMethod === "momo" ? "MOMO NUMBER" : "BANK ACCOUNT"}
-        </Text>
+        {/* Payment History */}
+        <Text style={styles.sectionTitle}>Payment History</Text>
 
-        <Text style={styles.numberText}>
-          {paymentMethod === "momo"
-  ? user?.phoneNumber || "No phone number available"
-  : `${user?.fullName || "TaxPadi User"} • ${
-                user?.category || "No email available"
-              }`}
-        </Text>
-      </View>
-
-      <Text style={styles.sectionLabel}>PAYMENT HISTORY</Text>
-
-      {payments.length === 0 ? (
-        <Card style={styles.emptyStateCard}>
-          <Ionicons
-            name="wallet-outline"
-            size={48}
-            color="#9CA3AF"
-            style={{ marginBottom: 12 }}
-          />
-          <Text style={styles.emptyStateTitle}>No Payments Yet</Text>
-          <Text style={styles.emptyStateSubtitle}>
-            Completed payments will appear here.
-          </Text>
-        </Card>
-      ) : (
-        payments
-          .slice()
-          .reverse()
-          .map((item: any) => (
-            <Card key={item.payment_id} style={styles.historyCard}>
-              <View style={styles.historyRow}>
-                <View style={styles.leftSection}>
-                  <View style={styles.dot} />
-                  <View>
-                    <Text style={styles.historyTitle}>{item.payment_method}</Text>
-                    <Text style={styles.historyRef}>Ref: {item.payment_reference}</Text>
+        {loading ? (
+          <ActivityIndicator color="#C44736" style={{ marginTop: 20 }} />
+        ) : error ? (
+          <ErrorState onRetry={refreshPayments} />
+        ) : payments.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="wallet-outline" size={28} color="#C44736" />
+            </View>
+            <Text style={styles.emptyTitle}>No Payments Yet</Text>
+            <Text style={styles.emptyText}>Completed payments will appear here.</Text>
+          </View>
+        ) : (
+          payments
+            .slice()
+            .reverse()
+            .map((item: any) => {
+              const statusKey = item.status?.toUpperCase() ?? "PENDING";
+              const cfg = STATUS_CONFIG[statusKey] ?? STATUS_CONFIG.PENDING;
+              return (
+                <View key={item.payment_id} style={styles.historyCard}>
+                  <View style={styles.historyIconBox}>
+                    <Ionicons
+                      name={METHOD_ICON[item.payment_method?.toLowerCase()] ?? "cash-outline"}
+                      size={18}
+                      color="#6B7280"
+                    />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.historyMethod}>{item.payment_method ?? "Payment"}</Text>
+                    <Text style={styles.historyRef} numberOfLines={1}>
+                      {item.payment_reference}
+                    </Text>
+                  </View>
+                  <View style={{ alignItems: "flex-end", gap: 4 }}>
+                    <Text style={styles.historyAmount}>
+                      {amountsHidden ? "••••••" : fmt(Number(item.amount))}
+                    </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: cfg.bg }]}>
+                      <Text style={[styles.statusBadgeText, { color: cfg.color }]}>{cfg.label}</Text>
+                    </View>
                   </View>
                 </View>
-
-                <View style={styles.rightSection}>
-                  <Text style={styles.historyAmount}>
-                    GH¢ {Number(item.amount).toFixed(2)}
-                  </Text>
-                  <Text style={styles.historyDate}>
-                    {new Date(item.paid_at ?? item.created_at).toLocaleString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "numeric",
-                      minute: "2-digit",
-                    })}
-                  </Text>
-                </View>
-              </View>
-            </Card>
-          ))
-      )}
-    </ScrollView>
+              );
+            })
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
-    paddingHorizontal: 16,
-    paddingTop: 44,
+    backgroundColor: "#F2EDE8",
   },
+  scroll: {
+    paddingHorizontal: 20,
+    paddingBottom: 48,
+  },
+
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
+    justifyContent: "space-between",
+    paddingTop: 8,
+    paddingBottom: 20,
   },
   title: {
-    fontSize: 28,
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
     color: "#111827",
-    fontFamily: "Inter_700Bold",
-    marginLeft: 8,
   },
-  subtitle: {
-    color: "#6B7280",
-    fontSize: 13,
-    lineHeight: 18,
-    fontFamily: "Inter_400Regular",
-    marginTop: 0,
-    marginBottom: 18,
+
+  // Hero
+  hero: {
+    borderRadius: 24,
+    paddingTop: 22,
+    paddingBottom: 20,
+    paddingHorizontal: 22,
+    marginBottom: 14,
+    overflow: "hidden",
   },
-  balanceCard: {
-    backgroundColor: "#C44736",
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
-    marginBottom: 18,
+  heroArcOuter: {
+    position: "absolute",
+    top: -60,
+    right: -60,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.1)",
   },
-  balanceHeader: {
-    flexDirection: "row",
-    alignItems: "center",
+  heroArcInner: {
+    position: "absolute",
+    top: -20,
+    right: -20,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.07)",
   },
-  balanceIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 4,
-    borderColor: "#FFFFFF",
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 14,
-  },
-  balanceLabel: {
-    color: "#FDECEC",
-    fontSize: 10,
-    letterSpacing: 0.5,
-    fontFamily: "Inter_600SemiBold",
-  },
-  balanceAmount: {
-    color: "#FFFFFF",
-    fontSize: 24,
-    fontFamily: "Inter_700Bold",
-    marginTop: 2,
-  },
-  balanceSubText: {
-    color: "#FDECEC",
-    marginTop: 4,
-    fontSize: 12,
-    fontFamily: "Inter_400Regular",
-  },
-  sectionLabel: {
-    fontSize: 16,
-    color: "#111827",
-    marginBottom: 10,
-    fontFamily: "Inter_700Bold",
-  },
-  methodContainer: {
+  heroTop: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 20,
-  },
-  methodButton: {
-    flex: 1,
-    backgroundColor: "#F3F4F6",
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    flexDirection: "row",
-    justifyContent: "center",
     alignItems: "center",
-    marginHorizontal: 4,
-  },
-  selectedMethod: {
-    borderWidth: 1.5,
-    borderColor: "#C44736",
-    backgroundColor: "#FFF5F3",
-  },
-  selectedMethodText: {
-    color: "#C44736",
-    marginLeft: 6,
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 12,
-  },
-  methodText: {
-    color: "#6B7280",
-    marginLeft: 6,
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-  },
-  numberCard: {
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#ECECEC",
-    borderRadius: 14,
-    padding: 16,
     marginBottom: 18,
   },
-  numberLabel: {
-    color: "#C44736",
-    fontSize: 10,
-    fontFamily: "Inter_600SemiBold",
+  heroIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    justifyContent: "center",
+    alignItems: "center",
   },
-  numberText: {
-    color: "#111827",
-    marginTop: 8,
+  heroLabel: {
+    color: "rgba(255,255,255,0.6)",
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    letterSpacing: 1.2,
+    marginBottom: 6,
+  },
+  heroAmount: {
+    color: "#FFFFFF",
+    fontSize: 34,
+    fontFamily: "Inter_700Bold",
+    letterSpacing: -0.5,
+    marginBottom: 16,
+  },
+
+  // Progress
+  progressWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 16,
+  },
+  progressTrack: {
+    flex: 1,
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressFill: {
+    height: 6,
+    backgroundColor: "#86EFAC",
+    borderRadius: 3,
+  },
+  progressLabel: {
+    color: "rgba(255,255,255,0.7)",
+    fontSize: 11,
     fontFamily: "Inter_500Medium",
   },
-  payButton: {
-    backgroundColor: "#C44736",
+
+  // Stats row inside hero
+  heroStats: {
+    flexDirection: "row",
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255,255,255,0.15)",
+  },
+  heroStat: {
+    flex: 1,
+    alignItems: "center",
+  },
+  heroStatVal: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    marginBottom: 2,
+  },
+  heroStatLabel: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 10,
+    fontFamily: "Inter_500Medium",
+  },
+  heroStatDivider: {
+    width: 1,
+    backgroundColor: "rgba(255,255,255,0.15)",
+    marginVertical: 2,
+  },
+
+  // Pay button
+  payBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#111827",
     borderRadius: 16,
     paddingVertical: 16,
-    alignItems: "center",
-    marginBottom: 20,
+    marginBottom: 28,
     shadowColor: "#000",
-    shadowOpacity: 0.12,
+    shadowOpacity: 0.15,
     shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    elevation: 5,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
   },
-  payButtonText: {
+  payBtnDisabled: {
+    backgroundColor: "#9CA3AF",
+  },
+  payBtnText: {
     color: "#FFFFFF",
-    fontSize: 15,
-    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
   },
-  historyCard: {
+
+  // Section title
+  sectionTitle: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 12,
+  },
+
+  // Method cards
+  methodList: {
+    gap: 10,
+    marginBottom: 28,
+  },
+  methodCard: {
+    flexDirection: "row",
+    alignItems: "center",
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 10,
-    borderWidth: 1,
-    borderColor: "#ECECEC",
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: "transparent",
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
   },
-  historyRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+  methodCardActive: {
+    borderColor: "#C44736",
+    backgroundColor: "#FFFAF9",
   },
-  leftSection: {
-    flexDirection: "row",
+  methodIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
     alignItems: "center",
   },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#34A853",
-    marginRight: 10,
-    marginTop: 6,
+  methodIconBoxActive: {
+    backgroundColor: "#FDECEC",
   },
-  historyTitle: {
-    color: "#111827",
+  methodLabel: {
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
+    color: "#374151",
+    marginBottom: 2,
+  },
+  methodLabelActive: {
+    color: "#C44736",
+  },
+  methodDetail: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
+  },
+  radio: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: "#D1D5DB",
+    justifyContent: "center",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  radioActive: {
+    borderColor: "#C44736",
+  },
+  radioDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: "#C44736",
+  },
+
+  // History
+  historyCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+  historyIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  historyMethod: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    marginBottom: 2,
+    textTransform: "capitalize",
   },
   historyRef: {
-    color: "#6B7280",
     fontSize: 11,
-    marginTop: 3,
-  },
-  rightSection: {
-    alignItems: "flex-end",
+    fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
   },
   historyAmount: {
+    fontSize: 15,
+    fontFamily: "Inter_700Bold",
     color: "#111827",
-    fontFamily: "Inter_600SemiBold",
   },
-  historyDate: {
-    color: "#6B7280",
+  statusBadge: {
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  statusBadgeText: {
     fontSize: 11,
-    marginTop: 3,
-  },
-  emptyStateCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 24,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: "#ECECEC",
-  },
-  emptyStateTitle: {
-    fontSize: 16,
     fontFamily: "Inter_600SemiBold",
-    color: "#111827",
-    marginBottom: 4,
   },
-  emptyStateSubtitle: {
+
+  // Empty
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 32,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  emptyIconCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 18,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 6,
+  },
+  emptyText: {
     fontSize: 13,
     fontFamily: "Inter_400Regular",
-    color: "#6B7280",
+    color: "#9CA3AF",
     textAlign: "center",
   },
 });

@@ -1,11 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { useUser } from "../../context/UserContext";
-import { useTransactions } from "../../context/TransactionContext";
-import { usePayments } from "../../context/PaymentContext";
 import { useNotifications } from "../../context/NotificationContext";
 import { useDeadlines } from "../../context/DeadlineContext";
+import { usePrivacy } from "../../context/PrivacyContext";
 import Card from "../../components/Card";
-import { getTaxLiability } from "@/services/tax.service";
+import { useTaxLiability } from "@/context/TaxLiabilityContext";
+import { useSavings } from "@/context/SavingsContext";
 
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -17,6 +17,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-GH", {
@@ -27,37 +28,30 @@ const formatCurrency = (value: number) =>
 
 export default function HomeScreen() {
   const { user } = useUser();
-  const { transactions } = useTransactions();
-  const { payments } = usePayments();
   const { unreadCount } = useNotifications();
   const { deadlines } = useDeadlines();
+  const { amountsHidden, toggleAmountsHidden } = usePrivacy();
 
-  const [hideAmounts, setHideAmounts] = useState(false);
+  const { liability, recalculate } = useTaxLiability();
+  const { suggestion } = useSavings();
+  const [recalculating, setRecalculating] = useState(false);
 
-  const [taxableIncome, setTaxableIncome] = useState(0);
-  const [totalDeductions, setTotalDeductions] = useState(0);
-  const [taxLiability, setTaxLiability] = useState(0);
-  const [totalAmountPaid, setTotalAmountPaid] = useState(0);
-  const [netLiability, setNetLiability] = useState(0);
+  const taxableIncome = liability?.taxable_income ?? 0;
+  const totalDeductions = liability?.total_deductions ?? 0;
+  const taxLiability = liability?.tax_liability ?? 0;
+  const totalAmountPaid = liability?.total_amount_paid ?? 0;
+  const netLiability = liability?.net_liability ?? 0;
 
-  useEffect(() => {
-    const loadLiability = async () => {
-      try {
-        const response = await getTaxLiability();
-        const data = response.data ?? response;
-
-        setTaxableIncome(data.taxable_income ?? 0);
-        setTotalDeductions(data.total_deductions ?? 0);
-        setTaxLiability(data.tax_liability ?? 0);
-        setTotalAmountPaid(data.total_amount_paid ?? 0);
-        setNetLiability(data.net_liability ?? 0);
-      } catch (error) {
-        console.log("Failed to load tax liability:", error);
-      }
-    };
-
-    loadLiability();
-  }, [transactions]);
+  const handleRecalculate = async () => {
+    if (recalculating) return;
+    setRecalculating(true);
+    try {
+      await recalculate();
+    } catch {
+    } finally {
+      setRecalculating(false);
+    }
+  };
 
   const currentDate = new Date().toLocaleDateString("en-US", {
     month: "long",
@@ -73,7 +67,7 @@ export default function HomeScreen() {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{ paddingBottom: 100 }}
+      contentContainerStyle={{ paddingBottom: 80 }}
       showsVerticalScrollIndicator={false}
     >
       {/* Header */}
@@ -92,9 +86,9 @@ export default function HomeScreen() {
         {/* Floating notification button */}
         <TouchableOpacity
           style={styles.notificationContainer}
-          onPress={() => router.push("/notification-preferences")}
+          onPress={() => router.push("/notifications")}
         >
-          <Ionicons name="notifications-outline" size={22} color="#111827" />
+          <Ionicons name="notifications-outline" size={28} color="#111827" />
           {unreadCount > 0 && (
             <View style={styles.notificationDot}>
               <Text style={styles.notificationCount}>{unreadCount}</Text>
@@ -104,39 +98,57 @@ export default function HomeScreen() {
       </View>
 
       {/* Net Tax Liability Card */}
-      <View style={styles.taxCard}>
-        <View style={styles.taxCircle}>
-          <Ionicons name="cash-outline" size={34} color="#FFFFFF" />
+      <LinearGradient
+        colors={["#C44736", "#8B2318"]}
+        style={styles.taxCard}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+      >
+        <View style={styles.taxArcOuter} pointerEvents="none" />
+        <View style={styles.taxArcInner} pointerEvents="none" />
+
+        <View style={styles.taxCardTop}>
+          <View style={styles.taxIconBox}>
+            <Ionicons name="cash-outline" size={20} color="#FFFFFF" />
+          </View>
+          <TouchableOpacity onPress={toggleAmountsHidden} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons
+              name={amountsHidden ? "eye-off-outline" : "eye-outline"}
+              size={20}
+              color="rgba(255,255,255,0.7)"
+            />
+          </TouchableOpacity>
         </View>
-        <View style={{ flex: 1 }}>
+
+        <View style={styles.taxLabelRow}>
           <Text style={styles.taxLabel}>NET TAX LIABILITY</Text>
-          <Text style={styles.taxAmount}>
-            {hideAmounts
-              ? "••••••"
-              : formatCurrency(Math.max(netLiability, 0))}
-          </Text>
           <TouchableOpacity
-            onPress={() => setHideAmounts(!hideAmounts)}
-            style={styles.visibilityButton}
+            style={styles.recalcBtn}
+            onPress={handleRecalculate}
+            disabled={recalculating}
+            activeOpacity={0.75}
           >
             <Ionicons
-              name={hideAmounts ? "eye-off-outline" : "eye-outline"}
-              size={18}
-              color="#FFFFFF"
+              name={recalculating ? "refresh" : "refresh-outline"}
+              size={13}
+              color="rgba(255,255,255,0.85)"
             />
-            <Text style={styles.visibilityText}>
-              {hideAmounts ? "Show" : "Hide"}
+            <Text style={styles.recalcBtnText}>
+              {recalculating ? "Updating…" : "Recalculate"}
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+        <Text style={styles.taxAmount}>
+          {amountsHidden ? "GHS ••••••" : formatCurrency(Math.max(netLiability, 0))}
+        </Text>
+      </LinearGradient>
 
       {/* Summary Cards */}
       <View style={styles.grid}>
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Taxable Income</Text>
           <Text style={styles.summaryAmount}>
-            {hideAmounts ? "••••••" : formatCurrency(taxableIncome)}
+            {amountsHidden ? "••••••" : formatCurrency(taxableIncome)}
           </Text>
           <Text style={styles.summaryCaption}>This month</Text>
         </Card>
@@ -144,7 +156,7 @@ export default function HomeScreen() {
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Total Deductions</Text>
           <Text style={styles.summaryAmount}>
-            {hideAmounts ? "••••••" : formatCurrency(totalDeductions)}
+            {amountsHidden ? "••••••" : formatCurrency(totalDeductions)}
           </Text>
           <Text style={styles.summaryCaption}>This month</Text>
         </Card>
@@ -152,7 +164,7 @@ export default function HomeScreen() {
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Total Tax Liability</Text>
           <Text style={styles.summaryAmount}>
-            {hideAmounts ? "••••••" : formatCurrency(taxLiability)}
+            {amountsHidden ? "••••••" : formatCurrency(taxLiability)}
           </Text>
           <Text style={styles.summaryCaption}>This month</Text>
         </Card>
@@ -160,7 +172,7 @@ export default function HomeScreen() {
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Tax Paid</Text>
           <Text style={styles.summaryAmount}>
-            {hideAmounts ? "••••••" : formatCurrency(totalAmountPaid)}
+            {amountsHidden ? "••••••" : formatCurrency(totalAmountPaid)}
           </Text>
           <Text style={styles.summaryCaption}>This month</Text>
         </Card>
@@ -171,7 +183,7 @@ export default function HomeScreen() {
       <View style={styles.quickGrid}>
         <TouchableOpacity
           style={styles.quickCard}
-          onPress={() => router.push("//(tabs)/add-transaction")}
+          onPress={() => router.push("/(tabs)/add-transaction")}
         >
           <Ionicons name="add-circle-outline" size={24} color="#C44736" />
           <Text style={styles.quickTitle}>Log Transaction</Text>
@@ -187,7 +199,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.quickCard}
-          onPress={() => router.push("//(tabs)/create-invoice")}
+          onPress={() => router.push("/(tabs)/create-invoice")}
         >
           <Ionicons name="receipt-outline" size={24} color="#C44736" />
           <Text style={styles.quickTitle}>Create Invoice</Text>
@@ -211,12 +223,36 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.quickCard}
-          onPress={() => router.push("/tax")}
+          onPress={() => router.push("/tax-rates")}
         >
           <Ionicons name="calculator-outline" size={24} color="#C44736" />
           <Text style={styles.quickTitle}>Tax Rates</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Savings Suggestion */}
+      {suggestion && suggestion.suggested_amount > 0 && (
+        <TouchableOpacity
+          style={styles.suggestionCard}
+          onPress={() => router.push("/savings-vault")}
+          activeOpacity={0.85}
+        >
+          <View style={styles.suggestionLeft}>
+            <View style={styles.bulbCircle}>
+              <Ionicons name="bulb-outline" size={18} color="#D97706" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.suggestionTitle}>Savings suggestion</Text>
+              <Text style={styles.suggestionText} numberOfLines={2}>
+                {suggestion.message ?? "Based on your income and tax liability."}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.saveNowBtn}>
+            <Text style={styles.saveNowLabel}>Save now →</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {/* Deadlines Header */}
       <View style={styles.deadlineHeader}>
@@ -269,7 +305,7 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     paddingHorizontal: 16,
     paddingTop: 44,
   },
@@ -284,20 +320,7 @@ const styles = StyleSheet.create({
 
   notificationContainer: {
     position: "relative",
-    width: 44,
-    height: 44,
-    borderRadius: 26,
-    backgroundColor: "#FFFFFF",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    elevation: 3,
+    padding: 4,
   },
 
   notificationDot: {
@@ -320,7 +343,7 @@ const styles = StyleSheet.create({
   },
 
   greeting: {
-    fontSize: 16,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: "#111827",
   },
@@ -333,58 +356,94 @@ const styles = StyleSheet.create({
   },
 
   taxCard: {
-    backgroundColor: "#C44736",
-    borderRadius: 20,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
-    flexDirection: "row",
-    alignItems: "center",
+    borderRadius: 24,
+    paddingTop: 24,
+    paddingBottom: 28,
+    paddingHorizontal: 24,
     marginBottom: 20,
-    shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 14,
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    elevation: 7,
+    overflow: "hidden",
+    shadowColor: "#8B2318",
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
 
-  taxCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 4,
-    borderColor: "#FFFFFF",
+  taxArcOuter: {
+    position: "absolute",
+    top: -60,
+    right: -60,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.1)",
+  },
+
+  taxArcInner: {
+    position: "absolute",
+    top: -20,
+    right: -20,
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 1.5,
+    borderColor: "rgba(255,255,255,0.07)",
+  },
+
+  taxCardTop: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+
+  taxIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 14,
+    backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 14,
+  },
+
+  taxLabelRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 6,
   },
 
   taxLabel: {
-    color: "#FDECEC",
+    color: "rgba(255,255,255,0.6)",
     fontFamily: "Inter_600SemiBold",
-    fontSize: 10,
-    letterSpacing: 0.5,
+    fontSize: 11,
+    letterSpacing: 1.2,
   },
 
   taxAmount: {
     color: "#FFFFFF",
     fontFamily: "Inter_700Bold",
-    fontSize: 24,
-    marginTop: 2,
+    fontSize: 34,
+    letterSpacing: -0.5,
+    marginBottom: 0,
   },
 
-  visibilityButton: {
+  recalcBtn: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 12,
+    gap: 5,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
   },
 
-  visibilityText: {
-    color: "#FFFFFF",
-    marginLeft: 6,
+  recalcBtnText: {
+    color: "rgba(255,255,255,0.85)",
     fontFamily: "Inter_500Medium",
+    fontSize: 12,
   },
 
   grid: {
@@ -446,11 +505,68 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
 
+  suggestionCard: {
+    backgroundColor: "#FFFBEB",
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+    gap: 12,
+  },
+
+  suggestionLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  bulbCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FEF3C7",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  suggestionTitle: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    fontSize: 14,
+    marginBottom: 2,
+  },
+
+  suggestionText: {
+    color: "#6B7280",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 18,
+  },
+
+  saveNowBtn: {
+    backgroundColor: "#D97706",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  saveNowLabel: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+  },
+
   deadlineHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: -20,
   },
 
   sectionTitle: {

@@ -1,246 +1,124 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { getDeadlines, completeDeadline } from "@/services/deadlines.service";
+import { getPenalties } from "@/services/penalty.service";
+import { Penalty } from "@/types/penalty";
+import { readCache, writeCache } from "@/utils/cache";
+
+const CACHE_KEY = "taxpadi:deadlines";
+const CACHE_TTL = 10 * 60 * 1000;
 
 export type Deadline = {
-  id: number;
+  id: string;
   title: string;
   authority: string;
   dueDate: string;
   completed: boolean;
+  daysUntilDue: number;
 };
+
+type CacheShape = { deadlines: Deadline[]; penalties: Penalty[] };
 
 type DeadlineContextType = {
   deadlines: Deadline[];
-
-  addDeadline: (
-    title: string,
-    authority: string,
-    dueDate: string
-  ) => void;
-
-  deleteDeadline: (id: number) => void;
-
-  toggleDeadline: (id: number) => void;
-
+  penalties: Penalty[];
+  loading: boolean;
+  error: boolean;
+  toggleDeadline: (id: string) => Promise<void>;
+  refreshDeadlines: (showLoader?: boolean) => Promise<void>;
   upcomingCount: number;
-
   overdueCount: number;
 };
 
-const DeadlineContext =
-  createContext<DeadlineContextType>(
-    {} as DeadlineContextType
-  );
+const DeadlineContext = createContext<DeadlineContextType>({} as DeadlineContextType);
 
-export function DeadlineProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [deadlines, setDeadlines] =
-    useState<Deadline[]>([]);
+const TAX_TYPE_LABELS: Record<string, string> = {
+  income_tax: "Income Tax",
+  vat: "VAT",
+  paye: "PAYE",
+  withholding: "Withholding Tax",
+  corporate_tax: "Corporate Tax",
+};
 
-  const [loaded, setLoaded] =
-    useState(false);
+function mapDeadline(item: any): Deadline {
+  const daysUntilDue =
+    item.days_until_due != null
+      ? item.days_until_due
+      : item.deadline_date
+      ? Math.ceil((new Date(item.deadline_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+      : 0;
+  return {
+    id: item.deadline_id,
+    title: item.description,
+    authority: TAX_TYPE_LABELS[item.tax_type] ?? "Ghana Revenue Authority",
+    dueDate: item.deadline_date,
+    completed: item.completed,
+    daysUntilDue,
+  };
+}
 
-  // Load stored deadlines
+export function DeadlineProvider({ children }: { children: React.ReactNode }) {
+  const [deadlines, setDeadlines] = useState<Deadline[]>([]);
+  const [penalties, setPenalties] = useState<Penalty[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
+
+  const doFetch = async (silent = false) => {
+    if (!silent) setError(false);
+    try {
+      const [deadlinesRes, fetchedPenalties] = await Promise.all([
+        getDeadlines(),
+        getPenalties().catch(() => [] as Penalty[]),
+      ]);
+      const mapped = (deadlinesRes.data?.deadlines ?? []).map(mapDeadline);
+      setDeadlines(mapped);
+      setPenalties(fetchedPenalties);
+      setError(false);
+      writeCache<CacheShape>(CACHE_KEY, { deadlines: mapped, penalties: fetchedPenalties });
+    } catch {
+      if (!silent) setError(true);
+    }
+  };
+
+  const refreshDeadlines = async (showLoader = true) => {
+    if (showLoader) setLoading(true);
+    await doFetch(false);
+    if (showLoader) setLoading(false);
+  };
 
   useEffect(() => {
-    const loadDeadlines =
-      async () => {
-        try {
-          const stored =
-            await AsyncStorage.getItem(
-              "deadlines"
-            );
-
-          if (stored) {
-            setDeadlines(
-              JSON.parse(stored)
-            );
-          } else {
-            generateDefaultDeadlines();
-          }
-
-          setLoaded(true);
-        } catch (error) {
-          console.log(
-            "Failed loading deadlines",
-            error
-          );
-
-          generateDefaultDeadlines();
-
-          setLoaded(true);
-        }
-      };
-
-    loadDeadlines();
+    readCache<CacheShape>(CACHE_KEY, CACHE_TTL).then(async (cached) => {
+      if (cached) {
+        setDeadlines(cached.data.deadlines);
+        setPenalties(cached.data.penalties);
+        setLoading(false);
+        if (cached.isStale) doFetch(true);
+      } else {
+        await doFetch(false);
+        setLoading(false);
+      }
+    });
   }, []);
 
-  // Save deadlines
-
-  useEffect(() => {
-    if (!loaded) return;
-
-    AsyncStorage.setItem(
-      "deadlines",
-      JSON.stringify(deadlines)
-    );
-  }, [deadlines, loaded]);
-
-  // Generate yearly deadlines
-
-  const generateDefaultDeadlines =
-    () => {
-      const year =
-        new Date().getFullYear();
-
-      const currentMonth =
-        new Date().getMonth();
-
-      const defaultDeadlines: Deadline[] =
-        [
-          {
-            id: 1,
-            title: "PAYE Filing",
-            authority:
-              "Ghana Revenue Authority",
-
-            dueDate: new Date(
-              year,
-              currentMonth + 1,
-              15
-            ).toISOString(),
-
-            completed: false,
-          },
-
-          {
-            id: 2,
-            title: "VAT Return",
-            authority:
-              "Ghana Revenue Authority",
-
-            dueDate: new Date(
-              year,
-              currentMonth + 1,
-              28
-            ).toISOString(),
-
-            completed: false,
-          },
-
-          {
-            id: 3,
-            title:
-              "Annual Income Tax",
-
-            authority:
-              "Ghana Revenue Authority",
-
-            dueDate: new Date(
-              year,
-              3,
-              30
-            ).toISOString(),
-
-            completed: false,
-          },
-        ];
-
-      setDeadlines(defaultDeadlines);
-    };
-
-  // Add deadline
-
-  const addDeadline = (
-    title: string,
-    authority: string,
-    dueDate: string
-  ) => {
-    setDeadlines((prev) => [
-      ...prev,
-      {
-        id: Date.now(),
-        title,
-        authority,
-        dueDate,
-        completed: false,
-      },
-    ]);
+  const toggleDeadline = async (id: string) => {
+    try {
+      await completeDeadline(id);
+      setDeadlines((prev) => prev.map((d) => (d.id === id ? { ...d, completed: true } : d)));
+    } catch {}
   };
 
-  // Delete deadline
+  const upcomingCount = useMemo(
+    () => deadlines.filter((d) => !d.completed && d.daysUntilDue >= 0).length,
+    [deadlines]
+  );
 
-  const deleteDeadline = (
-    id: number
-  ) => {
-    setDeadlines((prev) =>
-      prev.filter(
-        (deadline) =>
-          deadline.id !== id
-      )
-    );
-  };
-
-  // Complete deadline
-
-  const toggleDeadline = (
-    id: number
-  ) => {
-    setDeadlines((prev) =>
-      prev.map((deadline) =>
-        deadline.id === id
-          ? {
-              ...deadline,
-              completed:
-                !deadline.completed,
-            }
-          : deadline
-      )
-    );
-  };
-
-  // Statistics
-
-  const upcomingCount =
-    useMemo(
-      () =>
-        deadlines.filter(
-          (deadline) =>
-            !deadline.completed
-        ).length,
-      [deadlines]
-    );
-
-  const overdueCount =
-    useMemo(() => {
-      return deadlines.filter(
-        (deadline) =>
-          !deadline.completed &&
-          new Date(
-            deadline.dueDate
-          ) < new Date()
-      ).length;
-    }, [deadlines]);
+  const overdueCount = useMemo(
+    () => deadlines.filter((d) => !d.completed && d.daysUntilDue < 0).length,
+    [deadlines]
+  );
 
   return (
     <DeadlineContext.Provider
-      value={{
-        deadlines,
-        addDeadline,
-        deleteDeadline,
-        toggleDeadline,
-        upcomingCount,
-        overdueCount,
-      }}
+      value={{ deadlines, penalties, loading, error, toggleDeadline, refreshDeadlines, upcomingCount, overdueCount }}
     >
       {children}
     </DeadlineContext.Provider>
@@ -248,7 +126,5 @@ export function DeadlineProvider({
 }
 
 export function useDeadlines() {
-  return useContext(
-    DeadlineContext
-  );
+  return useContext(DeadlineContext);
 }

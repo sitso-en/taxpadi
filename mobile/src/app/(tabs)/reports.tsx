@@ -1,232 +1,170 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-
-import * as Print from "expo-print";
-import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system";
-import Papa from "papaparse";
-
+import SubscriptionGate from "@/components/SubscriptionGate";
 import {
-  Alert,
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import * as FileSystem from "expo-file-system";
+import * as Sharing from "expo-sharing";
 
-import { useTransactions } from "../../context/TransactionContext";
-import { usePayments } from "../../context/PaymentContext";
-import { useInvoices } from "../../context/InvoiceContext";
-import { useTaxReturns } from "../../context/TaxReturnsContext";
-import { useUser } from "../../context/UserContext";
+import {
+  exportReport,
+  getExportStatus,
+  getReportsSummary,
+} from "../../services/reports.service";
 import { getUserFriendlyError } from "@/utils/error";
+import { useToast } from "@/context/ToastContext";
+
+type Summary = {
+  income: { total: number };
+  expenses: { total: number };
+  net_profit: number;
+  tax_liability: number;
+};
+
+const REPORT_TYPES = [
+  {
+    id: "annual",
+    icon: "calendar-outline",
+    title: "Annual Tax Summary",
+    subtitle: "Full year income, expenses & liability",
+    exportType: "annual",
+  },
+  {
+    id: "income",
+    icon: "trending-up-outline",
+    title: "Income Statement",
+    subtitle: "Revenue, expenses, profit & loss",
+    exportType: "income_statement",
+  },
+  {
+    id: "vat",
+    icon: "receipt-outline",
+    title: "VAT Report",
+    subtitle: "VAT liabilities and payments",
+    exportType: "vat",
+  },
+  {
+    id: "paye",
+    icon: "person-outline",
+    title: "PAYE Report",
+    subtitle: "Employee payroll tax summary",
+    exportType: "paye",
+  },
+];
 
 export default function ReportsScreen() {
-  const { transactions } = useTransactions();
-  const { payments } = usePayments();
-  const { invoices } = useInvoices();
-  const { previousReturns } = useTaxReturns();
-  const { user } = useUser();
+  const { showToast } = useToast();
+  const [summary, setSummary] = useState<Summary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [exporting, setExporting] = useState<string | null>(null);
 
-  const [exportingPdf, setExportingPdf] = useState(false);
-  const [exportingCsv, setExportingCsv] = useState(false);
-
-  // Dynamic calculations
-  const totalIncome = transactions
-    .filter((transaction) => transaction.type === "income")
-    .reduce((sum, transaction) => sum + transaction.amount, 0);
-
-  const totalExpenses = transactions
-    .filter((transaction) => transaction.type === "expense")
-    .reduce((sum, transaction) => sum + transaction.amount, 0);
-
-  const netProfit = totalIncome - totalExpenses;
-  const estimatedTax = Math.max(netProfit, 0) * 0.1;
-
-  const totalPayments = payments.reduce((sum, payment) => sum + payment.amount, 0);
-  const totalInvoices = invoices.reduce((sum, invoice) => sum + invoice.amount, 0);
-
-  const reports = [
-    {
-      id: 1,
-      icon: "calendar-outline",
-      title: "Annual Tax Summary",
-      subtitle: "Full year income, expenses & liability",
-    },
-    {
-      id: 2,
-      icon: "trending-up-outline",
-      title: "Income Statement",
-      subtitle: "Revenue, expenses, profit & loss",
-    },
-    {
-      id: 3,
-      icon: "receipt-outline",
-      title: "VAT Report",
-      subtitle: "VAT liabilities and payments",
-    },
-    {
-      id: 4,
-      icon: "person-outline",
-      title: "PAYE Report",
-      subtitle: "Employee payroll tax summary",
-    },
-    {
-      id: 5,
-      icon: "bar-chart-outline",
-      title: "Transaction History",
-      subtitle: "All logged transactions",
-    },
-  ];
-
-  // PDF Export
-  const generatePDF = async (reportTitle: string) => {
-    if (exportingPdf) return;
-
-    setExportingPdf(true);
-
+  const loadSummary = useCallback(async () => {
     try {
-      const html = `
-        <html>
-          <body style="font-family: Arial; padding: 20px;">
-            <h1>${reportTitle}</h1>
-            <h2>${user?.fullName}</h2>
-            <p>Generated: ${new Date().toLocaleString("en-US")}</p>
-            <hr/>
-            <p><strong>Total Income:</strong> GH¢ ${totalIncome.toFixed(2)}</p>
-            <p><strong>Total Expenses:</strong> GH¢ ${totalExpenses.toFixed(2)}</p>
-            <p><strong>Net Profit:</strong> GH¢ ${netProfit.toFixed(2)}</p>
-            <p><strong>Estimated Tax:</strong> GH¢ ${estimatedTax.toFixed(2)}</p>
-            <p><strong>Total Payments:</strong> GH¢ ${totalPayments.toFixed(2)}</p>
-            <p><strong>Total Invoices:</strong> GH¢ ${totalInvoices.toFixed(2)}</p>
-            <p><strong>Filed Returns:</strong> ${previousReturns.length}</p>
-          </body>
-        </html>
-      `;
-
-      const { uri } = await Print.printToFileAsync({ html });
-
-      if (await Sharing.isAvailableAsync()) {
-        await Sharing.shareAsync(uri);
-        Alert.alert(
-          "Success",
-          `${reportTitle} PDF generated successfully.`
-        );
-      }
+      const res = await getReportsSummary();
+      setSummary(res.data);
     } catch (error: any) {
-      Alert.alert(
-        "Export Failed",
-        error?.response?.data?.message ??
-          "Unable to export PDF."
-      );
+      showToast(getUserFriendlyError(error), "error");
     } finally {
-      setExportingPdf(false);
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSummary();
+  }, [loadSummary]);
+
+  const shareFile = async (fileUrl: string, format: "pdf" | "excel") => {
+    const ext = format === "pdf" ? "pdf" : "xlsx";
+    const mimeType =
+      format === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const localUri = `${FileSystem.cacheDirectory}taxpadi_report_${Date.now()}.${ext}`;
+    const { uri } = await FileSystem.downloadAsync(fileUrl, localUri);
+    await Sharing.shareAsync(uri, { mimeType, dialogTitle: "Share Report" });
+  };
+
+  const handleExport = async (format: "pdf" | "excel", reportType: string) => {
+    const key = `${reportType}-${format}`;
+    if (exporting) return;
+    setExporting(key);
+    try {
+      const res = await exportReport(format, reportType);
+
+      // Synchronous path: file_url returned immediately
+      const directUrl: string | undefined = res.data?.file_url;
+      if (directUrl) {
+        await shareFile(directUrl, format);
+        return;
+      }
+
+      // Async path: backend returns export_id and status "processing"
+      const exportId: string | undefined = res.data?.export_id;
+      if (!exportId) {
+        showToast("Could not start export. Please try again.", "error");
+        return;
+      }
+
+      // Poll every 2s, up to 30 attempts (60 seconds)
+      for (let i = 0; i < 30; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 2000));
+        const statusRes = await getExportStatus(exportId);
+        const jobStatus: string = statusRes.data?.status;
+
+        if (jobStatus === "done") {
+          const fileUrl: string | undefined = statusRes.data?.file_url ?? statusRes.data?.fileUrl;
+          if (fileUrl) {
+            await shareFile(fileUrl, format);
+          } else {
+            showToast("File URL not found.", "error");
+          }
+          return;
+        }
+
+        if (jobStatus === "failed") {
+          showToast(statusRes.data?.error ?? "Export generation failed.", "error");
+          return;
+        }
+      }
+
+      showToast("Report generation is taking longer than expected. Please try again later.", "info");
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setExporting(null);
     }
   };
 
-  // CSV Export
-  const generateCSV = async (reportTitle: string) => {
-    if (exportingCsv) return;
-
-    setExportingCsv(true);
-
-    try {
-      const csv = Papa.unparse([
-        {
-          Report: reportTitle,
-          User: user?.fullName,
-          Generated: new Date().toLocaleString("en-US"),
-          Income: totalIncome,
-          Expenses: totalExpenses,
-          NetProfit: netProfit,
-          Tax: estimatedTax,
-          Payments: totalPayments,
-          Invoices: totalInvoices,
-          FiledReturns: previousReturns.length,
-        },
-      ]);
-
-      console.log("CSV DATA:", csv);
-
-      const file = new FileSystem.File(
-        FileSystem.Paths.document,
-        `${reportTitle.replace(/\s+/g, "_")}_${new Date()
-          .toISOString()
-          .slice(0, 10)}.csv`
-      );
-
-      console.log("Saving CSV to:", file.uri);
-      await file.write(csv);
-
-      const available = await Sharing.isAvailableAsync();
-      console.log("Sharing available:", available);
-
-      if (available) {
-        await Sharing.shareAsync(file.uri);
-        Alert.alert(
-          "Success",
-          `${reportTitle} CSV generated successfully.`
-        );
-      } else {
-        Alert.alert("Sharing not available");
-      }
-    } catch (error: any) {
-      console.log("CSV ERROR:", error);
-     Alert.alert(
-  "Export Unsuccessful",
-  getUserFriendlyError(error)
-);
-    } finally {
-      setExportingCsv(false);
-    }
-  };
-
-  if (
-    transactions.length === 0 &&
-    payments.length === 0 &&
-    invoices.length === 0
-  ) {
+  if (loading) {
     return (
-      <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="chevron-back" size={26} color="#111827" />
-          </TouchableOpacity>
-          <Text style={styles.title}>Reports & Export</Text>
-        </View>
-
-        <View style={styles.emptyState}>
-          <Ionicons
-            name="bar-chart-outline"
-            size={56}
-            color="#9CA3AF"
-          />
-          <Text style={styles.emptyTitle}>
-            No Reports Available
-          </Text>
-          <Text style={styles.emptySubtitle}>
-            Add transactions or payments to generate reports.
-          </Text>
-        </View>
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color="#C44736" />
       </View>
     );
   }
 
   return (
+    <SubscriptionGate
+      feature="Reports & Export"
+      description="Generate and export your annual tax summary, income statement, VAT and PAYE reports as PDF or Excel."
+      icon="bar-chart-outline"
+    >
     <ScrollView
       style={styles.container}
-      contentContainerStyle={{
-        paddingBottom: 120,
-      }}
+      contentContainerStyle={{ paddingBottom: 48 }}
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back" size={26} color="#111827" />
         </TouchableOpacity>
-
         <Text style={styles.title}>Reports & Export</Text>
       </View>
 
@@ -237,178 +175,170 @@ export default function ReportsScreen() {
       {/* Business Summary Card */}
       <View style={styles.summaryCard}>
         <View style={styles.summaryIcon}>
-          <Ionicons
-            name="analytics-outline"
-            size={28}
-            color="#FFFFFF"
-          />
+          <Ionicons name="analytics-outline" size={28} color="#FFFFFF" />
         </View>
 
-        <View>
-          <Text style={styles.summaryTitle}>
-            Business Summary
-          </Text>
-
+        <View style={{ flex: 1 }}>
+          <Text style={styles.summaryTitle}>Business Summary</Text>
           <Text style={styles.summarySubtitle}>
-            Income • GH¢ {totalIncome.toFixed(2)}
+            Income • GH¢ {Number(summary?.income?.total ?? 0).toFixed(2)}
           </Text>
-
           <Text style={styles.summarySubtitle}>
-            Expenses • GH¢ {totalExpenses.toFixed(2)}
+            Expenses • GH¢ {Number(summary?.expenses?.total ?? 0).toFixed(2)}
           </Text>
-
           <Text style={styles.summarySubtitle}>
-            Net Profit • GH¢ {netProfit.toFixed(2)}
+            Net Profit • GH¢ {Number(summary?.net_profit ?? 0).toFixed(2)}
+          </Text>
+          <Text style={styles.summarySubtitle}>
+            Tax Liability • GH¢ {Number(summary?.tax_liability ?? 0).toFixed(2)}
           </Text>
         </View>
       </View>
 
-      {/* Reports List */}
-      {reports.map((report) => (
+      {/* Report Cards */}
+      {REPORT_TYPES.map((report) => (
         <View key={report.id} style={styles.card}>
           <View style={styles.topRow}>
             <View style={styles.iconCircle}>
-              <Ionicons name={report.icon as any} size={22} color="#C44736" />
+              <Ionicons name={report.icon as any} size={18} color="#C44736" />
             </View>
-
             <View style={styles.textContainer}>
               <Text style={styles.cardTitle}>{report.title}</Text>
               <Text style={styles.cardSubtitle}>{report.subtitle}</Text>
-              <Text style={styles.generatedText}>
-                Updated {new Date().toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                  year: "numeric",
-                })}
-              </Text>
             </View>
           </View>
 
           <View style={styles.buttonRow}>
             <TouchableOpacity
-              style={styles.pdfButton}
-              onPress={() => generatePDF(report.title)}
-              disabled={exportingPdf}
+              style={[styles.pdfButton, exporting === `${report.exportType}-pdf` && { opacity: 0.7 }]}
+              onPress={() => handleExport("pdf", report.exportType)}
+              disabled={!!exporting}
             >
               <Ionicons
-                name="document-text-outline"
+                name="share-outline"
                 size={18}
                 color="#FFFFFF"
-                style={{ marginRight: 6 }}
+                style={{ marginRight: 5 }}
               />
               <Text style={styles.pdfText}>
-                {exportingPdf ? "Exporting..." : "Export PDF"}
+                {exporting === `${report.exportType}-pdf`
+                  ? "Exporting…"
+                  : "Share PDF"}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.csvButton}
-              onPress={() => generateCSV(report.title)}
-              disabled={exportingCsv}
+              style={[styles.csvButton, exporting === `${report.exportType}-excel` && { opacity: 0.7 }]}
+              onPress={() => handleExport("excel", report.exportType)}
+              disabled={!!exporting}
             >
               <Ionicons
-                name="download-outline"
+                name="share-outline"
                 size={18}
                 color="#111827"
-                style={{ marginRight: 6 }}
+                style={{ marginRight: 5 }}
               />
               <Text style={styles.csvText}>
-                {exportingCsv ? "Exporting..." : "Export CSV"}
+                {exporting === `${report.exportType}-excel`
+                  ? "Exporting…"
+                  : "Share Excel"}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       ))}
     </ScrollView>
+    </SubscriptionGate>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     paddingHorizontal: 16,
     paddingTop: 44,
+  },
+
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
   },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 16,
   },
 
   title: {
-    fontSize: 34,
+    fontSize: 24,
     color: "#111827",
     fontFamily: "Inter_700Bold",
-    marginLeft: 8,
+    marginLeft: 10,
   },
 
   subtitle: {
     color: "#6B7280",
     fontSize: 13,
     lineHeight: 18,
-    marginTop: 2,
-    marginBottom: 18,
+    marginBottom: 20,
     fontFamily: "Inter_400Regular",
   },
 
   summaryCard: {
     backgroundColor: "#C44736",
-    borderRadius: 16,
-    paddingVertical: 20,
-    paddingHorizontal: 18,
+    borderRadius: 20,
+    paddingVertical: 22,
+    paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 28,
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 10,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
+    marginBottom: 20,
+    shadowColor: "#C44736",
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 5,
   },
 
   summaryIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    borderWidth: 4,
-    borderColor: "#FFFFFF",
-    backgroundColor: "transparent",
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 3,
+    borderColor: "rgba(255,255,255,0.5)",
+    backgroundColor: "rgba(255,255,255,0.15)",
     justifyContent: "center",
     alignItems: "center",
     marginRight: 16,
+    flexShrink: 0,
   },
 
   summaryTitle: {
     color: "#FFFFFF",
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: "Inter_700Bold",
+    marginBottom: 6,
   },
 
   summarySubtitle: {
-    color: "#FDECEC",
-    marginTop: 3,
+    color: "rgba(255,255,255,0.82)",
+    fontSize: 13,
+    marginTop: 2,
     fontFamily: "Inter_400Regular",
   },
 
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 16,
-    padding: 18,
-    marginBottom: 16,
+    padding: 14,
+    marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#ECECEC",
+    borderColor: "#EFEFED",
     shadowColor: "#000",
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 8,
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     elevation: 2,
   },
 
@@ -418,9 +348,9 @@ const styles = StyleSheet.create({
   },
 
   iconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#FCE8E6",
     justifyContent: "center",
     alignItems: "center",
@@ -433,36 +363,28 @@ const styles = StyleSheet.create({
 
   cardTitle: {
     color: "#111827",
-    fontSize: 16,
+    fontSize: 14,
     fontFamily: "Inter_600SemiBold",
   },
 
   cardSubtitle: {
     color: "#6B7280",
     fontSize: 12,
-    marginTop: 4,
-    fontFamily: "Inter_400Regular",
-  },
-
-  generatedText: {
-    color: "#9CA3AF",
-    fontSize: 11,
-    marginTop: 6,
+    marginTop: 2,
     fontFamily: "Inter_400Regular",
   },
 
   buttonRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: 16,
+    gap: 8,
+    marginTop: 12,
   },
 
   pdfButton: {
     flex: 1,
     backgroundColor: "#C44736",
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginRight: 8,
+    paddingVertical: 10,
+    borderRadius: 12,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -470,12 +392,11 @@ const styles = StyleSheet.create({
 
   csvButton: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
-    paddingVertical: 16,
-    borderRadius: 16,
-    marginLeft: 8,
+    backgroundColor: "#F9F9F9",
+    paddingVertical: 10,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: "#D1D5DB",
+    borderColor: "#E5E7EB",
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
@@ -484,31 +405,12 @@ const styles = StyleSheet.create({
   pdfText: {
     color: "#FFFFFF",
     fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
   },
 
   csvText: {
     color: "#111827",
     fontFamily: "Inter_600SemiBold",
-  },
-
-  emptyState: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    paddingVertical: 80,
-  },
-
-  emptyTitle: {
-    marginTop: 16,
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    color: "#111827",
-  },
-
-  emptySubtitle: {
-    marginTop: 6,
-    color: "#6B7280",
-    textAlign: "center",
-    fontFamily: "Inter_400Regular",
+    fontSize: 13,
   },
 });

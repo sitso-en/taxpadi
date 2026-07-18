@@ -13,11 +13,12 @@ export const ENDPOINTS = {
     BIOMETRIC_LOGIN: "/api/v1/auth/biometric/login",
   },
   TAXBOT: {
-    CHAT: "/api/v1/taxbot/chat",
-    CONVERSATIONS: "/api/v1/taxbot/conversations",
+    CHAT: "/api/v1/taxbot/ask",
+    CONVERSATIONS: "/api/v1/taxbot/history",
   },
   PENALTY: {
-    GET: "/api/v1/penalties",
+    LIST: "/api/v1/penalties",
+    BY_TAX_TYPE: (taxType: string) => `/api/v1/penalties/${taxType}`,
     RESOLVE: "/api/v1/penalties/resolve",
   },
   NOTIFICATIONS: {
@@ -29,6 +30,8 @@ export const ENDPOINTS = {
     DELETE: (id: string) => `/api/v1/notifications/${id}`,
     DELETE_ALL: "/api/v1/notifications",
     REGISTER: "/api/v1/notifications/register",
+    GET_PREFERENCES: "/api/v1/notifications/preferences",
+    UPDATE_PREFERENCES: "/api/v1/notifications/preferences",
   },
   PROFILE: {
     LIST: "/api/v1/profiles",
@@ -36,6 +39,8 @@ export const ENDPOINTS = {
   TAX: {
     LIABILITY: "/api/v1/tax/liability",
     RECALCULATE: "/api/v1/tax/liability/recalculate",
+    RATES: "/api/v1/tax/rates",
+    BRACKETS: "/api/v1/tax/brackets",
   },
   TAX_RETURNS: {
     LIST: "/api/v1/tax/returns",
@@ -66,6 +71,95 @@ export const ENDPOINTS = {
     STATUS: (id: string) => `/api/v1/payments/${id}/status`,
     CONFIRM: (id: string) => `/api/v1/payments/${id}/confirm`,
     CERTIFICATE: (id: string) => `/api/v1/payments/${id}/certificate`,
+  },
+  USER: {
+    ME: "/api/v1/users/me",
+    UPDATE: "/api/v1/users/me",
+    CHANGE_PASSWORD: "/api/v1/users/me/password",
+    HEALTH_SCORE: "/api/v1/users/me/health-score",
+    DATA_REQUEST: "/api/v1/users/me/data-request",
+    DELETE: "/api/v1/users/me",
+    DELETE_PERMANENT: "/api/v1/users/me/permanent",
+  },
+  SESSIONS: {
+    LIST: "/api/v1/users/me/sessions",
+    REVOKE: (tokenId: string) => `/api/v1/users/me/sessions/${tokenId}`,
+    REVOKE_ALL: "/api/v1/users/me/sessions",
+  },
+  SUBSCRIPTIONS: {
+    PLANS: "/api/v1/subscriptions/plans",
+    STATUS: "/api/v1/subscriptions/status",
+    SUBSCRIBE: "/api/v1/subscriptions/subscribe",
+    VERIFY: "/api/v1/subscriptions/verify",
+    CANCEL: "/api/v1/subscriptions/cancel",
+  },
+  TAX_PROFILE: {
+    GET: "/api/v1/tax-profile",
+    UPDATE: "/api/v1/tax-profile",
+    COMPLETE_ONBOARDING: "/api/v1/tax-profile/complete-onboarding",
+  },
+  VAT: {
+    STATUS: "/api/v1/tax/vat/status",
+    REGISTER: "/api/v1/tax/vat/register",
+    RECORDS: "/api/v1/tax/vat/records",
+    RECORD_BY_PERIOD: (month: string, year: string) =>
+      `/api/v1/tax/vat/records/${month}/${year}`,
+  },
+  PAYE: {
+    EMPLOYEES: "/api/v1/tax/paye/employees",
+    EMPLOYEE: (id: string) => `/api/v1/tax/paye/employees/${id}`,
+    RECORDS: "/api/v1/tax/paye/records",
+    RECORD_BY_PERIOD: (month: string, year: string) =>
+      `/api/v1/tax/paye/records/${month}/${year}`,
+    REMIT: (id: string) => `/api/v1/tax/paye/records/${id}/remit`,
+    ANNUAL_RETURN: (year: string) => `/api/v1/tax/paye/annual-return/${year}`,
+  },
+  WITHHOLDING_TAX: {
+    TRANSACTIONS: "/api/v1/tax/withholding/transactions",
+    REMIT: (id: string) => `/api/v1/tax/withholding/transactions/${id}/remit`,
+  },
+  DEADLINES: {
+    LIST: "/api/v1/tax/deadlines",
+    UPCOMING: "/api/v1/tax/deadlines/upcoming",
+    COMPLETE: (id: string) => `/api/v1/tax/deadlines/${id}/complete`,
+  },
+  CERTIFICATES: {
+    LIST: "/api/v1/certificates",
+    GET: (id: string) => `/api/v1/certificates/${id}`,
+    DOWNLOAD: (id: string) => `/api/v1/certificates/${id}/download`,
+  },
+  SAVINGS_VAULT: {
+    GET: "/api/v1/vault",
+    LINK: "/api/v1/vault/link",
+    CONTRIBUTE: "/api/v1/vault/contribute",
+    TRANSACTIONS: "/api/v1/vault/transactions",
+    SUGGESTION: "/api/v1/vault/suggestion",
+  },
+  INVOICES: {
+    LIST: "/api/v1/invoices",
+    STATS: "/api/v1/invoices/stats",
+    CREATE: "/api/v1/invoices",
+    GET: (id: string) => `/api/v1/invoices/${id}`,
+    UPDATE: (id: string) => `/api/v1/invoices/${id}`,
+    MARK_PAID: (id: string) => `/api/v1/invoices/${id}/paid`,
+    CANCEL: (id: string) => `/api/v1/invoices/${id}/cancel`,
+    PDF: (id: string) => `/api/v1/invoices/${id}/pdf`,
+    SEND: (id: string) => `/api/v1/invoices/${id}/send`,
+  },
+  REPORTS: {
+    SUMMARY: "/api/v1/reports/summary",
+    EXPORT: "/api/v1/reports/export",
+    EXPORT_STATUS: (jobId: string) => `/api/v1/reports/export/status/${jobId}`,
+    INCOME_STATEMENT: "/api/v1/reports/income-statement",
+    TAX_HISTORY: "/api/v1/reports/tax-history",
+  },
+  REFERRALS: {
+    LIST: "/api/v1/referrals",
+    CHECK_ELIGIBILITY: "/api/v1/referrals/check-eligibility",
+    VIEWED: (id: string) => `/api/v1/referrals/${id}/viewed`,
+    CLICKED: (id: string) => `/api/v1/referrals/${id}/clicked`,
+    DISMISS: (id: string) => `/api/v1/referrals/${id}/dismiss`,
+    CONVERTED: (id: string) => `/api/v1/referrals/${id}/converted`,
   },
 };
 

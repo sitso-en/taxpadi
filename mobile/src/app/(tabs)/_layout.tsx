@@ -32,6 +32,8 @@ export default function Layout() {
             height: 70,
             paddingBottom: 10,
             paddingTop: 10,
+            backgroundColor: "#F2EDE8",
+            borderTopColor: "#E3D9D0",
           },
         }}
       >
@@ -101,82 +103,6 @@ export default function Layout() {
 
         {/* Hidden Screens */}
 
-        <Tabs.Screen
-          name="index"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="login"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="register"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="forgot-password"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="otp-verification"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="deadlines"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="explore"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="settings"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="tax-profile"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="edit-profile"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="subscription"
-          options={{
-            href: null,
-          }}
-        />
 
         <Tabs.Screen
           name="invoices"

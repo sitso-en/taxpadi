@@ -20,6 +20,9 @@ public class VerifyOtpRequest {
     @NotNull(message = "You need to select a purpose for the OTP")
     private OtpPurpose purpose;
 
+    @JsonProperty("device_info")
+    private String deviceInfo;
+
 
     // --- Getters and Setters ---
 
@@ -44,5 +47,12 @@ public class VerifyOtpRequest {
     }
     public void setPurpose(OtpPurpose purpose) {
         this.purpose = purpose;
+    }
+
+    public String getDeviceInfo() {
+        return deviceInfo;
+    }
+    public void setDeviceInfo(String deviceInfo) {
+        this.deviceInfo = deviceInfo;
     }
 }

@@ -209,7 +209,7 @@ public class AuthService {
     }
 
     @Transactional
-    public VerifyOtpResponse verifyOtp(VerifyOtpRequest request) {
+    public VerifyOtpResponse verifyOtp(VerifyOtpRequest request, String ipAddress) {
         String phone = PhoneUtil.normalize(request.getPhone());
         OtpPurpose purpose = request.getPurpose();
         log.info("OTP verification attempt for phone={}, purpose={}", phone, purpose);
@@ -250,6 +250,37 @@ public class AuthService {
                 emailService.sendWelcome(user.getEmail(), user.getFullName());
             }
             log.info("Account verified for userId={}", user.getUserId());
+
+            // Auto-login: create a session so the frontend can skip the login screen
+            String deviceInfo = request.getDeviceInfo() != null ? request.getDeviceInfo() : "mobile";
+            String rawRefreshToken = UUID.randomUUID().toString();
+            RefreshToken refreshToken = refreshTokenRepository
+                    .findByUserAndDeviceInfoAndRevokedFalse(user, deviceInfo)
+                    .orElse(new RefreshToken());
+            refreshToken.setUser(user);
+            refreshToken.setTokenHash(hashToken(rawRefreshToken));
+            refreshToken.setDeviceInfo(deviceInfo);
+            refreshToken.setIpAddress(ipAddress);
+            refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
+            refreshTokenRepository.save(refreshToken);
+
+            String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
+
+            boolean isPaid = subscriptionRepository.existsByUserAndStatus(user, SubscriptionStatus.ACTIVE);
+            boolean onboardingComplete = userTaxProfileRepository.findByUser(user)
+                    .map(p -> Boolean.TRUE.equals(p.getOnboardingComplete())
+                            || (user.getTin() != null && !user.getTin().isBlank() && p.getTaxYearStart() != null))
+                    .orElse(false);
+            UserSummary userSummary = new UserSummary(
+                    user.getUserId(), user.getFullName(), user.getPhone(),
+                    isPaid ? SubscriptionTier.PAID.name() : SubscriptionTier.FREE.name(),
+                    onboardingComplete);
+
+            auditLogService.log(user, "LOGIN", "Auto-login after registration OTP verification", ipAddress);
+            log.info("Auto-login session created for userId={} after registration", user.getUserId());
+
+            return new VerifyOtpResponse(true, purpose, accessToken, rawRefreshToken,
+                    "Bearer", JwtService.ACCESS_TOKEN_EXPIRY_SECONDS, userSummary);
         }
 
         log.info("OTP verified successfully for userId={}, purpose={}", user.getUserId(), purpose);
@@ -340,15 +371,18 @@ public class AuthService {
 
         
         String rawRefreshToken = UUID.randomUUID().toString();
-        RefreshToken refreshToken = new RefreshToken();
+        RefreshToken refreshToken = refreshTokenRepository
+                .findByUserAndDeviceInfoAndRevokedFalse(user, request.getDeviceInfo())
+                .orElse(new RefreshToken());
         refreshToken.setUser(user);
         refreshToken.setTokenHash(hashToken(rawRefreshToken));
         refreshToken.setDeviceInfo(request.getDeviceInfo());
+        refreshToken.setIpAddress(ipAddress);
         refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
         refreshTokenRepository.save(refreshToken);
 
         String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
-        
+
         auditLogService.log(user, "LOGIN", "Login from device: " + request.getDeviceInfo(), ipAddress);
         log.info("Login successful for userId={}", user.getUserId());
 
@@ -451,13 +485,16 @@ public class AuthService {
 
         
         String rawRefreshToken = UUID.randomUUID().toString();
-        RefreshToken refreshToken = new RefreshToken();
+        RefreshToken refreshToken = refreshTokenRepository
+                .findByUserAndDeviceInfoAndRevokedFalse(user, request.getDeviceInfo())
+                .orElse(new RefreshToken());
         refreshToken.setUser(user);
         refreshToken.setTokenHash(hashToken(rawRefreshToken));
         refreshToken.setDeviceInfo(request.getDeviceInfo());
+        refreshToken.setIpAddress(ipAddress);
         refreshToken.setExpiresAt(LocalDateTime.now().plusDays(30));
         refreshTokenRepository.save(refreshToken);
-        
+
         String accessToken = jwtService.generateAccessToken(user, refreshToken.getTokenId());
 
         auditLogService.log(user, "BIOMETRIC_LOGIN", "Device: " + request.getDeviceInfo(), ipAddress);

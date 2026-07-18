@@ -1,12 +1,17 @@
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useNavigation } from "expo-router";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { clearTokens, getRefreshToken } from "@/utils/storage";
+import { clearAllCaches } from "@/utils/cache";
 import { logout } from "@/services/auth.service";
 import { useUser } from "../context/UserContext";
 
 export default function LogoutConfirmationScreen() {
   const { setUser } = useUser();
+  const navigation = useNavigation();
+
+  const resetToLogin = () =>
+    (navigation as any).reset({ index: 0, routes: [{ name: "login" }] });
 
   const handleLogout = async () => {
     try {
@@ -19,6 +24,7 @@ export default function LogoutConfirmationScreen() {
         }
       }
 
+      await clearAllCaches();
       await clearTokens();
 
       setUser({
@@ -35,9 +41,9 @@ export default function LogoutConfirmationScreen() {
         active_profile: false,
       });
 
-      router.replace("/login");
+      resetToLogin();
     } catch {
-      router.replace("/login");
+      resetToLogin();
     }
   };
 
@@ -73,7 +79,7 @@ export default function LogoutConfirmationScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#FAFAFA",
+    backgroundColor: "#F2EDE8",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,

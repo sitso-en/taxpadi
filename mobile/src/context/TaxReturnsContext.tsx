@@ -1,278 +1,68 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, {
-  createContext,
-  useContext,
-  useEffect,
-  useState,
-} from "react";
-
-export type FilingStep = {
-  step: number;
-  title: string;
-  completed: boolean;
-};
+import React, { createContext, useContext, useEffect, useState } from "react";
+import { getTaxReturns } from "@/services/taxReturns.service";
 
 export type TaxReturn = {
-  return_id: number;
-  tax_year: string;
-  submitted_at: string;
-  status: "Filed" | "Pending";
+  id: string;
+  taxType: string;
+  taxYear: number;
+  periodStart: string;
+  periodEnd: string;
+  taxLiability: number;
+  status: "draft" | "submitted";
+  submittedAt: string | null;
+  graReference: string | null;
+  createdAt: string;
 };
 
 type TaxReturnsContextType = {
-  currentReturnFiled: boolean;
-
-  filingSteps: FilingStep[];
-
-  previousReturns: TaxReturn[];
-
-  fileCurrentReturn: () => void;
-
-  toggleStep: (step: number) => void;
-
-  resetCurrentReturn: () => void;
+  returns: TaxReturn[];
+  loading: boolean;
+  refreshReturns: () => Promise<void>;
 };
 
-const TaxReturnsContext =
-  createContext<TaxReturnsContextType>(
-    {} as TaxReturnsContextType
-  );
+const TaxReturnsContext = createContext<TaxReturnsContextType>({} as TaxReturnsContextType);
 
-export function TaxReturnsProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const [
-    currentReturnFiled,
-    setCurrentReturnFiled,
-  ] = useState(false);
+function mapReturn(item: any): TaxReturn {
+  return {
+    id: item.returnId,
+    taxType: item.taxType,
+    taxYear: item.taxYear,
+    periodStart: item.periodStart,
+    periodEnd: item.periodEnd,
+    taxLiability: Number(item.taxLiability ?? 0),
+    status: item.status,
+    submittedAt: item.submittedAt ?? null,
+    graReference: item.graReference ?? null,
+    createdAt: item.createdAt,
+  };
+}
 
-  const [
-    previousReturns,
-    setPreviousReturns,
-  ] = useState<TaxReturn[]>([]);
+export function TaxReturnsProvider({ children }: { children: React.ReactNode }) {
+  const [returns, setReturns] = useState<TaxReturn[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const [loaded, setLoaded] =
-    useState(false);
-
-  const [
-    filingSteps,
-    setFilingSteps,
-  ] = useState<FilingStep[]>([
-    {
-      step: 1,
-      title: "Verify Tax Profile",
-      completed: false,
-    },
-
-    {
-      step: 2,
-      title:
-        "Review Income & Expenses",
-      completed: false,
-    },
-
-    {
-      step: 3,
-      title:
-        "Calculate Final Liability",
-      completed: false,
-    },
-
-    {
-      step: 4,
-      title: "Submit Return",
-      completed: false,
-    },
-
-    {
-      step: 5,
-      title:
-        "Pay Outstanding Balance",
-      completed: false,
-    },
-  ]);
-
-  // Load saved data
+  const refreshReturns = async () => {
+    setLoading(true);
+    try {
+      const res = await getTaxReturns();
+      setReturns((res.data?.returns ?? []).map(mapReturn));
+    } catch {
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const storedReturns =
-          await AsyncStorage.getItem(
-            "taxReturns"
-          );
-
-        const storedSteps =
-          await AsyncStorage.getItem(
-            "filingSteps"
-          );
-
-        const storedFiled =
-          await AsyncStorage.getItem(
-            "currentReturnFiled"
-          );
-
-        if (storedReturns) {
-          setPreviousReturns(
-            JSON.parse(storedReturns)
-          );
-        }
-
-        if (storedSteps) {
-          setFilingSteps(
-            JSON.parse(storedSteps)
-          );
-        }
-
-        if (storedFiled) {
-          setCurrentReturnFiled(
-            JSON.parse(storedFiled)
-          );
-        }
-
-        setLoaded(true);
-      } catch (error) {
-        console.log(
-          "Failed to load tax returns:",
-          error
-        );
-
-        setLoaded(true);
-      }
-    };
-
-    loadData();
+    refreshReturns();
   }, []);
 
-  // Save data whenever state changes
-
-  useEffect(() => {
-    if (!loaded) return;
-
-    AsyncStorage.setItem(
-      "taxReturns",
-      JSON.stringify(previousReturns)
-    );
-
-    AsyncStorage.setItem(
-      "filingSteps",
-      JSON.stringify(filingSteps)
-    );
-
-    AsyncStorage.setItem(
-      "currentReturnFiled",
-      JSON.stringify(
-        currentReturnFiled
-      )
-    );
-  }, [
-    previousReturns,
-    filingSteps,
-    currentReturnFiled,
-    loaded,
-  ]);
-
-  // Toggle step completion
-
-  const toggleStep = (
-    step: number
-  ) => {
-    if (currentReturnFiled) return;
-
-    setFilingSteps((prev) =>
-      prev.map((item) =>
-        item.step === step
-          ? {
-              ...item,
-              completed:
-                !item.completed,
-            }
-          : item
-      )
-    );
-  };
-
-  // File current return
-
-  const fileCurrentReturn = () => {
-    const allDone =
-      filingSteps.every(
-        (step) => step.completed
-      );
-
-    // Cannot file unless all
-    // steps are completed
-
-    if (!allDone) return;
-
-    // Prevent duplicate filing
-
-    if (currentReturnFiled)
-      return;
-
-    const now = new Date();
-
-    const taxYear = `FY ${now.getFullYear()}/${
-      now.getFullYear() + 1
-    }`;
-
-    setCurrentReturnFiled(true);
-
-    setPreviousReturns((prev) => [
-      {
-        return_id: Date.now(),
-        tax_year: taxYear,
-        submitted_at:
-          now.toISOString(),
-        status: "Filed",
-      },
-
-      ...prev,
-    ]);
-  };
-
-  // Reset current return
-  // (useful for testing)
-
-  const resetCurrentReturn =
-    () => {
-      setCurrentReturnFiled(
-        false
-      );
-
-      setFilingSteps((prev) =>
-        prev.map((step) => ({
-          ...step,
-          completed: false,
-        }))
-      );
-    };
-
   return (
-    <TaxReturnsContext.Provider
-      value={{
-        currentReturnFiled,
-
-        filingSteps,
-
-        previousReturns,
-
-        fileCurrentReturn,
-
-        toggleStep,
-
-        resetCurrentReturn,
-      }}
-    >
+    <TaxReturnsContext.Provider value={{ returns, loading, refreshReturns }}>
       {children}
     </TaxReturnsContext.Provider>
   );
 }
 
 export function useTaxReturns() {
-  return useContext(
-    TaxReturnsContext
-  );
+  return useContext(TaxReturnsContext);
 }

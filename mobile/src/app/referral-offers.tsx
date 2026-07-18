@@ -1,604 +1,496 @@
-import React, {
-  useMemo,
-  useState,
-} from "react";
-
+import React, { useCallback, useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-
 import {
+  ActivityIndicator,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-
-import { useTransactions } from "../context/TransactionContext";
-import { useDeadlines } from "../context/DeadlineContext";
-import { useUser } from "../context/UserContext";
+import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  checkEligibility,
+  dismissOffer,
+  getReferralOffers,
+  markClicked,
+  markViewed,
+} from "../services/referrals.service";
+import { useToast } from "@/context/ToastContext";
+import { useNetwork } from "@/context/NetworkContext";
 
 type Offer = {
-  id: number;
-  title: string;
-  subtitle: string;
-  amount: string;
+  id: string;
+  productName: string;
+  partnerName: string;
+  offerType: string;
+  maxAmount: number | null;
+  interestRate: number | null;
   description: string;
-  icon: keyof typeof Ionicons.glyphMap;
-  type: "available" | "locked";
+  status: string;
+  expiresAt: string | null;
+};
+
+type EligibilityBasis = {
+  months_of_data: number;
+  consistency_score: number;
+};
+
+type Eligibility = {
+  eligible: boolean;
+  eligibility_basis?: EligibilityBasis;
+};
+
+function normalizeOffer(raw: any): Offer {
+  return {
+    id: raw.offer_id ?? "",
+    productName: raw.product_name ?? "Referral Offer",
+    partnerName: raw.partner_name ?? "",
+    offerType: raw.offer_type ?? "",
+    maxAmount: raw.max_amount ?? null,
+    interestRate: raw.interest_rate ?? null,
+    description: raw.description ?? "",
+    status: (raw.status ?? "ACTIVE").toUpperCase(),
+    expiresAt: raw.expires_at ?? null,
+  };
+}
+
+const OFFER_TYPE_ICON: Record<string, any> = {
+  LOAN: "cash-outline",
+  INSURANCE: "shield-checkmark-outline",
+  SAVINGS: "wallet-outline",
+  INVESTMENT: "trending-up-outline",
 };
 
 export default function ReferralOffersScreen() {
-  const { user } = useUser();
+  const { showToast } = useToast();
+  const { isOnline } = useNetwork();
 
-  const { transactions } =
-    useTransactions();
+  const [offers, setOffers] = useState<Offer[]>([]);
+  const [eligibility, setEligibility] = useState<Eligibility | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [subscriptionRequired, setSubscriptionRequired] = useState(false);
+  const [actioning, setActioning] = useState<string | null>(null);
 
-  const { deadlines } =
-    useDeadlines();
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [offersRes, eligRes] = await Promise.all([
+        getReferralOffers(),
+        checkEligibility(),
+      ]);
 
-  const [showPopup, setShowPopup] =
-    useState(false);
+      const rawOffers: any[] = offersRes?.data?.offers ?? [];
+      const mapped = rawOffers.map(normalizeOffer).filter((o) => o.id);
+      setOffers(mapped);
+      setEligibility(eligRes?.data ?? null);
 
-  const [popupMessage, setPopupMessage] =
-    useState("");
-
-  const completedDeadlines =
-    deadlines.filter(
-      (d) => d.completed
-    ).length;
-
-  const compliant =
-    deadlines.every(
-      (d) => d.completed
-    );
-
-  const monthsOfRecords =
-    Math.max(
-      1,
-      Math.ceil(
-        transactions.length / 5
-      )
-    );
-
-  const totalIncome =
-    transactions
-      .filter(
-        (t) => t.type === "income"
-      )
-      .reduce(
-        (sum, t) =>
-          sum + t.amount,
-        0
-      );
-
-  const consistencyScore =
-    Math.min(
-      100,
-      Math.round(
-        monthsOfRecords * 15 +
-          completedDeadlines * 10 +
-          transactions.length * 2
-      )
-    );
-
-  const availableOffers =
-    useMemo(() => {
-      const offers: Offer[] = [];
-
-      if (
-        transactions.length >= 3
-      ) {
-        offers.push({
-          id: 1,
-          title: "Fido Instant Loan",
-          subtitle:
-            "Loan Offer",
-
-          amount: `Up to GH¢ ${Math.max(
-            1000,
-            Math.round(
-              totalIncome * 0.3
-            )
-          ).toLocaleString()}`,
-
-          description:
-            "Pre-qualified based on your transaction history.",
-
-          icon: "cash-outline",
-
-          type: "available",
-        });
+      // Mark all ACTIVE offers as VIEWED silently
+      mapped
+        .filter((o) => o.status === "ACTIVE")
+        .forEach((o) => markViewed(o.id).catch(() => {}));
+    } catch (err: any) {
+      const status = err?.response?.status;
+      if (status === 403) {
+        setSubscriptionRequired(true);
+      } else {
+        showToast("Could not load referral offers.", "error");
       }
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
-      if (
-        consistencyScore >= 40
-      ) {
-        offers.push({
-          id: 2,
-          title:
-            "Acacia Insurance",
+  useEffect(() => { load(); }, [load]);
 
-          subtitle:
-            "Business Insurance",
+  const handleApply = async (offer: Offer) => {
+    if (!isOnline) { showToast("You're offline.", "info"); return; }
+    if (actioning) return;
+    setActioning(offer.id);
+    try {
+      const res = await markClicked(offer.id);
+      const deepLink = res?.data?.deep_link;
 
-          amount:
-            "From GH¢ 48/month",
+      // Update status locally
+      setOffers((prev) => prev.map((o) => o.id === offer.id ? { ...o, status: "CLICKED" } : o));
 
-          description:
-            "Protect your business assets and income.",
-
-          icon:
-            "shield-checkmark-outline",
-
-          type: "available",
-        });
+      if (deepLink) {
+        await Linking.openURL(deepLink);
+      } else {
+        showToast(`Opening ${offer.partnerName} application…`, "success");
       }
-
-      return offers;
-    }, [
-      transactions,
-      totalIncome,
-      consistencyScore,
-    ]);
-
-  const lockedOffers =
-    useMemo(() => {
-      const offers: Offer[] = [];
-
-      if (
-        monthsOfRecords < 6 ||
-        !compliant
-      ) {
-        offers.push({
-          id: 3,
-          title:
-            "Premium Credit Line",
-
-          subtitle:
-            "Requires 6 months of records and full compliance.",
-
-          amount: "",
-
-          description: "",
-
-          icon:
-            "lock-closed-outline",
-
-          type: "locked",
-        });
-      }
-
-      return offers;
-    }, [
-      monthsOfRecords,
-      compliant,
-    ]);
-
-  const handleApply = (
-    offerName: string
-  ) => {
-    setPopupMessage(
-      `Your application for ${offerName} has been submitted successfully.`
-    );
-
-    setShowPopup(true);
+    } catch (err: any) {
+      const msg = err?.response?.data?.message ?? "Could not apply for this offer.";
+      showToast(msg, "error");
+    } finally {
+      setActioning(null);
+    }
   };
 
-  return (
-    <>
-      <ScrollView
-        style={styles.container}
-        contentContainerStyle={{
-          paddingBottom: 50,
-        }}
-        showsVerticalScrollIndicator={
-          false
-        }
-      >
+  const handleDismiss = async (offer: Offer) => {
+    setActioning(offer.id);
+    try {
+      await dismissOffer(offer.id);
+      setOffers((prev) => prev.filter((o) => o.id !== offer.id));
+    } catch {
+      // silently ignore
+    } finally {
+      setActioning(null);
+    }
+  };
+
+  const fmtAmount = (o: Offer) => {
+    if (o.maxAmount == null) return null;
+    const base = `Up to GH¢ ${o.maxAmount.toLocaleString("en-GH")}`;
+    return o.interestRate != null ? `${base} at ${o.interestRate}% p.a.` : base;
+  };
+
+  const score = eligibility?.eligibility_basis?.consistency_score;
+  const months = eligibility?.eligibility_basis?.months_of_data ?? 0;
+
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.safe, { justifyContent: "center", alignItems: "center" }]} edges={["top"]}>
+        <ActivityIndicator size="large" color="#C44736" />
+      </SafeAreaView>
+    );
+  }
+
+  if (subscriptionRequired) {
+    return (
+      <SafeAreaView style={styles.safe} edges={["top"]}>
         <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() =>
-              router.back()
-            }
-          >
-            <Ionicons
-              name="arrow-back"
-              size={24}
-              color="#111827"
-            />
+          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="chevron-back" size={26} color="#111827" />
           </TouchableOpacity>
-
-          <Text style={styles.title}>
-            Referral Offers
-          </Text>
+          <Text style={styles.title}>Referral Offers</Text>
+          <View style={{ width: 26 }} />
         </View>
-
-        <View style={styles.heroCard}>
-          <Ionicons
-            name="trophy-outline"
-            size={32}
-            color="#C44736"
-          />
-
-          <View
-            style={{
-              marginLeft: 14,
-              flex: 1,
-            }}
-          >
-            <Text
-              style={styles.heroTitle}
-            >
-              You are eligible for{" "}
-              {
-                availableOffers.length
-              }{" "}
-              offer
-              {availableOffers.length !==
-              1
-                ? "s"
-                : ""}
-              !
-            </Text>
-
-            <Text
-              style={
-                styles.heroSubtitle
-              }
-            >
-              Based on your
-              transaction and
-              compliance history
-            </Text>
-
-            <Text
-              style={styles.scoreText}
-            >
-              Consistency score:{" "}
-              {consistencyScore}
-              /100
-            </Text>
+        <View style={styles.gateCard}>
+          <View style={styles.gateIconBox}>
+            <Ionicons name="lock-closed-outline" size={28} color="#C44736" />
           </View>
+          <Text style={styles.gateTitle}>Subscription Required</Text>
+          <Text style={styles.gateSub}>
+            Referral offers are available to TaxPadi subscribers. Upgrade your plan to access partner loans, insurance, and savings offers.
+          </Text>
+          <TouchableOpacity style={styles.upgradeBtn} onPress={() => router.push("/subscription")} activeOpacity={0.85}>
+            <Text style={styles.upgradeBtnText}>View Plans</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Ionicons name="chevron-back" size={26} color="#111827" />
+        </TouchableOpacity>
+        <Text style={styles.title}>Referral Offers</Text>
+        <View style={{ width: 26 }} />
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+        {/* ── Eligibility banner ── */}
+        <View style={styles.eligibilityCard}>
+          <View style={styles.eligibilityLeft}>
+            <View style={[styles.eligibilityIconBox, { backgroundColor: eligibility?.eligible ? "#DCFCE7" : "#FEF3C7" }]}>
+              <Ionicons
+                name={eligibility?.eligible ? "checkmark-circle-outline" : "time-outline"}
+                size={24}
+                color={eligibility?.eligible ? "#16A34A" : "#D97706"}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.eligibilityTitle}>
+                {eligibility?.eligible ? "You're eligible for offers" : "Building eligibility…"}
+              </Text>
+              <Text style={styles.eligibilitySub}>
+                {eligibility?.eligible
+                  ? `${months} months of data on TaxPadi`
+                  : `${months}/3 months of data needed`}
+              </Text>
+            </View>
+          </View>
+          {score != null && (
+            <View style={styles.scoreBox}>
+              <Text style={styles.scoreNum}>{score}</Text>
+              <Text style={styles.scoreLabel}>score</Text>
+            </View>
+          )}
         </View>
 
-        <Text
-          style={styles.sectionTitle}
-        >
-          AVAILABLE OFFERS
-        </Text>
-
-        {availableOffers.length ===
-        0 ? (
-          <View
-            style={styles.infoCard}
-          >
-            <Text
-              style={styles.infoText}
-            >
-              Keep using
-              TaxPadi to unlock
-              referral offers.
+        {/* ── Offers ── */}
+        {offers.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconBox}>
+              <Ionicons name="gift-outline" size={28} color="#C44736" />
+            </View>
+            <Text style={styles.emptyTitle}>No offers yet</Text>
+            <Text style={styles.emptySub}>
+              Keep using TaxPadi — partner offers will appear here as you build your financial profile.
             </Text>
           </View>
         ) : (
-          availableOffers.map(
-            (offer) => (
-              <View
-                key={offer.id}
-                style={
-                  styles.offerCard
-                }
-              >
-                <View
-                  style={
-                    styles.offerHeader
-                  }
-                >
-                  <Ionicons
-                    name={offer.icon}
-                    size={26}
-                    color="#C44736"
-                  />
+          offers.map((offer) => {
+            const amountText = fmtAmount(offer);
+            const icon = OFFER_TYPE_ICON[offer.offerType] ?? "cash-outline";
+            const isClicked = offer.status === "CLICKED";
+            const isActioning = actioning === offer.id;
 
-                  <View
-                    style={{
-                      marginLeft: 12,
-                      flex: 1,
-                    }}
-                  >
-                    <Text
-                      style={
-                        styles.offerTitle
-                      }
-                    >
-                      {offer.title}
-                    </Text>
-
-                    <Text
-                      style={
-                        styles.offerSubtitle
-                      }
-                    >
-                      {
-                        offer.subtitle
-                      }
-                    </Text>
+            return (
+              <View key={offer.id} style={styles.offerCard}>
+                {/* Header row */}
+                <View style={styles.offerTopRow}>
+                  <View style={styles.offerIconBox}>
+                    <Ionicons name={icon} size={20} color="#C44736" />
                   </View>
-
-                  <Text
-                    style={
-                      styles.newBadge
-                    }
-                  >
-                    ★ New
-                  </Text>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={styles.offerPartner}>{offer.partnerName}</Text>
+                    <Text style={styles.offerType}>{offer.offerType}</Text>
+                  </View>
+                  {isClicked ? (
+                    <View style={styles.appliedBadge}>
+                      <Text style={styles.appliedBadgeText}>Applied</Text>
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      onPress={() => handleDismiss(offer)}
+                      disabled={isActioning}
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                    >
+                      <Ionicons name="close" size={18} color="#9CA3AF" />
+                    </TouchableOpacity>
+                  )}
                 </View>
 
-                <Text
-                  style={
-                    styles.offerAmount
-                  }
-                >
-                  {offer.amount}
-                </Text>
+                <Text style={styles.offerTitle}>{offer.productName}</Text>
 
-                <Text
-                  style={
-                    styles.offerDescription
-                  }
-                >
-                  {
-                    offer.description
-                  }
-                </Text>
+                {amountText && <Text style={styles.offerAmount}>{amountText}</Text>}
 
-                <TouchableOpacity
-                  style={
-                    styles.primaryButton
-                  }
-                  onPress={() =>
-                    handleApply(
-                      offer.title
-                    )
-                  }
-                >
-                  <Text
-                    style={
-                      styles.primaryButtonText
-                    }
-                  >
-                    Apply Now →
+                {offer.description ? (
+                  <Text style={styles.offerDesc}>{offer.description}</Text>
+                ) : null}
+
+                {offer.expiresAt && (
+                  <Text style={styles.offerExpiry}>
+                    Expires {new Date(offer.expiresAt).toLocaleDateString("en-GH", { day: "numeric", month: "short", year: "numeric" })}
                   </Text>
-                </TouchableOpacity>
+                )}
+
+                {!isClicked && (
+                  eligibility?.eligible ? (
+                    <TouchableOpacity
+                      style={[styles.applyBtn, isActioning && { opacity: 0.6 }]}
+                      onPress={() => handleApply(offer)}
+                      disabled={isActioning}
+                      activeOpacity={0.85}
+                    >
+                      <Text style={styles.applyBtnText}>{isActioning ? "Opening…" : "Apply Now"}</Text>
+                      <Ionicons name="arrow-forward" size={15} color="#FFFFFF" />
+                    </TouchableOpacity>
+                  ) : (
+                    <View style={styles.lockedBtn}>
+                      <Ionicons name="lock-closed-outline" size={13} color="#9CA3AF" />
+                      <Text style={styles.lockedBtnText}>Build 3 months of data to unlock</Text>
+                    </View>
+                  )
+                )}
               </View>
-            )
-          )
+            );
+          })
         )}
-
       </ScrollView>
-
-      {showPopup && (
-        <View
-          style={
-            styles.modalOverlay
-          }
-        >
-          <View
-            style={styles.modalCard}
-          >
-            <Ionicons
-              name="checkmark-circle"
-              size={70}
-              color="#34A853"
-            />
-
-            <Text
-              style={
-                styles.modalTitle
-              }
-            >
-              Application Submitted
-            </Text>
-
-            <Text
-              style={
-                styles.modalMessage
-              }
-            >
-              {popupMessage}
-            </Text>
-
-            <TouchableOpacity
-              style={
-                styles.modalButton
-              }
-              onPress={() =>
-                setShowPopup(false)
-              }
-            >
-              <Text
-                style={
-                  styles.modalButtonText
-                }
-              >
-                Continue
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    </>
+    </SafeAreaView>
   );
 }
+
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#FAFAFA",
-    paddingHorizontal: 20,
-    paddingTop: 55,
-  },
+  safe: { flex: 1, backgroundColor: "#F2EDE8" },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 16,
+  },
+
+  title: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#111827" },
+
+  scroll: { paddingHorizontal: 20, paddingBottom: 48 },
+
+  // ── Eligibility ──
+  eligibilityCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+
+  eligibilityLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: 12 },
+
+  eligibilityIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  eligibilityTitle: { fontSize: 14, fontFamily: "Inter_700Bold", color: "#111827", marginBottom: 3 },
+  eligibilitySub: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#6B7280" },
+
+  scoreBox: { alignItems: "center", marginLeft: 12 },
+  scoreNum: { fontSize: 22, fontFamily: "Inter_700Bold", color: "#C44736" },
+  scoreLabel: { fontSize: 10, fontFamily: "Inter_500Medium", color: "#9CA3AF", marginTop: -2 },
+
+  // ── Empty ──
+  emptyCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 32,
+    alignItems: "center",
+  },
+
+  emptyIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+
+  emptyTitle: { fontSize: 16, fontFamily: "Inter_700Bold", color: "#111827", marginBottom: 6 },
+  emptySub: { fontSize: 13, fontFamily: "Inter_400Regular", color: "#6B7280", textAlign: "center", lineHeight: 20 },
+
+  // ── Offer card ──
+  offerCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 1,
+  },
+
+  offerTopRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
+
+  offerIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  offerPartner: { fontSize: 12, fontFamily: "Inter_500Medium", color: "#9CA3AF" },
+  offerType: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#C9B8B5", marginTop: 1 },
+
+  appliedBadge: { backgroundColor: "#DCFCE7", borderRadius: 20, paddingHorizontal: 8, paddingVertical: 2 },
+  appliedBadgeText: { fontSize: 11, fontFamily: "Inter_600SemiBold", color: "#16A34A" },
+
+  offerTitle: { fontSize: 15, fontFamily: "Inter_700Bold", color: "#111827", marginBottom: 4 },
+
+  offerAmount: { fontSize: 17, fontFamily: "Inter_700Bold", color: "#C44736", marginBottom: 6 },
+
+  offerDesc: { fontSize: 12, fontFamily: "Inter_400Regular", color: "#6B7280", lineHeight: 18, marginBottom: 8 },
+
+  offerExpiry: { fontSize: 11, fontFamily: "Inter_400Regular", color: "#9CA3AF", marginBottom: 8 },
+
+  applyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#C44736",
+    borderRadius: 10,
+    paddingVertical: 10,
+    shadowColor: "#C44736",
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+
+  applyBtnText: { color: "#FFFFFF", fontFamily: "Inter_600SemiBold", fontSize: 13 },
+
+  lockedBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+
+  lockedBtnText: { color: "#9CA3AF", fontFamily: "Inter_500Medium", fontSize: 12 },
+
+  // ── Subscription gate ──
+  gateCard: {
+    margin: 20,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 28,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 2,
+  },
+
+  gateIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+
+  gateTitle: { fontSize: 18, fontFamily: "Inter_700Bold", color: "#111827", marginBottom: 8 },
+
+  gateSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+    textAlign: "center",
+    lineHeight: 20,
     marginBottom: 24,
   },
 
-  title: {
-    fontSize: 28,
-    marginLeft: 10,
-    color: "#111827",
-    fontFamily: "Inter_700Bold",
-  },
-
-  heroCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 18,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 28,
-  },
-
-  heroTitle: {
-    color: "#111827",
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-  },
-
-  heroSubtitle: {
-    color: "#6B7280",
-    marginTop: 4,
-    fontSize: 12,
-  },
-
-  scoreText: {
-    color: "#C44736",
-    marginTop: 6,
-    fontFamily: "Inter_600SemiBold",
-  },
-
-  sectionTitle: {
-    color: "#C44736",
-    fontSize: 11,
-    marginBottom: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-
-  offerCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 18,
-    marginBottom: 18,
-  },
-
-  offerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  offerTitle: {
-    color: "#111827",
-    fontFamily: "Inter_700Bold",
-    fontSize: 16,
-  },
-
-  offerSubtitle: {
-    color: "#6B7280",
-    marginTop: 2,
-    fontSize: 12,
-  },
-
-  newBadge: {
-    color: "#C44736",
-    fontSize: 12,
-  },
-
-  offerAmount: {
-    marginTop: 18,
-    color: "#111827",
-    fontSize: 22,
-    fontFamily: "Inter_700Bold",
-  },
-
-  offerDescription: {
-    color: "#6B7280",
-    marginTop: 8,
-    marginBottom: 18,
-    lineHeight: 20,
-  },
-
-  primaryButton: {
-    backgroundColor: "#C44736",
-    borderRadius: 24,
-    paddingVertical: 12,
-    alignItems: "center",
-  },
-
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontFamily: "Inter_600SemiBold",
-  },
-
-  infoCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 18,
-  },
-
-  infoText: {
-    color: "#6B7280",
-    lineHeight: 20,
-  },
-
-  modalOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 30,
-  },
-
-  modalCard: {
-    width: "100%",
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    padding: 28,
-    alignItems: "center",
-  },
-
-  modalTitle: {
-    fontSize: 22,
-    color: "#111827",
-    marginTop: 16,
-    fontFamily: "Inter_700Bold",
-  },
-
-  modalMessage: {
-    color: "#6B7280",
-    textAlign: "center",
-    marginTop: 12,
-    lineHeight: 22,
-    fontFamily: "Inter_400Regular",
-  },
-
-  modalButton: {
+  upgradeBtn: {
     backgroundColor: "#C44736",
     borderRadius: 14,
-    width: "100%",
-    paddingVertical: 15,
-    alignItems: "center",
-    marginTop: 24,
+    paddingVertical: 14,
+    paddingHorizontal: 32,
+    shadowColor: "#C44736",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
 
-  modalButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontFamily: "Inter_600SemiBold",
-  },
+  upgradeBtnText: { color: "#FFFFFF", fontFamily: "Inter_600SemiBold", fontSize: 15 },
 });

@@ -1,6 +1,6 @@
 import client from "@/api/client";
 import { ENDPOINTS } from "@/api/endpoints";
-import { saveTokens, clearTokens, getAccessToken } from "@/utils/storage";
+import { saveTokens, clearTokens } from "@/utils/storage";
 import { LoginResponse } from "@/types/auth";
 
 export const login = async (
@@ -8,12 +8,6 @@ export const login = async (
   password: string,
   deviceInfo: string
 ): Promise<LoginResponse> => {
-  console.log("Sending login request...");
-
-  console.log(
-    "URL:",
-    client.defaults.baseURL + ENDPOINTS.AUTH.LOGIN
-  );
   const response = await client.post<LoginResponse>(
     ENDPOINTS.AUTH.LOGIN,
     {
@@ -23,22 +17,14 @@ export const login = async (
     }
   );
 
-  console.log("Login request finished.");
-
   if (
     response.data.success &&
     response.data.data.access_token
   ) {
-
     await saveTokens(
       response.data.data.access_token,
       response.data.data.refresh_token
     );
-
-    console.log("TOKEN SAVED");
-
-    const token = await getAccessToken();
-    console.log("TOKEN AFTER SAVE:", token);
   }
 
   return response.data;
@@ -63,7 +49,8 @@ export const register = async (payload: {
 export const verifyOTP = async (
   phone: string,
   otp: string,
-  purpose: string
+  purpose: string,
+  deviceInfo?: string
 ) => {
   const response = await client.post(
     ENDPOINTS.AUTH.VERIFY_OTP,
@@ -71,8 +58,14 @@ export const verifyOTP = async (
       phone,
       purpose,
       otp_code: otp,
+      ...(deviceInfo ? { device_info: deviceInfo } : {}),
     }
   );
+
+  // Auto-save tokens when backend returns them (REGISTER auto-login)
+  if (response.data.success && response.data.data?.access_token) {
+    await saveTokens(response.data.data.access_token, response.data.data.refresh_token);
+  }
 
   return response.data;
 };
@@ -162,5 +155,30 @@ export const refreshAccessToken = async (
     }
   );
 
+  return response.data;
+};
+
+export const biometricRegister = async (
+  biometricToken: string,
+  deviceInfo: string
+) => {
+  const response = await client.post(ENDPOINTS.AUTH.BIOMETRIC_REGISTER, {
+    biometric_token: biometricToken,
+    device_info: deviceInfo,
+  });
+  return response.data;
+};
+
+export const biometricLogin = async (
+  biometricToken: string,
+  deviceInfo: string
+): Promise<LoginResponse> => {
+  const response = await client.post<LoginResponse>(ENDPOINTS.AUTH.BIOMETRIC_LOGIN, {
+    biometric_token: biometricToken,
+    device_info: deviceInfo,
+  });
+  if (response.data.success && response.data.data.access_token) {
+    await saveTokens(response.data.data.access_token, response.data.data.refresh_token);
+  }
   return response.data;
 };

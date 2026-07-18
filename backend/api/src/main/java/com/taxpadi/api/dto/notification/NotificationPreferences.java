@@ -5,12 +5,24 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class NotificationPreferences {
 
+    private Boolean pushNotifications;
+    private Boolean emailNotifications;
+    private Boolean smsNotifications;
     private Boolean deadlineReminders;
     private Boolean penaltyAlerts;
     private Boolean vaultSuggestions;
     private Boolean referralOffers;
     private Boolean paymentConfirmations;
     private Boolean systemUpdates;
+
+    public Boolean getPushNotifications() { return pushNotifications; }
+    public void setPushNotifications(Boolean pushNotifications) { this.pushNotifications = pushNotifications; }
+
+    public Boolean getEmailNotifications() { return emailNotifications; }
+    public void setEmailNotifications(Boolean emailNotifications) { this.emailNotifications = emailNotifications; }
+
+    public Boolean getSmsNotifications() { return smsNotifications; }
+    public void setSmsNotifications(Boolean smsNotifications) { this.smsNotifications = smsNotifications; }
 
     public Boolean getDeadlineReminders() { return deadlineReminders; }
     public void setDeadlineReminders(Boolean deadlineReminders) { this.deadlineReminders = deadlineReminders; }

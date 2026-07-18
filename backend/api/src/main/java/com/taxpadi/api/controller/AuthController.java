@@ -51,8 +51,10 @@ public class AuthController {
     }
 
     @PostMapping("/verify-otp")
-    public ResponseEntity<ApiResponse<VerifyOtpResponse>> verifyOtp(@RequestBody @Valid VerifyOtpRequest request) {
-        VerifyOtpResponse data = authService.verifyOtp(request);
+    public ResponseEntity<ApiResponse<VerifyOtpResponse>> verifyOtp(
+            @RequestBody @Valid VerifyOtpRequest request,
+            HttpServletRequest httpRequest) {
+        VerifyOtpResponse data = authService.verifyOtp(request, httpRequest.getRemoteAddr());
         return ResponseEntity.ok(new ApiResponse<>(true, data, "OTP verified successfully"));
     }
 
