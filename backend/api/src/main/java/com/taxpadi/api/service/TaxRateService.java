@@ -12,6 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -60,7 +61,7 @@ public class TaxRateService {
                 formatPct(effective), vatThreshold,
                 "All service suppliers must register", "monthly",
                 "Last working day of the following month"));
-        response.setPaye(new PayeRateInfo(brackets, "15th of the following month", "April 30"));
+        response.setPaye(new PayeRateInfo(toMonthlyPayeBracketDtos(config.getIncomeTaxBrackets()), "15th of the following month", "April 30"));
         response.setWithholding(new WithholdingRatesInfo(whtRates));
         response.setPenalties(new PenaltiesInfo(
                 "125% of statutory rate, compounded monthly",
@@ -98,6 +99,38 @@ public class TaxRateService {
         return new AdminUpdateTaxRatesResponse(config.getTaxYear(), config.getUpdatedAt(), updatedBy);
     }
 
+
+    /**
+     * Converts annual income-tax brackets (stored in DB) to monthly PAYE brackets
+     * by dividing each band width by 12 and recomputing cumulative from/to values.
+     * Produces the same figures as GhanaTaxEngine.PAYE_BRACKETS.
+     */
+    private List<TaxBracketDto> toMonthlyPayeBracketDtos(List<Map<String, Object>> annualMaps) {
+        List<TaxBracketDto> result = new ArrayList<>();
+        BigDecimal twelve = new BigDecimal("12");
+        BigDecimal prevAnnualTo = BigDecimal.ZERO;
+        BigDecimal prevMonthlyTo = BigDecimal.ZERO;
+
+        for (Map<String, Object> m : annualMaps) {
+            int bracket = ((Number) m.get("bracket")).intValue();
+            String rate = (String) m.get("rate");
+            String desc = (String) m.get("description");
+            BigDecimal annualTo = m.get("to") != null ? new BigDecimal(m.get("to").toString()) : null;
+
+            BigDecimal monthlyFrom = bracket == 1 ? BigDecimal.ZERO : prevMonthlyTo.add(BigDecimal.ONE);
+            BigDecimal monthlyTo = null;
+
+            if (annualTo != null) {
+                BigDecimal bandWidth = annualTo.subtract(prevAnnualTo);
+                monthlyTo = prevMonthlyTo.add(bandWidth.divide(twelve, 0, RoundingMode.HALF_UP));
+                prevAnnualTo = annualTo;
+                prevMonthlyTo = monthlyTo;
+            }
+
+            result.add(new TaxBracketDto(bracket, monthlyFrom, monthlyTo, rate, desc));
+        }
+        return result;
+    }
 
     private TaxRateConfig latestConfig() {
         return taxRateConfigRepository.findTopByOrderByTaxYearDesc()
