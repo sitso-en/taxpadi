@@ -1,7 +1,9 @@
 package com.taxpadi.api.model;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.SQLRestriction;
+import org.hibernate.type.SqlTypes;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -31,6 +33,7 @@ public class Transaction {
     private String category;
 
     @Column(length = 500)
+    @JdbcTypeCode(SqlTypes.VARCHAR)
     private String description;
 
     @Column(name = "entry_method", nullable = false, length = 20)
