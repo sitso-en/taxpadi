@@ -11,6 +11,18 @@ export const recalculateTaxLiability = async () => {
   return response.data;
 };
 
+export const getTaxLiabilityByType = async (
+  taxType: string,
+  year?: number,
+  month?: number
+) => {
+  const response = await client.get(
+    `/api/v1/tax/liability/${taxType}`,
+    { params: { year, month } }
+  );
+  return response.data;
+};
+
 export const getTaxRates = async () => {
   const response = await client.get(ENDPOINTS.TAX.RATES);
   return response.data;

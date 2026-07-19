@@ -35,6 +35,10 @@ export const ENDPOINTS = {
   },
   PROFILE: {
     LIST: "/api/v1/profiles",
+    CREATE: "/api/v1/profiles",
+    UPDATE: (id: string) => `/api/v1/profiles/${id}`,
+    DELETE: (id: string) => `/api/v1/profiles/${id}`,
+    SWITCH: (id: string) => `/api/v1/profiles/${id}/switch`,
   },
   TAX: {
     LIABILITY: "/api/v1/tax/liability",

@@ -144,6 +144,13 @@ export default function MoreScreen() {
       color: "#EA4335",
     },
     {
+      title: "Manage Profiles",
+      subtitle: "Switch between personal or business profiles",
+      icon: "people-outline",
+      route: "/manage-profiles",
+      color: "#3B82F6",
+    },
+    {
       title: "Settings",
       subtitle: "Profile, plan and preferences",
       icon: "settings-outline",
@@ -279,10 +286,10 @@ export default function MoreScreen() {
       </View>
 
       <View style={styles.menuGroupCard}>
-        {menuItems.slice(10).map((item) => (
+        {menuItems.slice(10).map((item, index, arr) => (
           <TouchableOpacity
             key={item.title}
-            style={styles.menuItem}
+            style={[styles.menuItem, index !== arr.length - 1 && styles.menuItemBorder]}
             onPress={() => router.push(item.route as any)}
             activeOpacity={0.86}
           >
@@ -648,12 +655,12 @@ const styles = StyleSheet.create({
 
   logoutButton: {
     backgroundColor: "#FFF5F3",
-    borderRadius: 16,
-    paddingVertical: 14,
+    borderRadius: 14,
+    paddingVertical: 12,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    marginTop: 18,
+    marginTop: 12,
     marginBottom: 0,
     borderWidth: 1,
     borderColor: "#F8C5BF",

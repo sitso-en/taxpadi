@@ -105,20 +105,6 @@ export default function Layout() {
 
 
         <Tabs.Screen
-          name="invoices"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="create-invoice"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
           name="add-transaction"
           options={{
             href: null,
@@ -127,13 +113,6 @@ export default function Layout() {
 
         <Tabs.Screen
           name="edit-transaction"
-          options={{
-            href: null,
-          }}
-        />
-
-        <Tabs.Screen
-          name="reports"
           options={{
             href: null,
           }}

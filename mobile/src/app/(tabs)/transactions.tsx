@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { RefreshControl } from "react-native";
 import {
   ActivityIndicator,
@@ -40,21 +40,16 @@ export default function TransactionsScreen() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  const handleRefresh = async () => {
-    setRefreshing(true);
-    setPage(1);
-    setLocalError(false);
-    await fetchTransactions(selectedFilter, 1, false);
-    setRefreshing(false);
-  };
+  const searchInitialized = useRef(false);
 
   const fetchTransactions = useCallback(
-    async (typeFilter: string, pageNum: number, append = false) => {
+    async (typeFilter: string, pageNum: number, append = false, searchTerm = "") => {
       if (append) setLoadingMore(true);
       else { setLocalLoading(true); setLocalError(false); }
       try {
         const params: Record<string, any> = { page: pageNum, limit: LIMIT };
         if (typeFilter !== "All") params.type = typeFilter.toLowerCase();
+        if (searchTerm.trim()) params.search = searchTerm.trim();
         const response = await getTransactions(params);
         const fetched = response.data?.transactions ?? response.transactions ?? [];
         if (append) {
@@ -77,22 +72,41 @@ export default function TransactionsScreen() {
   useFocusEffect(
     useCallback(() => {
       setPage(1);
-      fetchTransactions(selectedFilter, 1, false);
+      fetchTransactions(selectedFilter, 1, false, search);
     }, [selectedFilter])
   );
+
+  // Debounced search — skip the initial empty-string run (useFocusEffect handles that)
+  useEffect(() => {
+    if (!searchInitialized.current) {
+      searchInitialized.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      setPage(1);
+      fetchTransactions(selectedFilter, 1, false, search);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    setPage(1);
+    setLocalError(false);
+    await fetchTransactions(selectedFilter, 1, false, search);
+    setRefreshing(false);
+  };
 
   const handleFilterChange = (filter: string) => {
     setSelectedFilter(filter);
     setPage(1);
-    // fetchTransactions is triggered by useFocusEffect/useEffect via selectedFilter change
-    // but since useFocusEffect won't re-fire on state change, call directly:
-    fetchTransactions(filter, 1, false);
+    fetchTransactions(filter, 1, false, search);
   };
 
   const handleLoadMore = () => {
     const next = page + 1;
     setPage(next);
-    fetchTransactions(selectedFilter, next, true);
+    fetchTransactions(selectedFilter, next, true, search);
   };
 
   const handleDeleteConfirmed = async () => {
@@ -125,10 +139,6 @@ export default function TransactionsScreen() {
     );
   };
 
-  const displayTransactions = localTransactions.filter((t) =>
-    (t.description ?? "").toLowerCase().includes(search.toLowerCase())
-  );
-
   return (
     <View style={styles.container}>
       <ScrollView
@@ -154,8 +164,8 @@ export default function TransactionsScreen() {
         </View>
 
         <Text style={styles.transactionCount}>
-          {displayTransactions.length} transaction
-          {displayTransactions.length !== 1 ? "s" : ""}
+          {localTransactions.length} transaction
+          {localTransactions.length !== 1 ? "s" : ""}
           {selectedFilter !== "All" ? ` · ${selectedFilter}` : ""}
         </Text>
 
@@ -220,7 +230,7 @@ export default function TransactionsScreen() {
           </View>
         ) : localError ? (
           <ErrorState onRetry={() => fetchTransactions(selectedFilter, 1, false)} />
-        ) : displayTransactions.length === 0 ? (
+        ) : localTransactions.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="wallet-outline" size={60} color="#D1D5DB" />
             <Text style={styles.emptyTitle}>No Transactions</Text>
@@ -228,7 +238,7 @@ export default function TransactionsScreen() {
           </View>
         ) : (
           <>
-            {displayTransactions.map((transaction) => {
+            {localTransactions.map((transaction) => {
               const id = transaction.transaction_id;
               const isIncome = transaction.type === "income";
               return (

@@ -120,11 +120,7 @@ export default function PaymentsScreen() {
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
-            <Ionicons name="chevron-back" size={26} color="#111827" />
-          </TouchableOpacity>
           <Text style={styles.title}>Payments</Text>
-          <View style={{ width: 26 }} />
         </View>
 
         {/* Hero card */}
@@ -297,9 +293,6 @@ const styles = StyleSheet.create({
 
   // Header
   header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingTop: 8,
     paddingBottom: 20,
   },

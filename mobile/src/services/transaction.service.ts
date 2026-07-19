@@ -5,6 +5,7 @@ import { Platform } from "react-native";
 export const getTransactions = async (params?: {
   type?: string;
   category?: string;
+  search?: string;
   page?: number;
   limit?: number;
 }) => {
