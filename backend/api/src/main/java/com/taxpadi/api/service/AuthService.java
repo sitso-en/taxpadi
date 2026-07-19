@@ -405,6 +405,7 @@ public class AuthService {
         return new LoginResponse(accessToken, rawRefreshToken, "Bearer", JwtService.ACCESS_TOKEN_EXPIRY_SECONDS, false, userSummary);
     }
 
+    @Transactional
     public RefreshTokenResponse refreshToken(RefreshTokenRequest request) {
         String hash = hashToken(request.getRefreshToken());
         log.info("Refresh token attempt");
@@ -428,6 +429,7 @@ public class AuthService {
         return new RefreshTokenResponse(newAccessToken, "Bearer", 900);
     }
 
+    @Transactional
     public LogoutResponse logout(RefreshTokenRequest request, String ipAddress) {
         String hash = hashToken(request.getRefreshToken());
         log.info("Logout attempt");

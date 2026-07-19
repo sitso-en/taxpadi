@@ -74,7 +74,9 @@ export default function ManagePlanScreen() {
 
   const [selectedPlan, setSelectedPlan] = useState<SelectedPlan>(null);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(null);
-  const [momoNumber, setMomoNumber] = useState("0551234987"); // test number — replace with user?.phoneNumber?.replace(/\s/g, "") ?? "" in production
+  const [momoNumber, setMomoNumber] = useState(
+    user?.phoneNumber?.replace(/\s/g, "") ?? ""
+  );
   const [momoProvider, setMomoProvider] = useState("mtn");
 
   const [subscribing, setSubscribing] = useState(false);
