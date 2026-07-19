@@ -26,10 +26,10 @@ public class TaxbotConversation {
     @JoinColumn(name="user_id", nullable = false)
     private User user;
 
-    @Column(name = "question", columnDefinition = "TEXT")
+    @Column(name = "question")
     private String question;
 
-    @Column(name = "answer", columnDefinition = "TEXT")
+    @Column(name = "answer")
     private String answer;
 
     @Column(name = "created_at", updatable = false)

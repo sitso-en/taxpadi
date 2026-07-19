@@ -35,7 +35,7 @@ public class Invoice {
     @Column(name = "invoice_ref", nullable = false, unique = true, length = 50)
     private String invoiceRef;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
+    @Column(nullable = false)
     private String description;
 
     @Column(nullable = false, precision = 15, scale = 2)

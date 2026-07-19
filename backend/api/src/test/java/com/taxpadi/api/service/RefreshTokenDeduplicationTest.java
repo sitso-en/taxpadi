@@ -7,10 +7,10 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.lang.reflect.Field;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
@@ -42,9 +42,11 @@ class RefreshTokenDeduplicationTest {
     private User user;
 
     @BeforeEach
-    void setUp() {
+    void setUp() throws Exception {
         user = new User();
-        // Use reflection-free approach: just need a stable userId
+        Field idField = User.class.getDeclaredField("userId");
+        idField.setAccessible(true);
+        idField.set(user, UUID.randomUUID());
     }
 
     // ── Positive: named device always produces exactly one non-revoked row ──

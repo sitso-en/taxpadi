@@ -30,7 +30,7 @@ public class Transaction {
     @Column(nullable = false, length = 50)
     private String category;
 
-    @Column(columnDefinition = "TEXT")
+    @Column
     private String description;
 
     @Column(name = "entry_method", nullable = false, length = 20)
