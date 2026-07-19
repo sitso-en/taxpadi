@@ -434,13 +434,13 @@ public class PaymentService {
                 Map<String, Object> data = (Map<String, Object>) event.get("data");
                 String reference = (String) data.get("reference");
 
-                paymentRepository.findByPaymentReference(reference).ifPresent(payment -> {
+                paymentRepository.findFirstByPaymentReference(reference).ifPresent(payment -> {
                     if (PaymentStatus.PENDING.equals(payment.getStatus())) {
                         confirmSuccessful(payment);
                     }
                 });
 
-                subscriptionRepository.findByPaymentReference(reference).ifPresent(sub -> {
+                subscriptionRepository.findFirstByPaymentReference(reference).ifPresent(sub -> {
                     if (SubscriptionStatus.PENDING.equals(sub.getStatus())) {
                         activateSubscription(sub);
                     }

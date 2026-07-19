@@ -89,7 +89,7 @@ public class SubscriptionService {
     }
 
     public SubscriptionStatusDto getStatus(User user) {
-        Optional<Subscription> activeOpt = subscriptionRepository.findByUserAndStatus(user, SubscriptionStatus.ACTIVE);
+        Optional<Subscription> activeOpt = subscriptionRepository.findFirstByUserAndStatusOrderByCreatedAtDesc(user, SubscriptionStatus.ACTIVE);
 
         SubscriptionStatusDto dto = new SubscriptionStatusDto();
 
@@ -103,7 +103,7 @@ public class SubscriptionService {
             dto.setAutoRenew(sub.getAutoRenew());
             dto.setFeatures(new SubscriptionFeaturesDto(true));
         } else {
-            Optional<Subscription> cancelledOpt = subscriptionRepository.findByUserAndStatus(user, SubscriptionStatus.CANCELLED);
+            Optional<Subscription> cancelledOpt = subscriptionRepository.findFirstByUserAndStatusOrderByCreatedAtDesc(user, SubscriptionStatus.CANCELLED);
             if (cancelledOpt.isPresent() &&
                     cancelledOpt.get().getExpiresAt() != null &&
                     cancelledOpt.get().getExpiresAt().isAfter(LocalDateTime.now())) {
@@ -217,7 +217,7 @@ public class SubscriptionService {
 
     @Transactional
     public SubscribeResponse verify(User user) {
-        Subscription sub = subscriptionRepository.findByUserAndStatus(user, SubscriptionStatus.PENDING)
+        Subscription sub = subscriptionRepository.findFirstByUserAndStatusOrderByCreatedAtDesc(user, SubscriptionStatus.PENDING)
                 .orElseThrow(() -> new BadRequestException("No pending subscription found"));
 
         if (!paystackService.isSuccessful(sub.getPaymentReference()))
@@ -246,7 +246,7 @@ public class SubscriptionService {
 
     @Transactional
     public CancelSubscriptionResponse cancel(User user, String reason) {
-        Subscription sub = subscriptionRepository.findByUserAndStatus(user, SubscriptionStatus.ACTIVE)
+        Subscription sub = subscriptionRepository.findFirstByUserAndStatusOrderByCreatedAtDesc(user, SubscriptionStatus.ACTIVE)
                 .orElseThrow(() -> new BadRequestException(
                         "You do not have an active paid subscription to cancel"));
 

@@ -18,27 +18,32 @@ public class ComplianceCertificate {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, unique = true)
+    @Column(nullable = false, unique = true, length = 50)
     private String certificateNumber;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 50)
     private String certificateType;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String status;
 
     private LocalDate issueDate;
 
     private LocalDate expiryDate;
 
+    @Column(length = 150)
     private String issuedBy;
 
+    @Column(name = "tin_number", length = 20)
     private String tinNumber;
 
+    @Column(name = "business_name", length = 200)
     private String businessName;
 
+    @Column(name = "download_url", length = 500)
     private String downloadUrl;
 
+    @Column(length = 500)
     private String remarks;
 
     @Column(nullable = false, updatable = false)

@@ -18,7 +18,7 @@ public class SavingsVault {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String vaultName;
 
     @Column(nullable = false, precision = 15, scale = 2)
@@ -30,18 +30,21 @@ public class SavingsVault {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal autoSaveAmount = BigDecimal.ZERO;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String autoSaveFrequency = "MONTHLY";
 
     private boolean autoSaveEnabled = false;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String status = "ACTIVE";
 
+    @Column(length = 200)
     private String purpose;
 
+    @Column(name = "linked_momo_number", length = 20)
     private String linkedMomoNumber;
 
+    @Column(name = "linked_momo_provider", length = 30)
     private String linkedMomoProvider;
 
     @Column(nullable = false, updatable = false)

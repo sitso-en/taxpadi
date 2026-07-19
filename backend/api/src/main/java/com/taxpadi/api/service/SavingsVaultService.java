@@ -144,6 +144,7 @@ public class SavingsVaultService {
         return new VaultTransactionsResponse(dtos, summary, pagination);
     }
 
+    @Transactional(readOnly = true)
     public VaultSuggestionDto getSuggestion(User user) {
         requirePaidSubscription(user);
         SavingsVault vault = requireVault(user);

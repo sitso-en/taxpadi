@@ -451,6 +451,7 @@ public class AuthService {
         return new LogoutResponse("Logged out successfully");
     }
 
+    @Transactional
     public RegisterBiometricResponse registerBiometric(RegisterBiometricRequest request, User user, String ipAddress) {
         log.info("Biometric registration for userId={}, device={}", user.getUserId(), request.getDeviceInfo());
 

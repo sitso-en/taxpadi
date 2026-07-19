@@ -18,29 +18,29 @@ public class Subscription {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 30)
     private String plan;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String status;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "subscription_tier", nullable = false)
     private SubscriptionTier subscriptionTier = SubscriptionTier.FREE;
 
-    @Column(name = "payment_method")
+    @Column(name = "payment_method", length = 30)
     private String paymentMethod;
 
     @Column(precision = 10, scale = 2)
     private BigDecimal amount;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 10)
     private String currency = "GHS";
 
-    @Column(name = "payment_reference")
+    @Column(name = "payment_reference", length = 100)
     private String paymentReference;
 
-    @Column(name = "momo_number")
+    @Column(name = "momo_number", length = 20)
     private String momoNumber;
 
     @Column(name = "auto_renew")
@@ -55,7 +55,7 @@ public class Subscription {
     @Column(name = "cancelled_at")
     private LocalDateTime cancelledAt;
 
-    @Column(name = "cancel_reason")
+    @Column(name = "cancel_reason", length = 500)
     private String cancelReason;
 
     @Column(name = "created_at", nullable = false, updatable = false)

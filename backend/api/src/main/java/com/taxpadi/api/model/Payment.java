@@ -33,19 +33,19 @@ public class Payment {
     @Column(nullable = false, precision = 15, scale = 2)
     private BigDecimal amount;
 
-    @Column(name = "payment_method", nullable = false)
+    @Column(name = "payment_method", nullable = false, length = 30)
     private String paymentMethod;
 
-    @Column(name = "payment_reference")
+    @Column(name = "payment_reference", length = 100)
     private String paymentReference;
 
-    @Column(name = "momo_number")
+    @Column(name = "momo_number", length = 20)
     private String momoNumber;
 
-    @Column(name = "momo_provider")
+    @Column(name = "momo_provider", length = 30)
     private String momoProvider;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 20)
     private String status = "pending";
 
     @Column(name = "paid_at")

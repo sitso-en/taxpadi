@@ -25,7 +25,7 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID>, JpaSpec
     @Query("SELECT COALESCE(SUM(p.amount), 0) FROM Payment p WHERE p.user = :user AND p.status = :status")
     BigDecimal sumByUserAndStatus(@Param("user") User user, @Param("status") String status);
 
-    Optional<Payment> findByPaymentReference(String paymentReference);
+    Optional<Payment> findFirstByPaymentReference(String paymentReference);
 
     boolean existsByTaxReturnAndStatus(TaxReturn taxReturn, String status);
     boolean existsByPenaltyAndStatus(Penalty penalty, String status);

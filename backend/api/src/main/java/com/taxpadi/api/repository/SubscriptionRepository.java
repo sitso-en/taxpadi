@@ -13,13 +13,13 @@ import java.util.UUID;
 
 public interface SubscriptionRepository extends JpaRepository<Subscription, UUID> {
 
-    Optional<Subscription> findByUserAndStatus(User user, String status);
+    Optional<Subscription> findFirstByUserAndStatusOrderByCreatedAtDesc(User user, String status);
 
     boolean existsByUserAndStatus(User user, String status);
 
-    Optional<Subscription> findByPaymentReference(String paymentReference);
+    Optional<Subscription> findFirstByPaymentReference(String paymentReference);
 
-    @Query("SELECT s FROM Subscription s WHERE s.user = :user ORDER BY s.createdAt DESC")
+    @Query("SELECT s FROM Subscription s WHERE s.user = :user ORDER BY s.createdAt DESC LIMIT 1")
     Optional<Subscription> findLatestByUser(@Param("user") User user);
 
     @Query("SELECT s FROM Subscription s WHERE s.status IN (:active, :cancelled) AND s.expiresAt < :now")
