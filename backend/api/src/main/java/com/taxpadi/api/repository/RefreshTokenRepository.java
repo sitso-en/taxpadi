@@ -27,7 +27,23 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 
     Optional<RefreshToken> findByTokenIdAndUser(UUID tokenId, User user);
 
-    Optional<RefreshToken> findByUserAndDeviceInfoAndRevokedFalse(User user, String deviceInfo);
+    /**
+     * Revokes all active (revoked = false) tokens for a given user and device before
+     * a new token is issued. Uses a native query so that null deviceInfo is matched
+     * correctly with IS NULL rather than the broken JPQL "= null" semantics.
+     */
+    @Modifying
+    @Query(value = """
+            UPDATE refresh_tokens
+            SET    revoked    = true,
+                   revoked_at = :now
+            WHERE  user_id    = :userId
+              AND  ((:deviceInfo IS NULL AND device_info IS NULL) OR device_info = :deviceInfo)
+              AND  revoked    = false
+            """, nativeQuery = true)
+    int revokeByUserAndDevice(@Param("userId") UUID userId,
+                               @Param("deviceInfo") String deviceInfo,
+                               @Param("now") LocalDateTime now);
 
     @Modifying
     @Query("UPDATE RefreshToken r SET r.revoked = true WHERE r.user = :user AND r.tokenId != :tokenId")

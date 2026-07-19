@@ -468,6 +468,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 32,
     borderTopRightRadius: 32,
     marginTop: -28,
+    overflow: "hidden",
   },
 
   sheetContent: {

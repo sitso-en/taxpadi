@@ -17,7 +17,7 @@ import {
   exportReport,
   getExportStatus,
   getReportsSummary,
-} from "../../services/reports.service";
+} from "@/services/reports.service";
 import { getUserFriendlyError } from "@/utils/error";
 import { useToast } from "@/context/ToastContext";
 

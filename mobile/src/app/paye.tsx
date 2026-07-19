@@ -4,7 +4,6 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -14,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import BottomSheet from "@/components/BottomSheet";
 import {
   getPayeRecords,
   getPayeEmployees,
@@ -317,20 +317,8 @@ export default function PAYEScreen() {
       )}
 
       {/* Add Employee Modal */}
-      <Modal
-        visible={showAddModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => { setShowAddModal(false); resetAddForm(); }}
-      >
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => { setShowAddModal(false); resetAddForm(); }}
-          />
-          <ScrollView style={styles.addSheet} keyboardShouldPersistTaps="handled">
-            <View style={styles.sheetHandle} />
+      <BottomSheet visible={showAddModal} onClose={() => { setShowAddModal(false); resetAddForm(); }} avoidKeyboard>
+        <ScrollView style={styles.sheetContent} keyboardShouldPersistTaps="handled">
             <Text style={styles.sheetTitle}>Add Employee</Text>
             <Text style={styles.sheetSub}>Employee's monthly PAYE will be calculated automatically.</Text>
 
@@ -419,9 +407,8 @@ export default function PAYEScreen() {
               <Text style={styles.buttonText}>{addingEmployee ? "Adding…" : "Add Employee"}</Text>
             </TouchableOpacity>
             <View style={{ height: 20 }} />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
+        </ScrollView>
+      </BottomSheet>
 
       {/* Deactivate Employee Modal */}
       <Modal
@@ -669,14 +656,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
 
-  // Add employee sheet
-  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.35)" },
-  addSheet: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  sheetContent: {
     paddingHorizontal: 22,
-    paddingTop: 12,
+    paddingBottom: 24,
     maxHeight: "90%",
   },
   sheetHandle: {

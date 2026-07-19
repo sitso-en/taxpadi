@@ -11,9 +11,9 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useInvoices } from "../../context/InvoiceContext";
+import { useInvoices } from "@/context/InvoiceContext";
 import ErrorState from "@/components/ErrorState";
-import { usePrivacy } from "../../context/PrivacyContext";
+import { usePrivacy } from "@/context/PrivacyContext";
 
 const FILTERS = ["All", "Unpaid", "Paid", "Overdue", "Cancelled"];
 

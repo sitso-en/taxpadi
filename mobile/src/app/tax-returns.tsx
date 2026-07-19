@@ -3,13 +3,13 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
   ActivityIndicator,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import BottomSheet from "@/components/BottomSheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTaxReturns } from "../context/TaxReturnsContext";
 import { generateTaxReturn } from "@/services/taxReturns.service";
@@ -128,10 +128,8 @@ export default function TaxReturnsScreen() {
       </ScrollView>
 
       {/* ── Generate Modal ── */}
-      <Modal visible={showGenModal} transparent animationType="slide" onRequestClose={() => setShowGenModal(false)}>
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowGenModal(false)} />
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHandle} />
+      <BottomSheet visible={showGenModal} onClose={() => setShowGenModal(false)}>
+        <View style={styles.sheetContent}>
           <Text style={styles.modalTitle}>Generate Tax Return</Text>
           <Text style={styles.modalSub}>Select the tax type for {currentYear}</Text>
 
@@ -160,7 +158,7 @@ export default function TaxReturnsScreen() {
             <Text style={styles.genBtnText}>{generating ? "Generating…" : "Generate Return"}</Text>
           </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -453,17 +451,8 @@ const styles = StyleSheet.create({
     color: "#C44736",
   },
 
-  // ── Modal ──
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.3)",
-  },
-
-  modalSheet: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
+  sheetContent: {
+    paddingHorizontal: 24,
     paddingBottom: 40,
   },
 

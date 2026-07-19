@@ -17,7 +17,7 @@ import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
-import { useInvoices } from "../../context/InvoiceContext";
+import { useInvoices } from "@/context/InvoiceContext";
 import { useNetwork } from "@/context/NetworkContext";
 import { useToast } from "@/context/ToastContext";
 import OfflineFormNotice from "@/components/OfflineFormNotice";

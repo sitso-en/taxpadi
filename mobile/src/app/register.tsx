@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Animated,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,6 +14,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import BottomSheet from "@/components/BottomSheet";
 import { useAuthAnimation } from "@/hooks/useAuthAnimation";
 import { AuthArcs } from "@/components/AuthArcs";
 import { Dropdown } from "react-native-element-dropdown";
@@ -469,19 +469,8 @@ export default function RegisterScreen() {
       </ScrollView>
 
       {/* Generated password modal */}
-      <Modal
-        visible={generatedPassword !== null}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setGeneratedPassword(null)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setGeneratedPassword(null)}
-        />
-        <View style={styles.modalSheet}>
-          <View style={styles.modalHandle} />
+      <BottomSheet visible={generatedPassword !== null} onClose={() => setGeneratedPassword(null)}>
+        <View style={styles.sheetContent}>
 
           <View style={styles.modalHeaderRow}>
             <View style={styles.modalIconBox}>
@@ -526,7 +515,7 @@ export default function RegisterScreen() {
             <Text style={styles.savedButtonText}>Done, I've saved it</Text>
           </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheet>
     </KeyboardAvoidingView>
   );
 }
@@ -797,25 +786,9 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     textDecorationLine: "underline",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-  modalSheet: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  sheetContent: {
     paddingHorizontal: 24,
     paddingBottom: 36,
-    paddingTop: 12,
-  },
-  modalHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#E5E7EB",
-    alignSelf: "center",
-    marginBottom: 20,
   },
   modalHeaderRow: {
     flexDirection: "row",

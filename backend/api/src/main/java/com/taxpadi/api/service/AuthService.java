@@ -254,9 +254,8 @@ public class AuthService {
             // Auto-login: create a session so the frontend can skip the login screen
             String deviceInfo = request.getDeviceInfo() != null ? request.getDeviceInfo() : "mobile";
             String rawRefreshToken = UUID.randomUUID().toString();
-            RefreshToken refreshToken = refreshTokenRepository
-                    .findByUserAndDeviceInfoAndRevokedFalse(user, deviceInfo)
-                    .orElse(new RefreshToken());
+            refreshTokenRepository.revokeByUserAndDevice(user.getUserId(), deviceInfo, LocalDateTime.now());
+            RefreshToken refreshToken = new RefreshToken();
             refreshToken.setUser(user);
             refreshToken.setTokenHash(hashToken(rawRefreshToken));
             refreshToken.setDeviceInfo(deviceInfo);
@@ -328,6 +327,7 @@ public class AuthService {
         return new ResendOtpResponse(phone, 10);
     }
 
+    @Transactional
     public LoginResponse login(LoginRequest request, String ipAddress) {
         String phone = PhoneUtil.normalize(request.getPhone());
         log.info("Login attempt for phone={}", phone);
@@ -371,9 +371,12 @@ public class AuthService {
 
         
         String rawRefreshToken = UUID.randomUUID().toString();
-        RefreshToken refreshToken = refreshTokenRepository
-                .findByUserAndDeviceInfoAndRevokedFalse(user, request.getDeviceInfo())
-                .orElse(new RefreshToken());
+        // Revoke any existing active session for this user+device before creating a new one.
+        // This prevents duplicate non-revoked rows from accumulating (the old findByUser...orElse
+        // pattern silently created new rows every time deviceInfo was null due to JPQL null-equality).
+        refreshTokenRepository.revokeByUserAndDevice(user.getUserId(), request.getDeviceInfo(), LocalDateTime.now());
+
+        RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
         refreshToken.setTokenHash(hashToken(rawRefreshToken));
         refreshToken.setDeviceInfo(request.getDeviceInfo());
@@ -462,6 +465,7 @@ public class AuthService {
         return new RegisterBiometricResponse(true, request.getDeviceInfo());
     }
 
+    @Transactional
     public BiometricLoginResponse biometricLogin(BiometricLoginRequest request, String ipAddress) {
         log.info("Biometric login attempt from device={}", request.getDeviceInfo());
 
@@ -485,9 +489,9 @@ public class AuthService {
 
         
         String rawRefreshToken = UUID.randomUUID().toString();
-        RefreshToken refreshToken = refreshTokenRepository
-                .findByUserAndDeviceInfoAndRevokedFalse(user, request.getDeviceInfo())
-                .orElse(new RefreshToken());
+        refreshTokenRepository.revokeByUserAndDevice(user.getUserId(), request.getDeviceInfo(), LocalDateTime.now());
+
+        RefreshToken refreshToken = new RefreshToken();
         refreshToken.setUser(user);
         refreshToken.setTokenHash(hashToken(rawRefreshToken));
         refreshToken.setDeviceInfo(request.getDeviceInfo());

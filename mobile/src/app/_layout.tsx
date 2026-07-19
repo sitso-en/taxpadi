@@ -1,4 +1,5 @@
 import { Stack } from "expo-router";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import {
   useFonts,
   Inter_400Regular,
@@ -39,7 +40,7 @@ export default function RootLayout() {
   }
 
   return (
-    <>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <StatusBar style="dark" />
       <NetworkProvider>
       <PrivacyProvider>
@@ -92,6 +93,6 @@ export default function RootLayout() {
       </ToastProvider>
       </PrivacyProvider>
       </NetworkProvider>
-    </>
+    </GestureHandlerRootView>
   );
 }

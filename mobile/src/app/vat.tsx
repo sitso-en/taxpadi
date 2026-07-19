@@ -4,8 +4,6 @@ import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -14,6 +12,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import BottomSheet from "@/components/BottomSheet";
 import { getVatStatus, getVatRecords, registerVat } from "@/services/vat.service";
 import { usePrivacy } from "@/context/PrivacyContext";
 import SubscriptionGate from "@/components/SubscriptionGate";
@@ -261,20 +260,8 @@ export default function VATScreen() {
       )}
 
       {/* VAT Registration Modal */}
-      <Modal
-        visible={showRegisterModal}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowRegisterModal(false)}
-      >
-        <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
-          <TouchableOpacity
-            style={styles.modalOverlay}
-            activeOpacity={1}
-            onPress={() => setShowRegisterModal(false)}
-          />
-          <View style={styles.regSheet}>
-            <View style={styles.regHandle} />
+      <BottomSheet visible={showRegisterModal} onClose={() => setShowRegisterModal(false)} avoidKeyboard>
+        <View style={styles.sheetContent}>
             <Text style={styles.regTitle}>Register for VAT</Text>
             <Text style={styles.regSub}>
               Enter your GRA VAT registration details to activate VAT tracking in TaxPadi.
@@ -316,9 +303,8 @@ export default function VATScreen() {
             >
               <Text style={styles.buttonText}>{registering ? "Registering…" : "Confirm Registration"}</Text>
             </TouchableOpacity>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+        </View>
+      </BottomSheet>
     </ScrollView>
   );
 }
@@ -549,26 +535,9 @@ const styles = StyleSheet.create({
     lineHeight: 17,
   },
 
-  // Registration modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-  regSheet: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  sheetContent: {
     paddingHorizontal: 22,
     paddingBottom: 36,
-    paddingTop: 12,
-  },
-  regHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#E5E7EB",
-    alignSelf: "center",
-    marginBottom: 18,
   },
   regTitle: {
     fontSize: 18,

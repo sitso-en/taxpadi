@@ -6,6 +6,7 @@ import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dropdown } from "react-native-element-dropdown";
 import { getUserFriendlyError } from "@/utils/error";
+import BottomSheet from "@/components/BottomSheet";
 import {
   Animated,
   Image,
@@ -512,19 +513,8 @@ export default function AddTransactionScreen() {
       </View>
 
       {/* Voice Help Tooltip */}
-      <Modal
-        visible={showVoiceHelp}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowVoiceHelp(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowVoiceHelp(false)}
-        />
-        <View style={styles.tooltipSheet}>
-          <View style={styles.tooltipHandle} />
+      <BottomSheet visible={showVoiceHelp} onClose={() => setShowVoiceHelp(false)}>
+        <View style={styles.tooltipContent}>
           <View style={styles.tooltipHeaderRow}>
             <View style={styles.tooltipIconBox}>
               <Ionicons name="mic-outline" size={18} color="#C44736" />
@@ -561,22 +551,11 @@ export default function AddTransactionScreen() {
             <Text style={styles.tooltipBtnText}>Got It</Text>
           </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheet>
 
       {/* Scan Receipt Tooltip */}
-      <Modal
-        visible={showScanHelp}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setShowScanHelp(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowScanHelp(false)}
-        />
-        <View style={styles.tooltipSheet}>
-          <View style={styles.tooltipHandle} />
+      <BottomSheet visible={showScanHelp} onClose={() => setShowScanHelp(false)}>
+        <View style={styles.tooltipContent}>
           <View style={styles.tooltipHeaderRow}>
             <View style={styles.tooltipIconBox}>
               <Ionicons name="camera-outline" size={18} color="#C44736" />
@@ -613,7 +592,7 @@ export default function AddTransactionScreen() {
             <Text style={styles.tooltipBtnText}>Got It</Text>
           </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheet>
 
       {/* Voice Scanning Overlay */}
       <Modal
@@ -648,15 +627,8 @@ export default function AddTransactionScreen() {
         </View>
       </Modal>
       {/* Voice Review */}
-      <Modal
-        visible={showVoiceReview}
-        transparent
-        animationType="slide"
-        onRequestClose={discardVoice}
-      >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={discardVoice} />
-        <View style={styles.tooltipSheet}>
-          <View style={styles.tooltipHandle} />
+      <BottomSheet visible={showVoiceReview} onClose={discardVoice}>
+        <View style={styles.tooltipContent}>
           <View style={styles.tooltipHeaderRow}>
             <View style={styles.tooltipIconBox}>
               <Ionicons name="mic" size={18} color="#C44736" />
@@ -696,7 +668,7 @@ export default function AddTransactionScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </BottomSheet>
 
       {/* Receipt Preview */}
       <Modal
@@ -948,27 +920,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: "Inter_600SemiBold",
   },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.35)",
-  },
-
-  // Voice help tooltip sheet
-  tooltipSheet: {
-    backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+  tooltipContent: {
     paddingHorizontal: 22,
     paddingBottom: 32,
-    paddingTop: 12,
-  },
-  tooltipHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#E5E7EB",
-    alignSelf: "center",
-    marginBottom: 18,
   },
   tooltipHeaderRow: {
     flexDirection: "row",
