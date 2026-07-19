@@ -19,12 +19,14 @@ import {
   getSubscriptionPlans,
   getSubscriptionStatus,
   subscribe,
+  verifySubscription,
   cancelSubscription,
 } from "../services/subscriptions.service";
 import { getUserFriendlyError } from "@/utils/error";
 import { useToast } from "@/context/ToastContext";
 import { useNetwork } from "@/context/NetworkContext";
 import { useUser } from "@/context/UserContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 
 const PLAN_NICKNAMES: Record<string, string> = {
   free: "wiggly_faraday",
@@ -67,6 +69,7 @@ export default function ManagePlanScreen() {
   const { showToast } = useToast();
   const { isOnline } = useNetwork();
   const { user } = useUser();
+  const { refresh: refreshSubscriptionContext } = useSubscription();
 
   const [status, setStatus] = useState<Status | null>(null);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -81,6 +84,8 @@ export default function ManagePlanScreen() {
 
   const [subscribing, setSubscribing] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [pendingVerification, setPendingVerification] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -101,8 +106,8 @@ export default function ManagePlanScreen() {
   }, [load]);
 
   const isPaid = status?.subscription_tier === "paid";
-  const isActive = isPaid && status?.status === "ACTIVE";
-  const isCancelled = isPaid && status?.status === "CANCELLED";
+  const isActive = isPaid && status?.status?.toLowerCase() === "active";
+  const isCancelled = isPaid && status?.status?.toLowerCase() === "cancelled";
 
   const handleSelectPlan = (plan: SelectedPlan) => {
     if (selectedPlan === plan) {
@@ -142,12 +147,15 @@ export default function ManagePlanScreen() {
 
       if (url) {
         await Linking.openURL(url);
-        showToast("Complete your payment in the browser. Your plan will activate automatically.", "info");
+        showToast("Complete your payment in the browser, then tap 'Verify Payment' below.", "info");
+        setPendingVerification(true);
       } else if (paymentMethod === "momo") {
-        showToast("A payment prompt has been sent to your phone. Approve it to activate your plan.", "info");
+        showToast("A payment prompt has been sent to your phone. Approve it, then tap 'Verify Payment' below.", "info");
+        setPendingVerification(true);
       } else {
         showToast("Subscription activated successfully!", "success");
         await load();
+        await refreshSubscriptionContext();
       }
       setSelectedPlan(null);
       setPaymentMethod(null);
@@ -173,6 +181,26 @@ export default function ManagePlanScreen() {
       showToast(getUserFriendlyError(error), "error");
     } finally {
       setCancelling(false);
+    }
+  };
+
+  const handleVerify = async () => {
+    if (!isOnline) {
+      showToast("You're offline. Connect to the internet to verify.", "info");
+      return;
+    }
+    if (verifying) return;
+    setVerifying(true);
+    try {
+      await verifySubscription();
+      showToast("Subscription activated! You now have full access.", "success");
+      setPendingVerification(false);
+      await load();
+      await refreshSubscriptionContext();
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setVerifying(false);
     }
   };
 
@@ -369,6 +397,23 @@ export default function ManagePlanScreen() {
             </TouchableOpacity>
           )}
         </View>
+      )}
+
+      {/* Verify payment — shown after initiating a subscription */}
+      {pendingVerification && (
+        <TouchableOpacity
+          style={[styles.subscribeBtn, verifying && { opacity: 0.7 }, { marginBottom: 12 }]}
+          onPress={handleVerify}
+        >
+          {verifying ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Ionicons name="checkmark-circle-outline" size={18} color="#FFFFFF" style={{ marginRight: 8 }} />
+              <Text style={styles.subscribeBtnText}>Verify Payment</Text>
+            </>
+          )}
+        </TouchableOpacity>
       )}
 
       {/* Cancel */}
@@ -609,6 +654,8 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingVertical: 16,
     alignItems: "center",
+    flexDirection: "row",
+    justifyContent: "center",
     marginTop: 4,
   },
   subscribeBtnText: {

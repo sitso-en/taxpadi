@@ -21,6 +21,11 @@ export const subscribe = async (payload: {
   return response.data;
 };
 
+export const verifySubscription = async () => {
+  const response = await client.post(ENDPOINTS.SUBSCRIPTIONS.VERIFY);
+  return response.data;
+};
+
 export const cancelSubscription = async () => {
   const response = await client.post(ENDPOINTS.SUBSCRIPTIONS.CANCEL);
   return response.data;
