@@ -46,6 +46,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         AND (:withholdingApplicable IS NULL OR t.withholdingApplicable = :withholdingApplicable)
         AND (:dateFrom IS NULL OR t.transactionDate >= :dateFrom)
         AND (:dateTo IS NULL OR t.transactionDate <= :dateTo)
+        AND (:search IS NULL OR LOWER(t.description) LIKE LOWER(CONCAT('%', :search, '%')))
       ORDER BY t.transactionDate DESC
       """)
     Page<Transaction> findFiltered(
@@ -57,6 +58,7 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         @Param("withholdingApplicable") Boolean withholdingApplicable,
         @Param("dateFrom") LocalDate dateFrom,
         @Param("dateTo") LocalDate dateTo,
+        @Param("search") String search,
         Pageable pageable
     );
 

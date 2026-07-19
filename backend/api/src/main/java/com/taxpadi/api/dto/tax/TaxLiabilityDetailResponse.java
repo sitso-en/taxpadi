@@ -1,18 +1,35 @@
 package com.taxpadi.api.dto.tax;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 public class TaxLiabilityDetailResponse {
+    @JsonProperty("tax_type")
     private String taxType;
-      private LocalDate periodStart;
-      private LocalDate periodEnd;
-      private BigDecimal grossIncome;
-      private BigDecimal totalDeductions;
-      private BigDecimal taxableIncome;
-      private BigDecimal taxLiability;
-      private LocalDateTime calculatedAt;
+
+    @JsonProperty("period_start")
+    private LocalDate periodStart;
+
+    @JsonProperty("period_end")
+    private LocalDate periodEnd;
+
+    @JsonProperty("gross_income")
+    private BigDecimal grossIncome;
+
+    @JsonProperty("total_deductions")
+    private BigDecimal totalDeductions;
+
+    @JsonProperty("taxable_income")
+    private BigDecimal taxableIncome;
+
+    @JsonProperty("tax_liability")
+    private BigDecimal taxLiability;
+
+    @JsonProperty("calculated_at")
+    private LocalDateTime calculatedAt;
 
       public TaxLiabilityDetailResponse(String taxType, LocalDate periodStart, LocalDate periodEnd,
                                          BigDecimal grossIncome, BigDecimal totalDeductions,

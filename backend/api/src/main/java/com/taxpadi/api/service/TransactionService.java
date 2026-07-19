@@ -90,13 +90,13 @@ public class TransactionService {
 
     public TransactionListResponse getTransactions(User user, String type, String category,
             String entryMethod, Boolean taxDeductible, Boolean withholdingApplicable,
-            LocalDate dateFrom, LocalDate dateTo, int page, int limit) {
+            LocalDate dateFrom, LocalDate dateTo, String search, int page, int limit) {
         int safePage = Math.max(0, page - 1);
         int safeLimit = Math.min(limit, 100);
 
         Page<Transaction> results = transactionRepository.findFiltered(
             user, type, category, entryMethod, taxDeductible, withholdingApplicable,
-            dateFrom, dateTo, PageRequest.of(safePage, safeLimit));
+            dateFrom, dateTo, search, PageRequest.of(safePage, safeLimit));
 
         PaginationInfo pagination = new PaginationInfo();
         pagination.setTotal(results.getTotalElements());
@@ -202,7 +202,7 @@ public class TransactionService {
         if (type.equals("income")) {
             int year = LocalDate.now().getYear();
             taxCalculationRepository
-                .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+                .findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEndOrderByCalculatedAtDesc(
                     user, "income_tax", LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31))
                 .filter(c -> c.getGrossIncome() != null
                     && c.getGrossIncome().compareTo(BigDecimal.ZERO) > 0
@@ -606,7 +606,7 @@ public class TransactionService {
         BigDecimal liability = taxEngine.calculateIncomeTax(taxableIncome);
 
         TaxCalculation calc = taxCalculationRepository
-            .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, "income_tax", start, end)
+            .findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEndOrderByCalculatedAtDesc(user, "income_tax", start, end)
             .orElseGet(() -> {
                 TaxCalculation c = new TaxCalculation();
                 c.setUser(user);

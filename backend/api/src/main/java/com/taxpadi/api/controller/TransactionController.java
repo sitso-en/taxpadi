@@ -55,12 +55,13 @@ public class TransactionController {
             @RequestParam(name = "withholding_applicable", required = false) Boolean withholdingApplicable,
             @RequestParam(name = "date_from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateFrom,
             @RequestParam(name = "date_to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate dateTo,
+            @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit) {
         User user = userDetails.getUser();
         return ResponseEntity.ok(new ApiResponse<>(true,
             transactionService.getTransactions(user, type, category, entryMethod,
-                taxDeductible, withholdingApplicable, dateFrom, dateTo, page, limit),
+                taxDeductible, withholdingApplicable, dateFrom, dateTo, search, page, limit),
             "Transactions retrieved successfully."));
     }
 

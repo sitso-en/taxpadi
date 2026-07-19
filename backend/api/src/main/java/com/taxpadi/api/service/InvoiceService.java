@@ -362,7 +362,7 @@ public class InvoiceService {
 
     private VaultSuggestion buildVaultSuggestion(User user, BigDecimal subtotal) {
         int year = LocalDate.now().getYear();
-        return taxCalculationRepository.findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+        return taxCalculationRepository.findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEndOrderByCalculatedAtDesc(
             user, "income_tax",
             LocalDate.of(year, 1, 1),
             LocalDate.of(year, 12, 31)

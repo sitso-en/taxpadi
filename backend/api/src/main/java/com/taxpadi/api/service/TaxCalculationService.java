@@ -7,6 +7,7 @@ import com.taxpadi.api.model.TaxCalculation;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.repository.PaymentRepository;
 import com.taxpadi.api.repository.TaxCalculationRepository;
+import com.taxpadi.api.repository.TaxDeadlineRepository;
 import com.taxpadi.api.repository.TransactionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -16,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -32,15 +34,18 @@ public class TaxCalculationService {
     private final TaxCalculationRepository taxCalculationRepository;
     private final TransactionRepository transactionRepository;
     private final PaymentRepository paymentRepository;
+    private final TaxDeadlineRepository taxDeadlineRepository;
     private final GhanaTaxEngine taxEngine;
 
     public TaxCalculationService(TaxCalculationRepository taxCalculationRepository,
                                   TransactionRepository transactionRepository,
                                   PaymentRepository paymentRepository,
+                                  TaxDeadlineRepository taxDeadlineRepository,
                                   GhanaTaxEngine taxEngine) {
         this.taxCalculationRepository = taxCalculationRepository;
         this.transactionRepository = transactionRepository;
         this.paymentRepository = paymentRepository;
+        this.taxDeadlineRepository = taxDeadlineRepository;
         this.taxEngine = taxEngine;
     }
 
@@ -59,19 +64,14 @@ public class TaxCalculationService {
         LocalDate periodStart = from != null ? from : calculations.stream().map(TaxCalculation::getPeriodStart).min(LocalDate::compareTo).orElse(LocalDate.now());
         LocalDate periodEnd   = to   != null ? to   : calculations.stream().map(TaxCalculation::getPeriodEnd).max(LocalDate::compareTo).orElse(LocalDate.now());
 
-        List<TaxBreakdownItemDto> breakdown = calculations.stream()
-            .map(c -> new TaxBreakdownItemDto(
-                c.getTaxType(),
-                c.getGrossIncome(),
-                c.getTotalDeductions(),
-                c.getTaxableIncome(),
-                c.getTaxLiability(),
-                c.getCalculatedAt()
-            )).toList();
+        Map<String, BigDecimal> breakdown = new HashMap<>();
+        BigDecimal totalTaxableIncome = BigDecimal.ZERO;
+        for (TaxCalculation c : calculations) {
+            breakdown.merge(c.getTaxType(), c.getTaxLiability(), BigDecimal::add);
+            totalTaxableIncome = totalTaxableIncome.add(c.getTaxableIncome() != null ? c.getTaxableIncome() : BigDecimal.ZERO);
+        }
 
-        BigDecimal total = breakdown.stream()
-            .map(TaxBreakdownItemDto::getTaxLiability)
-            .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal total = breakdown.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
 
         BigDecimal totalAmountPaid = java.util.Optional.ofNullable(
             (from != null && to != null)
@@ -86,8 +86,12 @@ public class TaxCalculationService {
             .max(LocalDateTime::compareTo)
             .orElse(LocalDateTime.now());
 
+        List<com.taxpadi.api.model.TaxDeadline> upcoming = taxDeadlineRepository
+            .findNextUpcoming(LocalDate.now(), user, PageRequest.of(0, 1));
+        LocalDate nextDeadline = upcoming.isEmpty() ? null : upcoming.get(0).getDueDate();
+
         int taxYear = periodStart.getYear();
-        return new TaxLiabilityResponse(taxYear, periodStart, periodEnd, total, totalAmountPaid, netLiability, breakdown, lastUpdated);
+        return new TaxLiabilityResponse(taxYear, periodStart, periodEnd, total, totalAmountPaid, netLiability, totalTaxableIncome, breakdown, nextDeadline, lastUpdated);
     }
 
     public TaxLiabilityDetailResponse getLiabilityByType(User user, String taxType, Integer year, Integer month) {
@@ -109,7 +113,7 @@ public class TaxCalculationService {
         }
 
         TaxCalculation calc = taxCalculationRepository
-            .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, taxType, periodStart, periodEnd)
+            .findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEndOrderByCalculatedAtDesc(user, taxType, periodStart, periodEnd)
             .orElseThrow(() -> new NotFoundException("No calculations found for this tax type and period"));
 
         return new TaxLiabilityDetailResponse(
@@ -180,7 +184,7 @@ public class TaxCalculationService {
             BigDecimal liability = taxEngine.calculateIncomeTax(taxableIncome);
 
             TaxCalculation calc = taxCalculationRepository
-                .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, "income_tax", start, end)
+                .findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEndOrderByCalculatedAtDesc(user, "income_tax", start, end)
                 .orElseGet(() -> {
                     TaxCalculation c = new TaxCalculation();
                     c.setUser(user);

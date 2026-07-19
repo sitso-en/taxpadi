@@ -37,7 +37,7 @@ public interface TaxReturnRepository extends JpaRepository<TaxReturn, UUID> {
 
     Optional<TaxReturn> findByReturnIdAndUser(UUID returnId, User user);
 
-    Optional<TaxReturn> findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+    Optional<TaxReturn> findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
         User user, String taxType, LocalDate periodStart, LocalDate periodEnd
     );
 

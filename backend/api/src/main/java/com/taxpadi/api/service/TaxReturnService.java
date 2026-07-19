@@ -135,7 +135,7 @@ public class TaxReturnService {
             periodEnd = LocalDate.of(taxYear, 12, 31);
         }
 
-        if (taxReturnRepository.findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+        if (taxReturnRepository.findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
                 user, taxType, periodStart, periodEnd).isPresent()) {
             throw new BadRequestException("A return already exists for this tax type and period.");
         }
@@ -183,7 +183,7 @@ public class TaxReturnService {
             taxLiability = whtLiability;
         } else {
             TaxCalculation calc = taxCalculationRepository
-                .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, taxType, periodStart, periodEnd)
+                .findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEndOrderByCalculatedAtDesc(user, taxType, periodStart, periodEnd)
                 .orElseThrow(() -> new NotFoundException("No tax calculation found for this period. Ensure you have transactions recorded."));
             grossIncome = calc.getGrossIncome();
             totalDeductions = calc.getTotalDeductions();
@@ -208,7 +208,7 @@ public class TaxReturnService {
 
         // Auto-create a deadline for this return if one doesn't exist yet
         boolean deadlineExists = taxDeadlineRepository
-            .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, taxType, periodStart, periodEnd)
+            .findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, taxType, periodStart, periodEnd)
             .isPresent();
         if (!deadlineExists) {
             LocalDate dueDate = computeDueDate(taxType, periodEnd, taxYear);
@@ -323,7 +323,7 @@ public class TaxReturnService {
         taxReturnRepository.save(r);
 
         taxDeadlineRepository
-            .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+            .findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
                 user, r.getTaxType(), r.getPeriodStart(), r.getPeriodEnd())
             .ifPresent(deadline -> {
                 deadline.setCompleted(true);

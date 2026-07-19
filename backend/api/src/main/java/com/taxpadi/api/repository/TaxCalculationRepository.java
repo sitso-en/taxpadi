@@ -24,7 +24,7 @@ public interface TaxCalculationRepository extends JpaRepository<TaxCalculation, 
         @Param("to") LocalDate to
     );
 
-    Optional<TaxCalculation> findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+    Optional<TaxCalculation> findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEndOrderByCalculatedAtDesc(
         User user, String taxType, LocalDate periodStart, LocalDate periodEnd);
 
     Page<TaxCalculation> findAllByUserOrderByPeriodStartDesc(User user, Pageable pageable);

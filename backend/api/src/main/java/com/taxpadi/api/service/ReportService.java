@@ -84,7 +84,7 @@ public class ReportService {
         LocalDate yearStart = LocalDate.of(from.getYear(), 1, 1);
         LocalDate yearEnd   = LocalDate.of(from.getYear(), 12, 31);
         Optional<TaxCalculation> calc = taxCalculationRepository
-            .findByUserAndTaxTypeAndPeriodStartAndPeriodEnd(user, "income_tax", yearStart, yearEnd);
+            .findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEndOrderByCalculatedAtDesc(user, "income_tax", yearStart, yearEnd);
         if (calc.isPresent()) {
             incomeTax = nvl(calc.get().getTaxLiability());
         }

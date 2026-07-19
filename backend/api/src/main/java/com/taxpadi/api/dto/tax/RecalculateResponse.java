@@ -1,15 +1,28 @@
 package com.taxpadi.api.dto.tax;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
+
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
 public class RecalculateResponse {
+    @JsonProperty("recalculated")
     private boolean recalculated;
+
+    @JsonProperty("tax_types_updated")
     private List<String> taxTypesUpdated;
+
+    @JsonProperty("tax_liability")
     private BigDecimal newTotalLiability;
+
+    @JsonProperty("total_amount_paid")
     private BigDecimal totalAmountPaid;
+
+    @JsonProperty("net_liability")
     private BigDecimal netLiability;
+
+    @JsonProperty("calculated_at")
     private LocalDateTime calculatedAt;
 
     public RecalculateResponse(boolean recalculated, List<String> taxTypesUpdated,
