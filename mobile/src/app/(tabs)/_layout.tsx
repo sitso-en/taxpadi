@@ -6,7 +6,6 @@ import {
 } from "@expo-google-fonts/inter";
 import { Ionicons } from "@expo/vector-icons";
 import { Tabs } from "expo-router";
-import { StatusBar } from "expo-status-bar";
 import FloatingTaxBot from "../../components/FloatingTaxBot";
 
 export default function Layout() {
@@ -22,7 +21,6 @@ export default function Layout() {
 
   return (
     <>
-      <StatusBar style="dark" />
       <Tabs
         screenOptions={{
           headerShown: false,

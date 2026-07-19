@@ -6,6 +6,8 @@ public class WithholdingRatesInfo {
 
     private List<WhtRateDto> rates;
 
+    public WithholdingRatesInfo() {}
+
     public WithholdingRatesInfo(List<WhtRateDto> rates) {
         this.rates = rates;
     }

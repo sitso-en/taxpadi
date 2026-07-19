@@ -13,6 +13,8 @@ public class VatRateInfo {
     private String filingFrequency;
     private String filingDeadline;
 
+    public VatRateInfo() {}
+
     public VatRateInfo(String standardRate, String nhilLevy, String getfundLevy, String effectiveRate,
                        BigDecimal registrationThresholdGoods, String registrationThresholdServices,
                        String filingFrequency, String filingDeadline) {

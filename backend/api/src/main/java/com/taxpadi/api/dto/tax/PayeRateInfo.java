@@ -8,6 +8,8 @@ public class PayeRateInfo {
     private String remittanceDeadline;
     private String annualReturnDeadline;
 
+    public PayeRateInfo() {}
+
     public PayeRateInfo(List<TaxBracketDto> brackets, String remittanceDeadline, String annualReturnDeadline) {
         this.brackets = brackets;
         this.remittanceDeadline = remittanceDeadline;

@@ -9,8 +9,8 @@ import {
   Text,
   TouchableOpacity,
   View,
-  SafeAreaView,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { getTaxRates } from "@/services/tax.service";
 import { useTaxLiability } from "@/context/TaxLiabilityContext";
@@ -57,7 +57,7 @@ export default function TaxScreen() {
   const penalties = rates?.penalties;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
       <ScrollView
         style={styles.container}
         contentContainerStyle={{ paddingBottom: 80 }}

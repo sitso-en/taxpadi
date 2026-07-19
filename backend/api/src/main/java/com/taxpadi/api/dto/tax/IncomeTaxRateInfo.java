@@ -7,6 +7,8 @@ public class IncomeTaxRateInfo {
     private List<TaxBracketDto> brackets;
     private String filingDeadline;
 
+    public IncomeTaxRateInfo() {}
+
     public IncomeTaxRateInfo(List<TaxBracketDto> brackets, String filingDeadline) {
         this.brackets = brackets;
         this.filingDeadline = filingDeadline;

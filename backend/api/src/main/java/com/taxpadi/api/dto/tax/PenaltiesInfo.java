@@ -5,6 +5,8 @@ public class PenaltiesInfo {
     private String latePaymentRate;
     private String payeLateRemittance;
 
+    public PenaltiesInfo() {}
+
     public PenaltiesInfo(String latePaymentRate, String payeLateRemittance) {
         this.latePaymentRate = latePaymentRate;
         this.payeLateRemittance = payeLateRemittance;
