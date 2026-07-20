@@ -6,18 +6,30 @@ import com.taxpadi.api.dto.deadline.DeadlineListResponse;
 import com.taxpadi.api.dto.deadline.TaxDeadlineDto;
 import com.taxpadi.api.dto.deadline.UpcomingDeadlinesResponse;
 import com.taxpadi.api.exception.BadRequestException;
-import com.taxpadi.api.exception.NotFoundException;
+import com.taxpadi.api.model.PayeRecord;
 import com.taxpadi.api.model.TaxDeadline;
+import com.taxpadi.api.model.User;
+import com.taxpadi.api.model.UserTaxProfile;
+import com.taxpadi.api.repository.PayeRecordRepository;
 import com.taxpadi.api.repository.TaxDeadlineRepository;
-import org.springframework.cache.annotation.CacheEvict;
-import org.springframework.cache.annotation.Cacheable;
+import com.taxpadi.api.repository.TaxReturnRepository;
+import com.taxpadi.api.repository.TransactionRepository;
+import com.taxpadi.api.repository.UserTaxProfileRepository;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.TextStyle;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -25,52 +37,62 @@ import java.util.stream.Collectors;
 public class TaxDeadlineService {
 
     private final TaxDeadlineRepository repo;
+    private final UserTaxProfileRepository profileRepo;
+    private final TransactionRepository txRepo;
+    private final PayeRecordRepository payeRepo;
+    private final TaxReturnRepository returnRepo;
 
-    public TaxDeadlineService(TaxDeadlineRepository repo) {
+    public TaxDeadlineService(TaxDeadlineRepository repo, UserTaxProfileRepository profileRepo,
+                               TransactionRepository txRepo, PayeRecordRepository payeRepo,
+                               TaxReturnRepository returnRepo) {
         this.repo = repo;
+        this.profileRepo = profileRepo;
+        this.txRepo = txRepo;
+        this.payeRepo = payeRepo;
+        this.returnRepo = returnRepo;
     }
 
-    @Cacheable(value = "tax-deadlines", key = "'all:' + #page + ':' + #limit")
-    public DeadlineListResponse getAll(int page, int limit) {
-        List<TaxDeadline> all = repo.findByIsActiveTrue();
-        all.sort((a, b) -> a.getDueDate().compareTo(b.getDueDate()));
-        long total = all.size();
-        int fromIdx = Math.min((page - 1) * limit, (int) total);
-        int toIdx = Math.min(fromIdx + limit, (int) total);
-        List<TaxDeadlineDto> dtos = all.subList(fromIdx, toIdx).stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
-        int totalPages = (int) Math.ceil((double) total / limit);
-        return new DeadlineListResponse(dtos, new PaginationInfo(total, page, limit, totalPages));
+    public DeadlineListResponse getAll(User user, int page, int limit) {
+        List<TaxDeadlineDto> all = buildAllDeadlines(user);
+        int total = all.size();
+        int from = (page - 1) * limit;
+        int to = Math.min(from + limit, total);
+        List<TaxDeadlineDto> paged = from >= total ? List.of() : all.subList(from, to);
+        int totalPages = total == 0 ? 1 : (int) Math.ceil((double) total / limit);
+        return new DeadlineListResponse(paged, new PaginationInfo(total, page, limit, totalPages));
     }
 
-    @Cacheable(value = "tax-deadlines", key = "'upcoming:' + #days")
-    public UpcomingDeadlinesResponse getUpcoming(int days) {
+    public UpcomingDeadlinesResponse getUpcoming(User user, int days) {
         if (days < 1 || days > 365) {
             throw new BadRequestException("Days parameter must be between 1 and 365.");
         }
-        List<TaxDeadline> upcoming = repo.findUpcoming(LocalDate.now(), LocalDate.now().plusDays(days));
-        List<TaxDeadlineDto> dtos = upcoming.stream()
-                .map(d -> toDtoWithUrgency(d, true))
+        LocalDate today = LocalDate.now();
+        LocalDate cutoff = today.plusDays(days);
+        List<TaxDeadlineDto> dtos = buildAllDeadlines(user).stream()
+                .filter(d -> !d.getDeadlineDate().isBefore(today) && !d.getDeadlineDate().isAfter(cutoff))
+                .map(this::withUrgency)
                 .collect(Collectors.toList());
         return new UpcomingDeadlinesResponse(dtos);
     }
 
     @Transactional
-    @CacheEvict(value = "tax-deadlines", allEntries = true)
-    public CompleteDeadlineResponse complete(UUID deadlineId) {
-        TaxDeadline d = repo.findById(deadlineId)
-                .orElseThrow(() -> new NotFoundException("No deadline found with this ID."));
+    public CompleteDeadlineResponse complete(User user, String taxType,
+                                              LocalDate periodStart, LocalDate periodEnd) {
+        TaxDeadline d = repo.findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+                user, taxType, periodStart, periodEnd)
+                .orElseGet(() -> newDeadlineEntity(user, taxType, periodStart, periodEnd));
+
         if (d.isCompleted()) {
             throw new BadRequestException("This deadline is already marked as complete.");
         }
+
         d.setCompleted(true);
         d.setCompletedAt(LocalDateTime.now());
         repo.save(d);
 
         CompleteDeadlineResponse resp = new CompleteDeadlineResponse();
-        resp.setDeadlineId(d.getDeadlineId());
-        resp.setTaxType(d.getTaxType());
+        resp.setDeadlineId(deterministicId(user.getUserId(), taxType, periodStart));
+        resp.setTaxType(taxType);
         resp.setDescription(d.getDescription());
         resp.setDeadlineDate(d.getDueDate());
         resp.setCompleted(true);
@@ -78,25 +100,230 @@ public class TaxDeadlineService {
         return resp;
     }
 
-    private TaxDeadlineDto toDto(TaxDeadline d) {
-        return toDtoWithUrgency(d, false);
+    // ── Private helpers ──────────────────────────────────────────────────────
+
+    private List<TaxDeadlineDto> buildAllDeadlines(User user) {
+        UserTaxProfile profile = profileRepo.findByUser(user).orElse(null);
+        boolean vatOk  = profile != null && Boolean.TRUE.equals(profile.getVatRegistered());
+        boolean payeOk = profile != null && Boolean.TRUE.equals(profile.getPayeRegistered());
+
+        List<Integer> years = new ArrayList<>(txRepo.findDistinctYearsByUser(user));
+        if (years.isEmpty() && payeOk) {
+            years.add(LocalDate.now().getYear());
+        }
+
+        List<TaxDeadlineDto> result = new ArrayList<>();
+
+        for (int year : years) {
+            LocalDate yearStart = LocalDate.of(year, 1, 1);
+            LocalDate yearEnd   = LocalDate.of(year, 12, 31);
+
+            List<Object[]> incomeByMonth = txRepo.sumByMonth(user, "income", yearStart, yearEnd);
+
+            // Income tax — one per year if any income exists
+            if (!incomeByMonth.isEmpty()) {
+                result.add(buildDto(user, "income_tax",
+                        "Annual Income Tax Filing " + year,
+                        "File your annual income tax return with GRA for the " + year + " tax year.",
+                        LocalDate.of(year + 1, 4, 30), yearStart, yearEnd));
+            }
+
+            // VAT — per quarter that had income
+            if (vatOk) {
+                int[][] quarters = {{1, 3}, {4, 6}, {7, 9}, {10, 12}};
+                LocalDate[] dueDates = {
+                    LocalDate.of(year, 4, 30),
+                    LocalDate.of(year, 7, 31),
+                    LocalDate.of(year, 10, 31),
+                    LocalDate.of(year + 1, 1, 31)
+                };
+                String[] qNames = {"Q1 (Jan–Mar)", "Q2 (Apr–Jun)", "Q3 (Jul–Sep)", "Q4 (Oct–Dec)"};
+
+                for (int q = 0; q < 4; q++) {
+                    final int startM = quarters[q][0];
+                    final int endM   = quarters[q][1];
+                    boolean hasIncome = incomeByMonth.stream().anyMatch(row -> {
+                        int m = ((Number) row[1]).intValue();
+                        return m >= startM && m <= endM;
+                    });
+                    if (hasIncome) {
+                        LocalDate qStart = LocalDate.of(year, startM, 1);
+                        LocalDate qEnd   = LocalDate.of(year, endM, 1)
+                                .withDayOfMonth(LocalDate.of(year, endM, 1).lengthOfMonth());
+                        result.add(buildDto(user, "vat",
+                                "VAT Filing — " + qNames[q] + " " + year,
+                                "Submit VAT return and payment for " + qNames[q] + " " + year + " to GRA.",
+                                dueDates[q], qStart, qEnd));
+                    }
+                }
+            }
+
+            // PAYE — one per month with payroll records
+            if (payeOk) {
+                List<PayeRecord> records = payeRepo.findAllByUserAndYear(user, year);
+                Set<Integer> months = records.stream()
+                        .map(PayeRecord::getMonth)
+                        .collect(Collectors.toSet());
+                for (int m : months) {
+                    LocalDate pStart = LocalDate.of(year, m, 1);
+                    LocalDate pEnd   = pStart.withDayOfMonth(pStart.lengthOfMonth());
+                    LocalDate due    = pEnd.plusMonths(1).withDayOfMonth(
+                            pEnd.plusMonths(1).lengthOfMonth());
+                    String monthName = pStart.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+                    result.add(buildDto(user, "paye",
+                            "PAYE Remittance — " + monthName + " " + year,
+                            "Remit PAYE deductions to GRA for employees for " + monthName + " " + year + ".",
+                            due, pStart, pEnd));
+                }
+            }
+
+            // Withholding — one per month with WHT transactions
+            List<Object[]> whtMonths = txRepo.findDistinctWithholdingMonths(user, yearStart, yearEnd);
+            for (Object[] row : whtMonths) {
+                int m = ((Number) row[1]).intValue();
+                LocalDate wStart = LocalDate.of(year, m, 1);
+                LocalDate wEnd   = wStart.withDayOfMonth(wStart.lengthOfMonth());
+                LocalDate due    = wEnd.plusMonths(1).withDayOfMonth(15);
+                String monthName = wStart.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+                result.add(buildDto(user, "withholding",
+                        "Withholding Tax — " + monthName + " " + year,
+                        "Remit withholding tax deductions to GRA for " + monthName + " " + year + ".",
+                        due, wStart, wEnd));
+            }
+        }
+
+        result.sort(Comparator.comparing(TaxDeadlineDto::getDeadlineDate));
+        return result;
     }
 
-    private TaxDeadlineDto toDtoWithUrgency(TaxDeadline d, boolean includeUrgency) {
+    private TaxDeadlineDto buildDto(User user, String taxType, String title, String description,
+                                     LocalDate due, LocalDate periodStart, LocalDate periodEnd) {
         TaxDeadlineDto dto = new TaxDeadlineDto();
-        dto.setDeadlineId(d.getDeadlineId());
-        dto.setTaxType(d.getTaxType());
-        dto.setTitle(d.getTitle());
-        dto.setDescription(d.getDescription());
-        dto.setDeadlineDate(d.getDueDate());
-        long daysUntil = ChronoUnit.DAYS.between(LocalDate.now(), d.getDueDate());
-        dto.setDaysUntilDue(daysUntil);
-        dto.setCompleted("COMPLETED".equals(d.getStatus()));
-        if (includeUrgency) {
-            if (daysUntil <= 7) dto.setUrgency("critical");
-            else if (daysUntil <= 30) dto.setUrgency("warning");
-            else dto.setUrgency("normal");
-        }
+        dto.setDeadlineId(deterministicId(user.getUserId(), taxType, periodStart));
+        dto.setTaxType(taxType);
+        dto.setTitle(title);
+        dto.setDescription(description);
+        dto.setDeadlineDate(due);
+        dto.setDaysUntilDue(ChronoUnit.DAYS.between(LocalDate.now(), due));
+        dto.setCompleted(isCompleted(user, taxType, periodStart, periodEnd));
+        dto.setPeriodStart(periodStart);
+        dto.setPeriodEnd(periodEnd);
         return dto;
+    }
+
+    private TaxDeadlineDto withUrgency(TaxDeadlineDto dto) {
+        long d = dto.getDaysUntilDue();
+        if (d <= 7)       dto.setUrgency("critical");
+        else if (d <= 30) dto.setUrgency("warning");
+        else              dto.setUrgency("normal");
+        return dto;
+    }
+
+    private boolean isCompleted(User user, String taxType, LocalDate periodStart, LocalDate periodEnd) {
+        // 1. Tax return filed or approved
+        Optional<com.taxpadi.api.model.TaxReturn> ret =
+                returnRepo.findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+                        user, taxType, periodStart, periodEnd);
+        if (ret.isPresent()) {
+            String status = ret.get().getStatus();
+            if ("SUBMITTED".equals(status) || "APPROVED".equals(status)) return true;
+        }
+
+        // 2. Manual override stored in tax_deadlines table
+        Optional<TaxDeadline> manual = repo.findFirstByUserAndTaxTypeAndPeriodStartAndPeriodEnd(
+                user, taxType, periodStart, periodEnd);
+        if (manual.isPresent() && manual.get().isCompleted()) return true;
+
+        // 3. PAYE — all records for the month are remitted
+        if ("paye".equals(taxType)) {
+            List<PayeRecord> records = payeRepo.findAllByUserAndMonthAndYear(
+                    user, periodStart.getMonthValue(), periodStart.getYear());
+            if (!records.isEmpty() && records.stream().allMatch(r -> Boolean.TRUE.equals(r.getRemitted()))) {
+                return true;
+            }
+        }
+
+        // 4. Withholding — no unremitted transactions in the period
+        if ("withholding".equals(taxType)) {
+            var unremitted = txRepo.findWhtTransactions(
+                    user, false, null, periodStart, periodEnd, PageRequest.of(0, 1));
+            if (unremitted.isEmpty()) return true;
+        }
+
+        return false;
+    }
+
+    private UUID deterministicId(UUID userId, String taxType, LocalDate periodStart) {
+        String key = userId + ":" + taxType + ":" + periodStart;
+        return UUID.nameUUIDFromBytes(key.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private TaxDeadline newDeadlineEntity(User user, String taxType,
+                                           LocalDate periodStart, LocalDate periodEnd) {
+        LocalDate due = computeDueDate(taxType, periodEnd);
+        TaxDeadline d = new TaxDeadline();
+        d.setUser(user);
+        d.setTaxType(taxType);
+        d.setTitle(buildTitle(taxType, periodStart));
+        d.setDescription(buildDescription(taxType, periodStart, periodEnd));
+        d.setDueDate(due);
+        d.setPeriodStart(periodStart);
+        d.setPeriodEnd(periodEnd);
+        d.setFrequency(frequency(taxType));
+        d.setStatus("PENDING");
+        d.setApplicableTo("user");
+        d.setActive(true);
+        return d;
+    }
+
+    private LocalDate computeDueDate(String taxType, LocalDate periodEnd) {
+        return switch (taxType) {
+            case "income_tax" -> LocalDate.of(periodEnd.getYear() + 1, 4, 30);
+            case "withholding" -> periodEnd.plusMonths(1).withDayOfMonth(15);
+            default -> {
+                LocalDate after = periodEnd.plusMonths(1);
+                yield after.withDayOfMonth(after.lengthOfMonth());
+            }
+        };
+    }
+
+    private String buildTitle(String taxType, LocalDate periodStart) {
+        int year = periodStart.getYear();
+        String month = periodStart.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        return switch (taxType) {
+            case "income_tax"  -> "Annual Income Tax Filing " + year;
+            case "vat"         -> "VAT Filing — " + quarterLabel(periodStart) + " " + year;
+            case "paye"        -> "PAYE Remittance — " + month + " " + year;
+            case "withholding" -> "Withholding Tax — " + month + " " + year;
+            default            -> taxType + " — " + periodStart;
+        };
+    }
+
+    private String buildDescription(String taxType, LocalDate periodStart, LocalDate periodEnd) {
+        int year = periodStart.getYear();
+        String month = periodStart.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+        return switch (taxType) {
+            case "income_tax"  -> "File your annual income tax return with GRA for the " + year + " tax year.";
+            case "vat"         -> "Submit VAT return and payment for " + quarterLabel(periodStart) + " " + year + " to GRA.";
+            case "paye"        -> "Remit PAYE deductions to GRA for employees for " + month + " " + year + ".";
+            case "withholding" -> "Remit withholding tax deductions to GRA for " + month + " " + year + ".";
+            default            -> "File " + taxType + " for period " + periodStart + " to " + periodEnd + ".";
+        };
+    }
+
+    private String frequency(String taxType) {
+        return switch (taxType) {
+            case "income_tax" -> "annual";
+            case "vat"        -> "quarterly";
+            default           -> "monthly";
+        };
+    }
+
+    private String quarterLabel(LocalDate periodStart) {
+        int m = periodStart.getMonthValue();
+        if (m <= 3)  return "Q1 (Jan\u2013Mar)";
+        if (m <= 6)  return "Q2 (Apr\u2013Jun)";
+        if (m <= 9)  return "Q3 (Jul\u2013Sep)";
+        return "Q4 (Oct\u2013Dec)";
     }
 }

@@ -16,10 +16,11 @@ import java.util.Map;
 @Service
 public class OcrService {
 
-    private static final String ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
-    private static final String MODEL = "claude-haiku-4-5-20251001";
+    private static final String MODEL = "gemini-2.0-flash";
+    private static final String GEMINI_URL =
+        "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent";
 
-    @Value("${anthropic.api-key}")
+    @Value("${gemini.api-key}")
     private String apiKey;
 
     private final RestClient restClient = RestClient.create();
@@ -28,47 +29,41 @@ public class OcrService {
     public OcrResult extractFromImage(byte[] imageBytes, String mediaType) {
         String base64 = Base64.getEncoder().encodeToString(imageBytes);
 
-        Map<String, Object> imageContent = Map.of(
-            "type", "image",
-            "source", Map.of(
-                "type", "base64",
-                "media_type", mediaType,
-                "data", base64
-            )
-        );
-        Map<String, Object> textContent = Map.of(
-            "type", "text",
-            "text", """
-                Extract transaction details from this receipt and respond with ONLY a JSON object in this exact format:
-                {"amount":120.00,"description":"Merchant - item description","category":"general_expense","transaction_date":"2024-01-15","confidence":"high"}
-                category must be one of: supplies, food_drinks, transport, utilities, equipment, rent_commercial, services, general_expense
-                confidence must be: high (clear image, all fields visible), medium (some fields unclear), low (poor image quality)
-                Use today's date if transaction_date is not visible. Return only the JSON, no other text.
-                """
-        );
-
         Map<String, Object> requestBody = Map.of(
-            "model", MODEL,
-            "max_tokens", 300,
-            "messages", List.of(Map.of("role", "user", "content", List.of(imageContent, textContent)))
+            "contents", List.of(Map.of(
+                "role", "user",
+                "parts", List.of(
+                    Map.of("inlineData", Map.of("mimeType", mediaType, "data", base64)),
+                    Map.of("text",
+                        "Extract transaction details from this receipt and respond with ONLY a JSON object in this exact format: " +
+                        "{\"amount\":120.00,\"description\":\"Merchant - item description\",\"category\":\"general_expense\",\"transaction_date\":\"2024-01-15\",\"confidence\":\"high\"} " +
+                        "category must be one of: supplies, food_drinks, transport, utilities, equipment, rent_commercial, services, general_expense. " +
+                        "confidence must be: high (clear image, all fields visible), medium (some fields unclear), low (poor image quality). " +
+                        "Use today's date if transaction_date is not visible. Return only the JSON, no other text."
+                    )
+                )
+            )),
+            "generationConfig", Map.of("maxOutputTokens", 300)
         );
 
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.post()
-                .uri(ANTHROPIC_URL)
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", "2023-06-01")
+                .uri(GEMINI_URL + "?key=" + apiKey)
                 .header("Content-Type", "application/json")
                 .body(requestBody)
                 .retrieve()
                 .body(Map.class);
 
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> content = (List<Map<String, Object>>) response.get("content");
-            String jsonText = (String) content.get(0).get("text");
+            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> firstContent = (Map<String, Object>) candidates.get(0).get("content");
+            @SuppressWarnings("unchecked")
+            List<Map<String, Object>> parts = (List<Map<String, Object>>) firstContent.get("parts");
+            String jsonText = (String) parts.get(0).get("text");
 
-            // Extract JSON from response (Claude may wrap it in backticks)
+            // Extract JSON from response (model may wrap it in backticks)
             jsonText = jsonText.trim();
             if (jsonText.startsWith("```")) {
                 jsonText = jsonText.replaceAll("```[a-z]*\\n?", "").replaceAll("```", "").trim();

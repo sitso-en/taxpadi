@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
-import { getTaxRates } from "@/services/tax.service";
+import { getTaxLiability, getTaxRates } from "@/services/tax.service";
 import { useTaxLiability } from "@/context/TaxLiabilityContext";
 import { usePrivacy } from "@/context/PrivacyContext";
 
@@ -22,13 +22,22 @@ const fmt = (n: number) =>
 const TABS = ["Overview", "Income Tax", "VAT", "PAYE", "Withholding"] as const;
 type Tab = (typeof TABS)[number];
 
+const CURRENT_YEAR = new Date().getFullYear();
+
 export default function TaxScreen() {
   const { amountsHidden, toggleAmountsHidden } = usePrivacy();
-  const { liability, loading: liabilityLoading } = useTaxLiability();
+  const { liability: contextLiability, loading: contextLoading } = useTaxLiability();
   const [activeTab, setActiveTab] = useState<Tab>("Overview");
   const [rates, setRates] = useState<any>(null);
   const [ratesLoading, setRatesLoading] = useState(true);
-  const loading = liabilityLoading || ratesLoading;
+
+  const [selectedYear, setSelectedYear] = useState(CURRENT_YEAR);
+  const [yearLiability, setYearLiability] = useState<any>(null);
+  const [yearLoading, setYearLoading] = useState(false);
+
+  // Use context data for current year, fetch separately for other years
+  const liability = selectedYear === CURRENT_YEAR ? contextLiability : yearLiability;
+  const loading = (selectedYear === CURRENT_YEAR ? contextLoading : yearLoading) || ratesLoading;
 
   useEffect(() => {
     const load = async () => {
@@ -43,6 +52,22 @@ export default function TaxScreen() {
     };
     load();
   }, []);
+
+  useEffect(() => {
+    if (selectedYear === CURRENT_YEAR) return;
+    const fetchYear = async () => {
+      setYearLoading(true);
+      try {
+        const res = await getTaxLiability(selectedYear);
+        setYearLiability(res.data ?? res);
+      } catch {
+        setYearLiability(null);
+      } finally {
+        setYearLoading(false);
+      }
+    };
+    fetchYear();
+  }, [selectedYear]);
 
   const netDue = Number(liability?.net_liability ?? 0);
   const totalLiability = Number(liability?.total_liability ?? 0);
@@ -106,7 +131,30 @@ export default function TaxScreen() {
               {amountsHidden ? "••••••••" : fmt(netDue)}
             </Text>
           )}
-          <Text style={styles.heroYear}>{liability?.tax_year ?? new Date().getFullYear()} tax year</Text>
+
+          {/* Year selector */}
+          <View style={styles.yearRow}>
+            <TouchableOpacity
+              onPress={() => setSelectedYear((y) => y - 1)}
+              style={styles.yearArrow}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-back" size={14} color="rgba(255,255,255,0.75)" />
+            </TouchableOpacity>
+            <Text style={styles.heroYear}>{selectedYear} tax year</Text>
+            <TouchableOpacity
+              onPress={() => setSelectedYear((y) => Math.min(y + 1, CURRENT_YEAR))}
+              style={styles.yearArrow}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              disabled={selectedYear >= CURRENT_YEAR}
+            >
+              <Ionicons
+                name="chevron-forward"
+                size={14}
+                color={selectedYear >= CURRENT_YEAR ? "rgba(255,255,255,0.3)" : "rgba(255,255,255,0.75)"}
+              />
+            </TouchableOpacity>
+          </View>
 
           {/* Progress bar */}
           <View style={styles.progressTrack}>
@@ -563,11 +611,21 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
 
+  yearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 16,
+  },
+
+  yearArrow: {
+    padding: 2,
+  },
+
   heroYear: {
     color: "rgba(255,255,255,0.65)",
     fontSize: 12,
     fontFamily: "Inter_400Regular",
-    marginBottom: 16,
   },
 
   progressTrack: {

@@ -16,6 +16,8 @@ public class TaxDeadlineDto {
     private long daysUntilDue;
     private boolean completed;
     private String urgency;
+    private LocalDate periodStart;
+    private LocalDate periodEnd;
 
     public UUID getDeadlineId() { return deadlineId; }
     public void setDeadlineId(UUID v) { this.deadlineId = v; }
@@ -33,4 +35,8 @@ public class TaxDeadlineDto {
     public void setCompleted(boolean v) { this.completed = v; }
     public String getUrgency() { return urgency; }
     public void setUrgency(String v) { this.urgency = v; }
+    public LocalDate getPeriodStart() { return periodStart; }
+    public void setPeriodStart(LocalDate v) { this.periodStart = v; }
+    public LocalDate getPeriodEnd() { return periodEnd; }
+    public void setPeriodEnd(LocalDate v) { this.periodEnd = v; }
 }

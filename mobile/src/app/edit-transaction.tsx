@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { useLocalSearchParams, router } from "expo-router";
 import { useState, useEffect } from "react";
 import { Dropdown } from "react-native-element-dropdown";
@@ -46,6 +47,7 @@ export default function EditTransactionScreen() {
   const [withholdingApplicable, setWithholdingApplicable] = useState(false);
   const [date, setDate] = useState(new Date());
 
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const { showToast } = useToast();
   const { isOnline } = useNetwork();
@@ -204,6 +206,21 @@ export default function EditTransactionScreen() {
           onChange={(item) => { setCategory(item.value); if (errors.category) setErrors((e) => ({ ...e, category: undefined })); }}
         />
         {errors.category ? <Text style={styles.fieldError}>{errors.category}</Text> : null}
+
+        <Text style={styles.label}>DATE</Text>
+        <TouchableOpacity style={styles.input} onPress={() => setShowDatePicker(true)}>
+          <Text style={{ color: "#111827", fontFamily: "Inter_400Regular", fontSize: 14 }}>
+            {date.toLocaleDateString("en-GH", { day: "numeric", month: "long", year: "numeric" })}
+          </Text>
+        </TouchableOpacity>
+        {showDatePicker && Platform.OS !== "web" && (
+          <DateTimePicker
+            value={date}
+            mode="date"
+            display={Platform.OS === "ios" ? "spinner" : "default"}
+            onChange={(_, d) => { setShowDatePicker(false); if (d) setDate(d); }}
+          />
+        )}
 
         {/* Toggles */}
         <TouchableOpacity

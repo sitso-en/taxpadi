@@ -7,6 +7,8 @@ import { usePrivacy } from "../../context/PrivacyContext";
 import Card from "../../components/Card";
 import { useTaxLiability } from "@/context/TaxLiabilityContext";
 import { useSavings } from "@/context/SavingsContext";
+import { getTransactions } from "@/services/transaction.service";
+import { getPayments } from "@/services/payment.service";
 
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -39,20 +41,85 @@ export default function HomeScreen() {
   const { suggestion } = useSavings();
   const [recalculating, setRecalculating] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+  const [monthlyStats, setMonthlyStats] = useState<{
+    income: number; expenses: number; taxEstimate: number | null; paid: number;
+  }>({ income: 0, expenses: 0, taxEstimate: null, paid: 0 });
+  const [displayPeriod, setDisplayPeriod] = useState({
+    month: new Date().getMonth() + 1,
+    year: new Date().getFullYear(),
+  });
+  const [statsError, setStatsError] = useState(false);
+
+  const fetchMonthStats = async (year: number, month: number) => {
+    const m = String(month).padStart(2, "0");
+    const lastDay = new Date(year, month, 0).getDate();
+    const dateFrom = `${year}-${m}-01`;
+    const dateTo   = `${year}-${m}-${String(lastDay).padStart(2, "0")}`;
+    const [txRes, payRes] = await Promise.all([
+      getTransactions({ date_from: dateFrom, date_to: dateTo, limit: 100 }),
+      getPayments({ date_from: dateFrom, date_to: dateTo }),
+    ]);
+    const txList: any[] = txRes.data?.transactions ?? txRes.transactions ?? [];
+    const payList: any[] = payRes.data?.payments ?? payRes.payments ?? [];
+    return { txList, payList };
+  };
 
   useFocusEffect(
     useCallback(() => {
       getTaxProfile()
         .then((res) => setOnboardingComplete(res.data?.onboarding_complete ?? false))
         .catch(() => setOnboardingComplete(null));
-    }, [])
+
+      (async () => {
+        try {
+          const now = new Date();
+          let year = now.getFullYear();
+          let month = now.getMonth() + 1;
+          let txList: any[] = [];
+          let payList: any[] = [];
+
+          for (let i = 0; i < 3; i++) {
+            const result = await fetchMonthStats(year, month);
+            if (result.txList.length > 0) {
+              txList = result.txList;
+              payList = result.payList;
+              break;
+            }
+            month--;
+            if (month === 0) { month = 12; year--; }
+          }
+
+          setDisplayPeriod({ month, year });
+
+          const income = txList
+            .filter((t) => t.type === "income")
+            .reduce((s, t) => s + Number(t.amount ?? 0), 0);
+          const expenses = txList
+            .filter((t) => t.type === "expense")
+            .reduce((s, t) => s + Number(t.amount ?? 0), 0);
+          const paid = payList
+            .filter((p) => ["completed", "successful", "confirmed"].includes((p.status ?? "").toLowerCase()))
+            .reduce((s, p) => s + Number(p.amount ?? 0), 0);
+
+          const annualIncome = liability?.taxable_income ?? 0;
+          const annualTax   = liability?.tax_liability   ?? 0;
+          const taxEstimate = (liability != null && annualIncome > 0)
+            ? Math.round(income * (annualTax / annualIncome))
+            : null;
+
+          setMonthlyStats({ income, expenses, taxEstimate, paid });
+          setStatsError(false);
+        } catch {
+          setStatsError(true);
+        }
+      })();
+    }, [liability])
   );
 
-  const taxableIncome = liability?.taxable_income ?? 0;
-  const totalDeductions = liability?.total_deductions ?? 0;
-  const taxLiability = liability?.tax_liability ?? 0;
-  const totalAmountPaid = liability?.total_amount_paid ?? 0;
   const netLiability = liability?.net_liability ?? 0;
+
+  const MONTH_NAMES = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const periodCaption = `${MONTH_NAMES[displayPeriod.month - 1]} ${displayPeriod.year}`;
 
   const handleRecalculate = async () => {
     if (recalculating) return;
@@ -178,40 +245,50 @@ export default function HomeScreen() {
         </Text>
       </LinearGradient>
 
-      {/* Summary Cards */}
+      {/* Summary Cards — current or most recent month with data */}
       <View style={styles.grid}>
         <Card style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Taxable Income</Text>
+          <Text style={styles.summaryTitle}>Income</Text>
           <Text style={styles.summaryAmount}>
-            {amountsHidden ? "••••••" : formatCurrency(taxableIncome)}
+            {amountsHidden ? "••••••" : formatCurrency(monthlyStats.income)}
           </Text>
-          <Text style={styles.summaryCaption}>This month</Text>
+          <Text style={styles.summaryCaption}>{periodCaption}</Text>
         </Card>
 
         <Card style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Total Deductions</Text>
+          <Text style={styles.summaryTitle}>Expenses</Text>
           <Text style={styles.summaryAmount}>
-            {amountsHidden ? "••••••" : formatCurrency(totalDeductions)}
+            {amountsHidden ? "••••••" : formatCurrency(monthlyStats.expenses)}
           </Text>
-          <Text style={styles.summaryCaption}>This month</Text>
+          <Text style={styles.summaryCaption}>{periodCaption}</Text>
         </Card>
 
         <Card style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Total Tax Liability</Text>
+          <Text style={styles.summaryTitle}>Est. Tax Due</Text>
           <Text style={styles.summaryAmount}>
-            {amountsHidden ? "••••••" : formatCurrency(taxLiability)}
+            {amountsHidden ? "••••••" : monthlyStats.taxEstimate != null
+              ? formatCurrency(monthlyStats.taxEstimate)
+              : "—"}
           </Text>
-          <Text style={styles.summaryCaption}>This month</Text>
+          <Text style={styles.summaryCaption}>
+            {monthlyStats.taxEstimate != null ? periodCaption : "Tap Recalculate"}
+          </Text>
         </Card>
 
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Tax Paid</Text>
           <Text style={styles.summaryAmount}>
-            {amountsHidden ? "••••••" : formatCurrency(totalAmountPaid)}
+            {amountsHidden ? "••••••" : formatCurrency(monthlyStats.paid)}
           </Text>
-          <Text style={styles.summaryCaption}>This month</Text>
+          <Text style={styles.summaryCaption}>{periodCaption}</Text>
         </Card>
       </View>
+
+      {statsError && (
+        <Text style={styles.statsErrorNote}>
+          Could not load summary data. Check your connection and try again.
+        </Text>
+      )}
 
       {/* Quick Actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
@@ -297,7 +374,7 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
-      {deadlines.map((deadline) => {
+      {deadlines.slice(0, 3).map((deadline) => {
         const daysLeft = calculateDaysLeft(deadline.dueDate);
 
         return (
@@ -519,6 +596,15 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#9CA3AF",
     fontFamily: "Inter_400Regular",
+  },
+
+  statsErrorNote: {
+    color: "#C44736",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    textAlign: "center",
+    marginTop: -10,
+    marginBottom: 12,
   },
 
   quickGrid: {

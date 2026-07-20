@@ -35,12 +35,17 @@ import com.taxpadi.api.constant.SubscriptionPlan;
 import com.taxpadi.api.constant.SubscriptionStatus;
 import com.taxpadi.api.model.Subscription;
 import com.taxpadi.api.model.SubscriptionTier;
+import com.taxpadi.api.constant.VaultTransactionStatus;
+import com.taxpadi.api.model.SavingsVault;
+import com.taxpadi.api.model.VaultTransaction;
 import com.taxpadi.api.repository.ComplianceCertificateRepository;
 import com.taxpadi.api.repository.PaymentRepository;
 import com.taxpadi.api.repository.PenaltyRepository;
+import com.taxpadi.api.repository.SavingsVaultRepository;
 import com.taxpadi.api.repository.SubscriptionRepository;
 import com.taxpadi.api.repository.TaxReturnRepository;
 import com.taxpadi.api.repository.UserRepository;
+import com.taxpadi.api.repository.VaultTransactionRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -73,6 +78,8 @@ public class PaymentService {
     private final SubscriptionRepository subscriptionRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
+    private final SavingsVaultRepository savingsVaultRepository;
+    private final VaultTransactionRepository vaultTransactionRepository;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     public PaymentService(PaymentRepository paymentRepository,
@@ -82,7 +89,9 @@ public class PaymentService {
                           PaystackService paystackService,
                           SubscriptionRepository subscriptionRepository,
                           UserRepository userRepository,
-                          NotificationService notificationService) {
+                          NotificationService notificationService,
+                          SavingsVaultRepository savingsVaultRepository,
+                          VaultTransactionRepository vaultTransactionRepository) {
         this.paymentRepository = paymentRepository;
         this.taxReturnRepository = taxReturnRepository;
         this.penaltyRepository = penaltyRepository;
@@ -91,6 +100,8 @@ public class PaymentService {
         this.subscriptionRepository = subscriptionRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
+        this.savingsVaultRepository = savingsVaultRepository;
+        this.vaultTransactionRepository = vaultTransactionRepository;
     }
 
     @Transactional(readOnly = true)
@@ -190,18 +201,48 @@ public class PaymentService {
         payment.setExpiresAt(LocalDateTime.now().plusSeconds(600));
         Payment saved = paymentRepository.save(payment);
 
-        // Call Paystack (skip for vault — internal deduction)
-        String authorizationUrl = null;
-        if (!PaymentMethod.VAULT.equals(paymentMethod)) {
-            List<String> channels = switch (paymentMethod) {
-                case PaymentMethod.MOMO -> List.of("mobile_money");
-                case PaymentMethod.BANK_CARD -> List.of("card");
-                case PaymentMethod.USSD -> List.of(PaymentMethod.USSD);
-                default -> List.of("mobile_money", "card");
-            };
-            PaystackInitResult init = paystackService.initialize(user.getEmail(), amount, reference, channels);
-            authorizationUrl = init.authorizationUrl;
+        // Vault: deduct balance and confirm immediately — no Paystack needed
+        if (PaymentMethod.VAULT.equals(paymentMethod)) {
+            SavingsVault vault = savingsVaultRepository.findByUser(user)
+                    .orElseThrow(() -> new BadRequestException("You don't have a savings vault set up."));
+            if (vault.getBalance().compareTo(amount) < 0)
+                throw new BadRequestException("Insufficient vault balance. Available: GHS " + vault.getBalance() + ".");
+
+            vault.setBalance(vault.getBalance().subtract(amount));
+            savingsVaultRepository.save(vault);
+
+            VaultTransaction vaultTxn = new VaultTransaction();
+            vaultTxn.setVault(vault);
+            vaultTxn.setType("WITHDRAWAL");
+            vaultTxn.setAmount(amount);
+            vaultTxn.setBalanceAfter(vault.getBalance());
+            vaultTxn.setTrigger("TAX_PAYMENT");
+            vaultTxn.setStatus(VaultTransactionStatus.SUCCESSFUL);
+            vaultTxn.setConfirmedAt(LocalDateTime.now());
+            vaultTxn.setDescription("Tax payment deducted from vault");
+            vaultTxn.setReference("VLT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
+            vaultTransactionRepository.save(vaultTxn);
+
+            confirmSuccessful(saved);
+
+            InitiatePaymentResponse response = new InitiatePaymentResponse();
+            response.setPaymentId(saved.getPaymentId());
+            response.setAmount(saved.getAmount());
+            response.setPaymentMethod(saved.getPaymentMethod());
+            response.setStatus(PaymentStatus.SUCCESSFUL);
+            response.setPaymentReference(reference);
+            response.setMessage("GHS " + amount + " deducted from your savings vault successfully.");
+            return response;
         }
+
+        // Card / MoMo / USSD — initiate via Paystack, confirm via webhook
+        List<String> channels = switch (paymentMethod) {
+            case PaymentMethod.MOMO -> List.of("mobile_money");
+            case PaymentMethod.BANK_CARD -> List.of("card");
+            case PaymentMethod.USSD -> List.of(PaymentMethod.USSD);
+            default -> List.of("mobile_money", "card");
+        };
+        PaystackInitResult init = paystackService.initialize(user.getEmail(), amount, reference, channels);
 
         InitiatePaymentResponse response = new InitiatePaymentResponse();
         response.setPaymentId(saved.getPaymentId());
@@ -209,10 +250,8 @@ public class PaymentService {
         response.setPaymentMethod(saved.getPaymentMethod());
         response.setStatus(PaymentStatus.PENDING);
         response.setPaymentReference(reference);
-        response.setAuthorizationUrl(authorizationUrl);
-        response.setMessage(PaymentMethod.VAULT.equals(paymentMethod)
-                ? "Payment initiated from your savings vault."
-                : "Redirect the user to the authorization URL to complete payment.");
+        response.setAuthorizationUrl(init.authorizationUrl);
+        response.setMessage("Redirect the user to the authorization URL to complete payment.");
         return response;
     }
 

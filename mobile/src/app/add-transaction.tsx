@@ -283,7 +283,17 @@ export default function AddTransactionScreen() {
       const response = await scanReceiptTransaction(pendingReceiptBase64, type);
       const data = response.data;
       setAmount(String(data.amount ?? ""));
-      setCategory(data.category ?? "");
+      const OCR_CATEGORY_MAP: Record<string, string> = {
+        food_drinks: "Food",
+        transport: "Transport",
+        utilities: "Utilities",
+        rent_commercial: "Rent",
+        supplies: "Other",
+        equipment: "Other",
+        services: "Other",
+        general_expense: "Other",
+      };
+      setCategory(OCR_CATEGORY_MAP[data.category] ?? data.category ?? "");
       setDescription(data.description ?? "");
       if (data.transaction_date) setDate(new Date(data.transaction_date));
       setReceiptUri(pendingReceiptUri);

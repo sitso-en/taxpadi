@@ -6,6 +6,8 @@ export const getTransactions = async (params?: {
   type?: string;
   category?: string;
   search?: string;
+  date_from?: string;
+  date_to?: string;
   page?: number;
   limit?: number;
 }) => {

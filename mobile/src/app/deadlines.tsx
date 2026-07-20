@@ -238,7 +238,7 @@ export default function DeadlinesScreen() {
                   {!item.completed && (
                     <TouchableOpacity
                       style={styles.markBtn}
-                      onPress={() => toggleDeadline(item.id)}
+                      onPress={() => toggleDeadline(item).catch(() => showToast("Could not mark deadline complete. Try again.", "error"))}
                       activeOpacity={0.85}
                     >
                       <Ionicons name="checkmark" size={14} color="#16A34A" />

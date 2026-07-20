@@ -14,6 +14,9 @@ export type Deadline = {
   dueDate: string;
   completed: boolean;
   daysUntilDue: number;
+  taxType: string;
+  periodStart: string;
+  periodEnd: string;
 };
 
 type CacheShape = { deadlines: Deadline[]; penalties: Penalty[] };
@@ -23,7 +26,7 @@ type DeadlineContextType = {
   penalties: Penalty[];
   loading: boolean;
   error: boolean;
-  toggleDeadline: (id: string) => Promise<void>;
+  toggleDeadline: (deadline: Deadline) => Promise<void>;
   refreshDeadlines: (showLoader?: boolean) => Promise<void>;
   upcomingCount: number;
   overdueCount: number;
@@ -48,11 +51,14 @@ function mapDeadline(item: any): Deadline {
       : 0;
   return {
     id: item.deadline_id,
-    title: item.description,
+    title: item.title,
     authority: TAX_TYPE_LABELS[item.tax_type] ?? "Ghana Revenue Authority",
     dueDate: item.deadline_date,
     completed: item.completed,
     daysUntilDue,
+    taxType: item.tax_type,
+    periodStart: item.period_start,
+    periodEnd: item.period_end,
   };
 }
 
@@ -99,11 +105,14 @@ export function DeadlineProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const toggleDeadline = async (id: string) => {
+  const toggleDeadline = async (deadline: Deadline) => {
+    setDeadlines((prev) => prev.map((d) => (d.id === deadline.id ? { ...d, completed: true } : d)));
     try {
-      await completeDeadline(id);
-      setDeadlines((prev) => prev.map((d) => (d.id === id ? { ...d, completed: true } : d)));
-    } catch {}
+      await completeDeadline(deadline.id, deadline.taxType, deadline.periodStart, deadline.periodEnd);
+    } catch (e) {
+      setDeadlines((prev) => prev.map((d) => (d.id === deadline.id ? { ...d, completed: false } : d)));
+      throw e;
+    }
   };
 
   const upcomingCount = useMemo(

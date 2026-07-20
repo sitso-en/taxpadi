@@ -97,13 +97,18 @@ public class SavingsVaultService {
             throw new BadRequestException("Please link a MoMo number to your vault before contributing.");
         }
 
+        BigDecimal newBalance = vault.getBalance().add(request.getAmount());
+        vault.setBalance(newBalance);
+        vaultRepo.save(vault);
+
         VaultTransaction txn = new VaultTransaction();
         txn.setVault(vault);
         txn.setType("DEPOSIT");
         txn.setAmount(request.getAmount());
-        txn.setBalanceAfter(vault.getBalance().add(request.getAmount()));
+        txn.setBalanceAfter(newBalance);
         txn.setTrigger(request.getTrigger().toUpperCase());
-        txn.setStatus(VaultTransactionStatus.PENDING);
+        txn.setStatus(VaultTransactionStatus.SUCCESSFUL);
+        txn.setConfirmedAt(java.time.LocalDateTime.now());
         txn.setDescription("Vault contribution via MoMo");
         txn.setReference("VLT-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase());
         txnRepo.save(txn);
@@ -114,7 +119,7 @@ public class SavingsVaultService {
         resp.setTrigger(txn.getTrigger());
         resp.setStatus(VaultTransactionStatus.PENDING);
         resp.setMomoPromptSent(true);
-        resp.setMessage("A payment prompt of GHS " + request.getAmount() + " has been sent. Please approve it.");
+        resp.setMessage("GHS " + request.getAmount() + " deposited successfully. Your new vault balance is GHS " + newBalance + ".");
         resp.setNewBalanceOnConfirmation(txn.getBalanceAfter());
         return resp;
     }

@@ -42,16 +42,59 @@ export default function TransactionsScreen() {
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterAnim = useRef(new Animated.Value(0)).current;
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [customFrom, setCustomFrom] = useState("");
+  const [customTo, setCustomTo] = useState("");
+  const [activePreset, setActivePreset] = useState<string | null>(null);
+
   const searchInitialized = useRef(false);
 
+  const getPresetDates = (preset: string): { from: string; to: string } => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth(); // 0-indexed
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const lastDayOf = (yr: number, mo: number) => new Date(yr, mo + 1, 0).getDate();
+    switch (preset) {
+      case "this_month":
+        return { from: `${y}-${pad(m + 1)}-01`, to: `${y}-${pad(m + 1)}-${lastDayOf(y, m)}` };
+      case "last_month": {
+        const lm = m === 0 ? 11 : m - 1;
+        const ly = m === 0 ? y - 1 : y;
+        return { from: `${ly}-${pad(lm + 1)}-01`, to: `${ly}-${pad(lm + 1)}-${lastDayOf(ly, lm)}` };
+      }
+      case "this_quarter": {
+        const q = Math.floor(m / 3);
+        const qs = q * 3;
+        return { from: `${y}-${pad(qs + 1)}-01`, to: `${y}-${pad(qs + 3)}-${lastDayOf(y, qs + 2)}` };
+      }
+      case "this_year":
+        return { from: `${y}-01-01`, to: `${y}-12-31` };
+      default:
+        return { from: "", to: "" };
+    }
+  };
+
+  const fmtDate = (s: string) => {
+    if (!s) return "";
+    const [yr, mo, dy] = s.split("-");
+    const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+    return `${MONTHS[parseInt(mo) - 1]} ${dy}`;
+  };
+
   const fetchTransactions = useCallback(
-    async (typeFilter: string, pageNum: number, append = false, searchTerm = "") => {
+    async (typeFilter: string, pageNum: number, append = false, searchTerm = "", from = "", to = "") => {
       if (append) setLoadingMore(true);
       else { setLocalLoading(true); setLocalError(false); }
       try {
         const params: Record<string, any> = { page: pageNum, limit: LIMIT };
         if (typeFilter !== "All") params.type = typeFilter.toLowerCase();
         if (searchTerm.trim()) params.search = searchTerm.trim();
+        if (from) params.date_from = from;
+        if (to) params.date_to = to;
         const response = await getTransactions(params);
         const fetched = response.data?.transactions ?? response.transactions ?? [];
         if (append) {
@@ -74,8 +117,8 @@ export default function TransactionsScreen() {
   useFocusEffect(
     useCallback(() => {
       setPage(1);
-      fetchTransactions(selectedFilter, 1, false, search);
-    }, [selectedFilter])
+      fetchTransactions(selectedFilter, 1, false, search, dateFrom, dateTo);
+    }, [selectedFilter, dateFrom, dateTo])
   );
 
   // Debounced search — skip the initial empty-string run (useFocusEffect handles that)
@@ -86,7 +129,7 @@ export default function TransactionsScreen() {
     }
     const timer = setTimeout(() => {
       setPage(1);
-      fetchTransactions(selectedFilter, 1, false, search);
+      fetchTransactions(selectedFilter, 1, false, search, dateFrom, dateTo);
     }, 400);
     return () => clearTimeout(timer);
   }, [search]);
@@ -95,20 +138,20 @@ export default function TransactionsScreen() {
     setRefreshing(true);
     setPage(1);
     setLocalError(false);
-    await fetchTransactions(selectedFilter, 1, false, search);
+    await fetchTransactions(selectedFilter, 1, false, search, dateFrom, dateTo);
     setRefreshing(false);
   };
 
   const handleFilterChange = (filter: string) => {
     setSelectedFilter(filter);
     setPage(1);
-    fetchTransactions(filter, 1, false, search);
+    fetchTransactions(filter, 1, false, search, dateFrom, dateTo);
   };
 
   const handleLoadMore = () => {
     const next = page + 1;
     setPage(next);
-    fetchTransactions(selectedFilter, next, true, search);
+    fetchTransactions(selectedFilter, next, true, search, dateFrom, dateTo);
   };
 
   const handleDeleteConfirmed = async () => {
@@ -118,13 +161,53 @@ export default function TransactionsScreen() {
       await deleteTransactionApi(deleteConfirmId);
       setDeleteConfirmId(null);
       setPage(1);
-      fetchTransactions(selectedFilter, 1, false);
+      fetchTransactions(selectedFilter, 1, false, search, dateFrom, dateTo);
       showToast("Transaction deleted.", "success");
     } catch {
       showToast("Failed to delete transaction.", "error");
     } finally {
       setDeleting(false);
     }
+  };
+
+  const openFilter = () => {
+    setFilterOpen(true);
+    Animated.timing(filterAnim, { toValue: 1, duration: 220, useNativeDriver: false }).start();
+  };
+
+  const closeFilter = () => {
+    Animated.timing(filterAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start(() =>
+      setFilterOpen(false)
+    );
+  };
+
+  const applyPreset = (preset: string) => {
+    const { from, to } = getPresetDates(preset);
+    setActivePreset(preset);
+    setDateFrom(from);
+    setDateTo(to);
+    setCustomFrom(from);
+    setCustomTo(to);
+    setPage(1);
+    fetchTransactions(selectedFilter, 1, false, search, from, to);
+  };
+
+  const applyCustom = () => {
+    setActivePreset(null);
+    setDateFrom(customFrom);
+    setDateTo(customTo);
+    setPage(1);
+    fetchTransactions(selectedFilter, 1, false, search, customFrom, customTo);
+  };
+
+  const clearDateFilter = () => {
+    setActivePreset(null);
+    setDateFrom("");
+    setDateTo("");
+    setCustomFrom("");
+    setCustomTo("");
+    setPage(1);
+    fetchTransactions(selectedFilter, 1, false, search, "", "");
   };
 
   const openSearch = () => {
@@ -170,6 +253,7 @@ export default function TransactionsScreen() {
           {localTransactions.length} transaction
           {localTransactions.length !== 1 ? "s" : ""}
           {selectedFilter !== "All" ? ` · ${selectedFilter}` : ""}
+          {dateFrom && dateTo ? ` · ${fmtDate(dateFrom)} – ${fmtDate(dateTo)}` : ""}
         </Text>
 
         {/* Filters + search toggle */}
@@ -186,6 +270,16 @@ export default function TransactionsScreen() {
             </TouchableOpacity>
           ))}
           <View style={{ flex: 1 }} />
+          <TouchableOpacity
+            style={[styles.searchToggle, { marginRight: 8 }, (filterOpen || !!(dateFrom || dateTo)) && styles.searchToggleActive]}
+            onPress={filterOpen ? closeFilter : openFilter}
+          >
+            <Ionicons
+              name="funnel-outline"
+              size={16}
+              color={(filterOpen || !!(dateFrom || dateTo)) ? "#FFFFFF" : "#6B7280"}
+            />
+          </TouchableOpacity>
           <TouchableOpacity
             style={[styles.searchToggle, searchOpen && styles.searchToggleActive]}
             onPress={searchOpen ? closeSearch : openSearch}
@@ -226,13 +320,70 @@ export default function TransactionsScreen() {
           </View>
         </Animated.View>
 
+        {/* Animated filter panel */}
+        <Animated.View
+          style={{
+            height: filterAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 116] }),
+            opacity: filterAnim,
+            marginBottom: filterAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }),
+            overflow: "hidden",
+          }}
+        >
+          <View style={styles.filterPanel}>
+            <View style={styles.presetRow}>
+              {[
+                { key: "this_month",   label: "This Month" },
+                { key: "last_month",   label: "Last Month" },
+                { key: "this_quarter", label: "This Qtr"   },
+                { key: "this_year",    label: "This Year"  },
+              ].map((p) => (
+                <TouchableOpacity
+                  key={p.key}
+                  style={[styles.presetChip, activePreset === p.key && styles.presetChipActive]}
+                  onPress={() => applyPreset(p.key)}
+                >
+                  <Text style={[styles.presetChipText, activePreset === p.key && styles.presetChipTextActive]}>
+                    {p.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+              {(dateFrom || dateTo) && (
+                <TouchableOpacity style={styles.clearChip} onPress={clearDateFilter}>
+                  <Ionicons name="close-outline" size={12} color="#6B7280" />
+                  <Text style={styles.clearChipText}>Clear</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            <View style={styles.dateRow}>
+              <TextInput
+                style={styles.dateInput}
+                value={customFrom}
+                onChangeText={(t) => { setCustomFrom(t); setActivePreset(null); }}
+                placeholder="From YYYY-MM-DD"
+                placeholderTextColor="#9CA3AF"
+              />
+              <Text style={styles.dateSep}>→</Text>
+              <TextInput
+                style={styles.dateInput}
+                value={customTo}
+                onChangeText={(t) => { setCustomTo(t); setActivePreset(null); }}
+                placeholder="To YYYY-MM-DD"
+                placeholderTextColor="#9CA3AF"
+              />
+              <TouchableOpacity style={styles.applyBtn} onPress={applyCustom}>
+                <Text style={styles.applyBtnText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Animated.View>
+
         {/* List */}
         {localLoading ? (
           <View style={styles.emptyState}>
             <ActivityIndicator size="large" color="#C44736" />
           </View>
         ) : localError ? (
-          <ErrorState onRetry={() => fetchTransactions(selectedFilter, 1, false)} />
+          <ErrorState onRetry={() => fetchTransactions(selectedFilter, 1, false, search, dateFrom, dateTo)} />
         ) : localTransactions.length === 0 ? (
           <View style={styles.emptyState}>
             <Ionicons name="wallet-outline" size={60} color="#D1D5DB" />
@@ -515,6 +666,101 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 5 },
     elevation: 6,
+  },
+
+  // Filter panel
+  filterPanel: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    padding: 12,
+    gap: 10,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 2,
+  },
+
+  presetRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+
+  presetChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+
+  presetChipActive: {
+    backgroundColor: "#FDECEC",
+    borderColor: "#C44736",
+  },
+
+  presetChipText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#374151",
+  },
+
+  presetChipTextActive: {
+    color: "#C44736",
+  },
+
+  clearChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
+  },
+
+  clearChipText: {
+    fontSize: 12,
+    fontFamily: "Inter_500Medium",
+    color: "#6B7280",
+  },
+
+  dateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+
+  dateInput: {
+    flex: 1,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 9,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#111827",
+  },
+
+  dateSep: {
+    color: "#9CA3AF",
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+  },
+
+  applyBtn: {
+    backgroundColor: "#C44736",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+
+  applyBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
   },
 
   // Delete modal

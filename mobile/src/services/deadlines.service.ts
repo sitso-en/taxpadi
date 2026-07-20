@@ -18,7 +18,16 @@ export const getUpcomingDeadlines = async (days?: number) => {
   return response.data;
 };
 
-export const completeDeadline = async (id: string) => {
-  const response = await client.put(ENDPOINTS.DEADLINES.COMPLETE(id));
+export const completeDeadline = async (
+  id: string,
+  taxType: string,
+  periodStart: string,
+  periodEnd: string
+) => {
+  const response = await client.put(ENDPOINTS.DEADLINES.COMPLETE(id), {
+    tax_type: taxType,
+    period_start: periodStart,
+    period_end: periodEnd,
+  });
   return response.data;
 };

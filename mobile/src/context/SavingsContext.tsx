@@ -36,25 +36,30 @@ export function SavingsProvider({ children }: { children: React.ReactNode }) {
 
   const doFetch = async (silent = false) => {
     if (!silent) setError(false);
-    try {
-      const [vaultRes, txRes] = await Promise.all([getVault(), getVaultTransactions()]);
-      const freshVault = vaultRes.data ?? null;
-      const freshTx = txRes.data?.transactions ?? [];
-      setVault(freshVault);
-      setTransactions(freshTx);
-      setError(false);
 
-      let freshSuggestion = null;
-      try {
-        const sugRes = await getVaultSuggestion();
-        freshSuggestion = sugRes.data ?? null;
-      } catch {}
-      setSuggestion(freshSuggestion);
+    // Vault + suggestion fetched independently so a missing vault doesn't kill the suggestion
+    const [vaultRes, txRes] = await Promise.allSettled([getVault(), getVaultTransactions()]);
 
-      writeCache<CacheShape>(CACHE_KEY, { vault: freshVault, transactions: freshTx, suggestion: freshSuggestion });
-    } catch {
+    const freshVault = vaultRes.status === "fulfilled" ? (vaultRes.value.data ?? null) : null;
+    const freshTx = txRes.status === "fulfilled" ? (txRes.value.data?.transactions ?? []) : [];
+
+    if (vaultRes.status === "rejected" && txRes.status === "rejected") {
       if (!silent) setError(true);
+    } else {
+      setError(false);
     }
+
+    setVault(freshVault);
+    setTransactions(freshTx);
+
+    let freshSuggestion = null;
+    try {
+      const sugRes = await getVaultSuggestion();
+      freshSuggestion = sugRes.data ?? null;
+    } catch {}
+    setSuggestion(freshSuggestion);
+
+    writeCache<CacheShape>(CACHE_KEY, { vault: freshVault, transactions: freshTx, suggestion: freshSuggestion });
   };
 
   const refreshVault = async (showLoader = true) => {

@@ -222,10 +222,10 @@ export default function TaxReturnReviewScreen() {
                   {i > 0 && <View style={styles.rowDivider} />}
                   <View style={styles.bracketRow}>
                     <View style={styles.bracketLeft}>
-                      <Text style={styles.bracketRate}>{b.rate}%</Text>
-                      <Text style={styles.bracketAmount}>on {fmt(b.taxableAmount)}</Text>
+                      <Text style={styles.bracketRate}>{b.rate}</Text>
+                      <Text style={styles.bracketAmount}>{b.bracket}</Text>
                     </View>
-                    <Text style={styles.bracketTax}>{fmt(b.taxAmount)}</Text>
+                    <Text style={styles.bracketTax}>{fmt(b.tax)}</Text>
                   </View>
                 </React.Fragment>
               ))}

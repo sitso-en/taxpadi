@@ -1,8 +1,11 @@
 import client from "@/api/client";
 import { ENDPOINTS } from "@/api/endpoints";
 
-export const getTaxLiability = async () => {
-  const response = await client.get(ENDPOINTS.TAX.LIABILITY);
+export const getTaxLiability = async (year?: number) => {
+  const params = year
+    ? { from: `${year}-01-01`, to: `${year}-12-31` }
+    : undefined;
+  const response = await client.get(ENDPOINTS.TAX.LIABILITY, { params });
   return response.data;
 };
 

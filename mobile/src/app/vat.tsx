@@ -253,7 +253,7 @@ export default function VATScreen() {
             })
           )}
 
-          <TouchableOpacity style={styles.button} onPress={() => router.push("/payments")}>
+          <TouchableOpacity style={styles.button} onPress={() => router.push("/tax-returns")}>
             <Text style={styles.buttonText}>Submit VAT Return</Text>
           </TouchableOpacity>
         </>

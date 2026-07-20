@@ -22,8 +22,12 @@ const TAX_TYPE_LABELS: Record<string, string> = {
   vat: "VAT",
   paye: "PAYE",
   withholding: "Withholding Tax",
-  corporate_tax: "Corporate Tax",
 };
+
+const MONTH_LABELS = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
 
 const TAX_TYPES = Object.entries(TAX_TYPE_LABELS).map(([value, label]) => ({ value, label }));
 
@@ -40,7 +44,10 @@ export default function TaxReturnsScreen() {
 
   const [showGenModal, setShowGenModal] = useState(false);
   const [selectedType, setSelectedType] = useState("income_tax");
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  const needsMonth = selectedType === "vat" || selectedType === "paye";
 
   const [amendTarget, setAmendTarget] = useState<any>(null);
   const [amendReason, setAmendReason] = useState("");
@@ -72,9 +79,13 @@ export default function TaxReturnsScreen() {
 
   const handleGenerate = async () => {
     if (generating) return;
+    if (needsMonth && selectedMonth === null) {
+      showToast("Please select a month for VAT and PAYE returns.", "error");
+      return;
+    }
     setGenerating(true);
     try {
-      const res = await generateTaxReturn(selectedType, currentYear);
+      const res = await generateTaxReturn(selectedType, currentYear, needsMonth ? selectedMonth! : undefined);
       const returnId = res.data?.returnId ?? res.returnId;
       setShowGenModal(false);
       await refreshReturns();
@@ -146,7 +157,11 @@ export default function TaxReturnsScreen() {
 
             {submitted.length > 0 && <Text style={styles.sectionTitle}>Submitted</Text>}
             {submitted.map((item) => (
-              <ReturnCard key={item.id} item={item} onAmend={() => { setAmendTarget(item); setAmendReason(""); }} />
+              <ReturnCard
+                key={item.id}
+                item={item}
+                onAmend={item.status === "rejected" ? () => { setAmendTarget(item); setAmendReason(""); } : undefined}
+              />
             ))}
           </>
         )}
@@ -184,7 +199,7 @@ export default function TaxReturnsScreen() {
       </BottomSheet>
 
       {/* ── Generate Modal ── */}
-      <BottomSheet visible={showGenModal} onClose={() => setShowGenModal(false)}>
+      <BottomSheet visible={showGenModal} onClose={() => { setShowGenModal(false); setSelectedMonth(null); }}>
         <View style={styles.sheetContent}>
           <Text style={styles.modalTitle}>Generate Tax Return</Text>
           <Text style={styles.modalSub}>Select the tax type for {currentYear}</Text>
@@ -194,7 +209,7 @@ export default function TaxReturnsScreen() {
               <TouchableOpacity
                 key={t.value}
                 style={[styles.typeRow, selectedType === t.value && styles.typeRowActive]}
-                onPress={() => setSelectedType(t.value)}
+                onPress={() => { setSelectedType(t.value); setSelectedMonth(null); }}
                 activeOpacity={0.8}
               >
                 <Text style={[styles.typeLabel, selectedType === t.value && styles.typeLabelActive]}>
@@ -205,10 +220,33 @@ export default function TaxReturnsScreen() {
             ))}
           </View>
 
+          {needsMonth && (
+            <>
+              <Text style={styles.monthLabel}>SELECT MONTH</Text>
+              <View style={styles.monthGrid}>
+                {MONTH_LABELS.map((name, idx) => {
+                  const m = idx + 1;
+                  const active = selectedMonth === m;
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      style={[styles.monthChip, active && styles.monthChipActive]}
+                      onPress={() => setSelectedMonth(m)}
+                    >
+                      <Text style={[styles.monthChipText, active && styles.monthChipTextActive]}>
+                        {name.slice(0, 3)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </>
+          )}
+
           <TouchableOpacity
-            style={[styles.genBtn, generating && { opacity: 0.6 }]}
+            style={[styles.genBtn, (generating || (needsMonth && selectedMonth === null)) && { opacity: 0.6 }]}
             onPress={handleGenerate}
-            disabled={generating}
+            disabled={generating || (needsMonth && selectedMonth === null)}
             activeOpacity={0.85}
           >
             <Text style={styles.genBtnText}>{generating ? "Generating…" : "Generate Return"}</Text>
@@ -573,6 +611,48 @@ const styles = StyleSheet.create({
   typeLabelActive: {
     fontFamily: "Inter_600SemiBold",
     color: "#C44736",
+  },
+
+  monthLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#6B7280",
+    letterSpacing: 0.5,
+    marginBottom: 10,
+    marginTop: 4,
+  },
+
+  monthGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 20,
+  },
+
+  monthChip: {
+    width: "22%",
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+
+  monthChipActive: {
+    backgroundColor: "#FDECEC",
+    borderColor: "#C44736",
+  },
+
+  monthChipText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "#374151",
+  },
+
+  monthChipTextActive: {
+    color: "#C44736",
+    fontFamily: "Inter_600SemiBold",
   },
 
   genBtn: {

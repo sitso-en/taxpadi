@@ -10,6 +10,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
@@ -22,6 +23,7 @@ import ErrorState from "@/components/ErrorState";
 import { usePayments } from "../../context/PaymentContext";
 import { getPaymentStatus, confirmPayment } from "@/services/payment.service";
 import { useTaxLiability } from "@/context/TaxLiabilityContext";
+import { useSavings } from "@/context/SavingsContext";
 
 const fmt = (n: number) =>
   `GH¢ ${n.toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -46,15 +48,27 @@ export default function PaymentsScreen() {
   const { isOnline } = useNetwork();
   const { amountsHidden, toggleAmountsHidden } = usePrivacy();
   const { liability } = useTaxLiability();
+  const { totalSaved } = useSavings();
 
   const [paymentMethod, setPaymentMethod] = useState<"momo" | "bank" | "vault">("momo");
   const [paying, setPaying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [payAmountText, setPayAmountText] = useState("");
+  const [momoNumber, setMomoNumber] = useState("");
+  const [momoProvider, setMomoProvider] = useState<"mtn" | "telecel" | "airteltigo">("mtn");
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
     return () => { if (pollRef.current) clearInterval(pollRef.current); };
   }, []);
+
+  // Pre-fill MoMo number from user profile
+  useEffect(() => {
+    if (user?.phoneNumber && !momoNumber) {
+      setMomoNumber(user.phoneNumber.replace(/\s/g, ""));
+    }
+  }, [user?.phoneNumber]);
+
 
   const netLiability = liability?.net_liability ?? 0;
 
@@ -70,6 +84,21 @@ export default function PaymentsScreen() {
 
   const remainingBalance = Math.max(netLiability - totalPaid, 0);
   const paidPct = netLiability > 0 ? Math.min((totalPaid / netLiability) * 100, 100) : 0;
+
+  // Pre-fill amount when remaining balance first loads
+  useEffect(() => {
+    if (remainingBalance > 0 && !payAmountText) {
+      setPayAmountText(remainingBalance.toFixed(2));
+    }
+  }, [remainingBalance]);
+
+  const payAmount = parseFloat(payAmountText) || 0;
+  const amountError =
+    payAmountText && payAmount <= 0 ? "Enter a valid amount" :
+    payAmount > remainingBalance ? "Amount exceeds your outstanding balance" :
+    null;
+  const vaultInsufficient = paymentMethod === "vault" && payAmount > totalSaved;
+  const canPay = !paying && payAmount > 0 && !amountError && !vaultInsufficient && remainingBalance > 0;
 
   const startPolling = (paymentId: string) => {
     let attempts = 0;
@@ -114,19 +143,15 @@ export default function PaymentsScreen() {
       showToast("You're offline. Connect to the internet to process a payment.", "info");
       return;
     }
-    if (paying) return;
-    if (remainingBalance <= 0) {
-      showToast("You have no outstanding payments.", "info");
-      return;
-    }
+    if (!canPay) return;
 
     setPaying(true);
     try {
       const response = await createPayment({
-        amount: remainingBalance,
+        amount: payAmount,
         payment_method: paymentMethod === "momo" ? "momo" : paymentMethod === "vault" ? "vault" : "bank_card",
-        momo_number: paymentMethod === "momo" ? (user?.phoneNumber?.replace(/\s/g, "") ?? "") : undefined,
-        momo_provider: paymentMethod === "momo" ? "mtn" : undefined,
+        momo_number: paymentMethod === "momo" ? momoNumber.replace(/\s/g, "") : undefined,
+        momo_provider: paymentMethod === "momo" ? momoProvider : undefined,
       });
 
       const url =
@@ -156,9 +181,9 @@ export default function PaymentsScreen() {
   };
 
   const methods: { key: "momo" | "bank" | "vault"; label: string; detail: string }[] = [
-    { key: "momo",  label: "Mobile Money", detail: user?.phoneNumber || "No phone number on file" },
-    { key: "bank",  label: "Bank Card",    detail: "You'll be redirected to complete payment" },
-    { key: "vault", label: "Savings Vault", detail: "Deducted directly from your vault balance" },
+    { key: "momo",  label: "Mobile Money",  detail: "Enter your MoMo number below" },
+    { key: "bank",  label: "Bank Card",     detail: "You'll be redirected to complete payment" },
+    { key: "vault", label: "Savings Vault", detail: `Available: ${fmt(totalSaved)}` },
   ];
 
   return (
@@ -232,9 +257,92 @@ export default function PaymentsScreen() {
           </View>
         </LinearGradient>
 
+        {/* Amount input */}
+        <View style={styles.amountSection}>
+          <Text style={styles.sectionTitle}>Amount to Pay (GHS)</Text>
+          <TextInput
+            style={[styles.amountInput, amountError ? styles.amountInputError : null]}
+            value={payAmountText}
+            onChangeText={setPayAmountText}
+            keyboardType="decimal-pad"
+            placeholder="0.00"
+            placeholderTextColor="#9CA3AF"
+          />
+          {amountError ? (
+            <Text style={styles.amountErrorText}>{amountError}</Text>
+          ) : (
+            <Text style={styles.amountHint}>Outstanding: {fmt(remainingBalance)}</Text>
+          )}
+        </View>
+
+        {/* Payment Method */}
+        <Text style={styles.sectionTitle}>Payment Method</Text>
+        <View style={styles.methodList}>
+          {methods.map((m) => {
+            const active = paymentMethod === m.key;
+            return (
+              <View key={m.key}>
+                <TouchableOpacity
+                  style={[styles.methodCard, active && styles.methodCardActive]}
+                  onPress={() => setPaymentMethod(m.key)}
+                  activeOpacity={0.75}
+                >
+                  <View style={[styles.methodIconBox, active && styles.methodIconBoxActive]}>
+                    <Ionicons name={METHOD_ICON[m.key]} size={18} color={active ? "#C44736" : "#6B7280"} />
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <Text style={[styles.methodLabel, active && styles.methodLabelActive]}>{m.label}</Text>
+                    <Text style={styles.methodDetail} numberOfLines={1}>{m.detail}</Text>
+                  </View>
+                  <View style={[styles.radio, active && styles.radioActive]}>
+                    {active && <View style={styles.radioDot} />}
+                  </View>
+                </TouchableOpacity>
+
+                {/* MoMo extra fields */}
+                {active && m.key === "momo" && (
+                  <View style={styles.extraFields}>
+                    <TextInput
+                      style={styles.momoInput}
+                      value={momoNumber}
+                      onChangeText={setMomoNumber}
+                      keyboardType="phone-pad"
+                      placeholder="MoMo number (e.g. 0241234567)"
+                      placeholderTextColor="#9CA3AF"
+                    />
+                    <View style={styles.providerRow}>
+                      {(["mtn", "telecel", "airteltigo"] as const).map((p) => (
+                        <TouchableOpacity
+                          key={p}
+                          style={[styles.providerChip, momoProvider === p && styles.providerChipActive]}
+                          onPress={() => setMomoProvider(p)}
+                        >
+                          <Text style={[styles.providerChipText, momoProvider === p && styles.providerChipTextActive]}>
+                            {p === "mtn" ? "MTN" : p === "telecel" ? "Telecel" : "AirtelTigo"}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                )}
+
+                {/* Vault insufficient warning */}
+                {active && m.key === "vault" && vaultInsufficient && (
+                  <View style={styles.vaultWarning}>
+                    <Ionicons name="warning-outline" size={14} color="#DC2626" />
+                    <Text style={styles.vaultWarningText}>
+                      Vault balance ({fmt(totalSaved)}) is less than the amount. Top up your vault first.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            );
+          })}
+        </View>
+
         {/* Pay button */}
         <TouchableOpacity
-          style={[styles.payBtn, (remainingBalance <= 0 || paying) && styles.payBtnDisabled]}
+          style={[styles.payBtn, !canPay && styles.payBtnDisabled]}
           onPress={handlePayment}
           activeOpacity={0.85}
         >
@@ -244,40 +352,15 @@ export default function PaymentsScreen() {
             <>
               <Ionicons name="arrow-forward-circle-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
               <Text style={styles.payBtnText}>
-                {remainingBalance > 0
-                  ? amountsHidden ? "Pay Now" : `Pay ${fmt(remainingBalance)}`
-                  : "Nothing to Pay"}
+                {remainingBalance <= 0
+                  ? "Nothing to Pay"
+                  : canPay
+                  ? amountsHidden ? "Pay Now" : `Pay ${fmt(payAmount)}`
+                  : "Pay Now"}
               </Text>
             </>
           )}
         </TouchableOpacity>
-
-        {/* Payment Method */}
-        <Text style={styles.sectionTitle}>Payment Method</Text>
-        <View style={styles.methodList}>
-          {methods.map((m) => {
-            const active = paymentMethod === m.key;
-            return (
-              <TouchableOpacity
-                key={m.key}
-                style={[styles.methodCard, active && styles.methodCardActive]}
-                onPress={() => setPaymentMethod(m.key)}
-                activeOpacity={0.75}
-              >
-                <View style={[styles.methodIconBox, active && styles.methodIconBoxActive]}>
-                  <Ionicons name={METHOD_ICON[m.key]} size={18} color={active ? "#C44736" : "#6B7280"} />
-                </View>
-                <View style={{ flex: 1, marginLeft: 12 }}>
-                  <Text style={[styles.methodLabel, active && styles.methodLabelActive]}>{m.label}</Text>
-                  <Text style={styles.methodDetail} numberOfLines={1}>{m.detail}</Text>
-                </View>
-                <View style={[styles.radio, active && styles.radioActive]}>
-                  {active && <View style={styles.radioDot} />}
-                </View>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
 
         {/* Payment History */}
         <Text style={styles.sectionTitle}>Payment History</Text>
@@ -487,6 +570,101 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontFamily: "Inter_700Bold",
+  },
+
+  // Amount input
+  amountSection: {
+    marginBottom: 24,
+  },
+  amountInput: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 22,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    marginBottom: 6,
+  },
+  amountInputError: {
+    borderColor: "#DC2626",
+  },
+  amountErrorText: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#DC2626",
+  },
+  amountHint: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
+  },
+
+  // MoMo extra fields
+  extraFields: {
+    backgroundColor: "#FAFAFA",
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 2,
+    marginBottom: 4,
+    gap: 10,
+  },
+  momoInput: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 15,
+    fontFamily: "Inter_400Regular",
+    color: "#111827",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+  },
+  providerRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  providerChip: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    backgroundColor: "#F3F4F6",
+    alignItems: "center",
+    borderWidth: 1.5,
+    borderColor: "transparent",
+  },
+  providerChipActive: {
+    backgroundColor: "#FDECEC",
+    borderColor: "#C44736",
+  },
+  providerChipText: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#6B7280",
+  },
+  providerChipTextActive: {
+    color: "#C44736",
+  },
+
+  // Vault warning
+  vaultWarning: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: "#FEE2E2",
+    borderRadius: 10,
+    padding: 10,
+    marginTop: 2,
+    marginBottom: 4,
+  },
+  vaultWarningText: {
+    flex: 1,
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#DC2626",
+    lineHeight: 17,
   },
 
   // Section title

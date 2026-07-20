@@ -40,6 +40,6 @@ export const submitTaxReturn = async (id: string, graReference?: string) => {
 };
 
 export const amendTaxReturn = async (id: string, reason: string) => {
-  const response = await client.put(ENDPOINTS.TAX_RETURNS.AMEND(id), { reason });
+  const response = await client.put(ENDPOINTS.TAX_RETURNS.AMEND(id), { amendmentReason: reason });
   return response.data;
 };

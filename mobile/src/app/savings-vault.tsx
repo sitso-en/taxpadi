@@ -360,7 +360,7 @@ export default function SavingsVaultScreen() {
               </View>
             ) : (
               transactions.map((item) => {
-                const isCredit = item.type === "credit";
+                const isCredit = item.type === "DEPOSIT";
                 const statusCfg = STATUS_CONFIG[item.status?.toUpperCase()] ?? STATUS_CONFIG.PENDING;
                 const triggerLabel = TRIGGER_LABELS[item.trigger?.toUpperCase()] ?? item.trigger;
 
