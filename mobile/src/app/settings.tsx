@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -18,7 +19,12 @@ import Toggle from "@/components/Toggle";
 import { getSubscriptionStatus } from "@/services/subscriptions.service";
 import { requestDataExport } from "@/services/user.service";
 import { biometricRegister } from "@/services/auth.service";
-import { isBiometricEnabled, setBiometricEnabled, saveBiometricToken, getBiometricToken } from "@/utils/storage";
+import {
+  isBiometricEnabled,
+  setBiometricEnabled,
+  saveBiometricToken,
+  getBiometricToken,
+} from "@/utils/storage";
 import { getDeviceInfo } from "@/utils/device";
 import { useToast } from "@/context/ToastContext";
 import { getUserFriendlyError } from "@/utils/error";
@@ -67,14 +73,92 @@ const menuItems = [
   },
 ];
 
+// -------------------------------------------------------------
+// CONFIRMATION MODAL MATCHING TAXPADI DESIGN SYSTEM
+// -------------------------------------------------------------
+function DataExportConfirmationModal({
+  visible,
+  onClose,
+  onConfirm,
+  loading,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  onConfirm: () => void;
+  loading: boolean;
+}) {
+  return (
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      statusBarTranslucent
+      onRequestClose={onClose}
+    >
+      <View style={alertStyles.overlay}>
+        {/* Backdrop overlay */}
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          activeOpacity={1}
+          onPress={onClose}
+        />
+
+        {/* Modal Card */}
+        <View style={alertStyles.dialogCard}>
+          {/* Rounded Square Badge */}
+          <View style={alertStyles.iconBadge}>
+            <Ionicons name="cloud-download-outline" size={26} color="#C44736" />
+          </View>
+
+          {/* Title & Subtitle */}
+          <Text style={alertStyles.dialogTitle}>Request Data Export?</Text>
+          <Text style={alertStyles.dialogMessage}>
+            A copy of your personal tax and account data will be sent to your registered email address.
+          </Text>
+
+          {/* Action Buttons */}
+          <View style={alertStyles.actionsRow}>
+            <TouchableOpacity
+              style={alertStyles.cancelButton}
+              onPress={onClose}
+              disabled={loading}
+              activeOpacity={0.8}
+            >
+              <Text style={alertStyles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={alertStyles.confirmButton}
+              onPress={onConfirm}
+              disabled={loading}
+              activeOpacity={0.88}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={alertStyles.confirmButtonText}>Request</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
+// -------------------------------------------------------------
+// MAIN SETTINGS SCREEN
+// -------------------------------------------------------------
 export default function SettingsScreen() {
   const { user } = useUser();
   const { showToast } = useToast();
   const [planNickname, setPlanNickname] = useState(PLAN_NICKNAMES.free);
   const [requestingData, setRequestingData] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricOn, setBiometricOn] = useState(false);
   const [biometricLoading, setBiometricLoading] = useState(false);
+
   const entrance = useRef(new Animated.Value(0)).current;
   const heroAnim = useRef(new Animated.Value(0)).current;
   const securityAnim = useRef(new Animated.Value(0)).current;
@@ -83,14 +167,16 @@ export default function SettingsScreen() {
   const logoutAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    LocalAuthentication.hasHardwareAsync().then(async (has) => {
-      const enrolled = has ? await LocalAuthentication.isEnrolledAsync() : false;
-      setBiometricAvailable(has && enrolled);
-      if (has && enrolled) {
-        const enabled = await isBiometricEnabled();
-        setBiometricOn(enabled);
-      }
-    }).catch(() => {});
+    LocalAuthentication.hasHardwareAsync()
+      .then(async (has) => {
+        const enrolled = has ? await LocalAuthentication.isEnrolledAsync() : false;
+        setBiometricAvailable(has && enrolled);
+        if (has && enrolled) {
+          const enabled = await isBiometricEnabled();
+          setBiometricOn(enabled);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -177,9 +263,11 @@ export default function SettingsScreen() {
           showToast("Biometric login enabled.", "success");
           return;
         }
-        const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+        const chars =
+          "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
         let token = "";
-        for (let i = 0; i < 64; i++) token += chars.charAt(Math.floor(Math.random() * chars.length));
+        for (let i = 0; i < 64; i++)
+          token += chars.charAt(Math.floor(Math.random() * chars.length));
         await biometricRegister(token, getDeviceInfo());
         await saveBiometricToken(token);
         await setBiometricEnabled(true);
@@ -197,11 +285,15 @@ export default function SettingsScreen() {
     }
   };
 
-  const handleRequestData = async () => {
+  const handleConfirmDataExport = async () => {
     setRequestingData(true);
     try {
       await requestDataExport();
-      showToast("Data export requested. You will be notified when it is ready.", "success");
+      setShowExportModal(false);
+      showToast(
+        "Data export requested. You will be notified when it is ready.",
+        "success"
+      );
     } catch (error: any) {
       showToast(getUserFriendlyError(error), "error");
     } finally {
@@ -271,247 +363,369 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 60 }}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.backgroundOrbTop} />
-      <View style={styles.backgroundOrbBottom} />
-
-      {/* Header */}
-      <Animated.View style={[styles.header, { opacity: entrance }]}> 
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.8}>
-          <Ionicons name="chevron-back" size={20} color="#111827" />
-        </TouchableOpacity>
-        <View style={styles.headerTextBlock}>
-          <View style={styles.headerEyebrow}>
-            <Ionicons name="options-outline" size={14} color="#C44736" />
-            <Text style={styles.headerEyebrowText}>Account controls</Text>
-          </View>
-          <Text style={styles.title}>Settings</Text>
-          <Text style={styles.subtitle}>
-            Fine-tune your account, sessions, alerts, and plan.
-          </Text>
-        </View>
-      </Animated.View>
-
-      {/* Profile Card */}
-      <Animated.View style={[styles.heroWrap, heroStyle]}>
-      <TouchableOpacity
-        style={styles.profileCard}
-        onPress={() => router.push("/alter-profile")}
-        activeOpacity={0.9}
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 60 }}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.avatarWrap}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-          <View
-            style={[
-              styles.statusDot,
-              { backgroundColor: user?.active_profile ? "#34A853" : "#9CA3AF" },
-            ]}
-          />
-        </View>
+        <View style={styles.backgroundOrbTop} />
+        <View style={styles.backgroundOrbBottom} />
 
-        <View style={styles.profileInfo}>
-          <Text style={styles.profileName} numberOfLines={1}>
-            {user?.fullName ?? "TaxPadi User"}
-          </Text>
-          <Text style={styles.profileMeta} numberOfLines={1}>
-            {user?.email || "No email address on file"}
-          </Text>
-          <View style={styles.nicknamePill}>
-            <Ionicons name="sparkles-outline" size={11} color="#C44736" />
-            <Text style={styles.nicknameText}># {planNickname}</Text>
-          </View>
-          <Text style={styles.profileTin}>
-            {user?.tin?.trim() ? `TIN · ${user.tin}` : "TIN not assigned"}
-          </Text>
-        </View>
-
-        <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
-      </TouchableOpacity>
-      </Animated.View>
-
-      <Animated.View style={[styles.metricsRow, heroStyle]}>
-        <View style={styles.metricCard}>
-          <Ionicons name="person-outline" size={16} color="#6B7280" />
-          <Text style={styles.metricValue} numberOfLines={1}>
-            {user?.taxpayer_category || "Taxpayer"}
-          </Text>
-          <Text style={styles.metricLabel}>Category</Text>
-        </View>
-
-        <View style={styles.metricCard}>
-          <Ionicons name="location-outline" size={16} color="#6B7280" />
-          <Text style={styles.metricValue} numberOfLines={1}>
-            {user?.region || "Not set"}
-          </Text>
-          <Text style={styles.metricLabel}>Region</Text>
-        </View>
-      </Animated.View>
-
-      <Animated.View style={[styles.sectionBlock, securityStyle]}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Security</Text>
-          <Text style={styles.sectionHint}>Devices and alerts</Text>
-        </View>
-        <View style={styles.menuGroupCard}>
-          {securityItems.map((item, index) => (
-            <TouchableOpacity
-              key={item.title}
-              style={[styles.menuItem, styles.menuItemBorder]}
-              onPress={() => router.push(item.route as any)}
-              activeOpacity={0.86}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
-                <Ionicons name={item.icon as any} size={18} color="#6B7280" />
-              </View>
-
-              <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
-              </View>
-
-              <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-            </TouchableOpacity>
-          ))}
-          <View style={styles.menuItem}>
-            <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
-              <Ionicons name="finger-print" size={18} color={biometricAvailable ? "#6B7280" : "#D1D5DB"} />
+        {/* Header */}
+        <Animated.View style={[styles.header, { opacity: entrance }]}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => router.back()}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="chevron-back" size={20} color="#111827" />
+          </TouchableOpacity>
+          <View style={styles.headerTextBlock}>
+            <View style={styles.headerEyebrow}>
+              <Ionicons name="options-outline" size={14} color="#C44736" />
+              <Text style={styles.headerEyebrowText}>Account controls</Text>
             </View>
-            <View style={styles.textContainer}>
-              <Text style={[styles.menuTitle, !biometricAvailable && { color: "#9CA3AF" }]}>
-                Biometric Login
-              </Text>
-              <Text style={styles.menuSubtitle}>
-                {biometricAvailable
-                  ? "Use Face ID or fingerprint to sign in"
-                  : "Enable Face ID or fingerprint in device Settings first"}
-              </Text>
-            </View>
-            {biometricLoading ? (
-              <ActivityIndicator size="small" color="#9CA3AF" />
-            ) : (
-              <Toggle
-                value={biometricOn}
-                onValueChange={() => handleBiometricToggle(!biometricOn)}
-                disabled={!biometricAvailable}
+            <Text style={styles.title}>Settings</Text>
+            <Text style={styles.subtitle}>
+              Fine-tune your account, sessions, alerts, and plan.
+            </Text>
+          </View>
+        </Animated.View>
+
+        {/* Profile Card */}
+        <Animated.View style={[styles.heroWrap, heroStyle]}>
+          <TouchableOpacity
+            style={styles.profileCard}
+            onPress={() => router.push("/alter-profile")}
+            activeOpacity={0.9}
+          >
+            <View style={styles.avatarWrap}>
+              <View style={styles.avatar}>
+                <Text style={styles.avatarText}>{initials}</Text>
+              </View>
+              <View
+                style={[
+                  styles.statusDot,
+                  {
+                    backgroundColor: user?.active_profile
+                      ? "#34A853"
+                      : "#9CA3AF",
+                  },
+                ]}
               />
-            )}
-          </View>
-        </View>
-      </Animated.View>
+            </View>
 
-      <Animated.View style={[styles.sectionBlock, accountStyle]}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Account</Text>
-          <Text style={styles.sectionHint}>Profile and plan management</Text>
-        </View>
-        <View style={styles.menuGroupCard}>
-          {accountItems.map((item, index) => (
+            <View style={styles.profileInfo}>
+              <Text style={styles.profileName} numberOfLines={1}>
+                {user?.fullName ?? "TaxPadi User"}
+              </Text>
+              <Text style={styles.profileMeta} numberOfLines={1}>
+                {user?.email || "No email address on file"}
+              </Text>
+              <View style={styles.nicknamePill}>
+                <Ionicons name="sparkles-outline" size={11} color="#C44736" />
+                <Text style={styles.nicknameText}># {planNickname}</Text>
+              </View>
+              <Text style={styles.profileTin}>
+                {user?.tin?.trim() ? `TIN · ${user.tin}` : "TIN not assigned"}
+              </Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={18} color="#D1D5DB" />
+          </TouchableOpacity>
+        </Animated.View>
+
+        <Animated.View style={[styles.metricsRow, heroStyle]}>
+          <View style={styles.metricCard}>
+            <Ionicons name="person-outline" size={16} color="#6B7280" />
+            <Text style={styles.metricValue} numberOfLines={1}>
+              {user?.taxpayer_category || "Taxpayer"}
+            </Text>
+            <Text style={styles.metricLabel}>Category</Text>
+          </View>
+
+          <View style={styles.metricCard}>
+            <Ionicons name="location-outline" size={16} color="#6B7280" />
+            <Text style={styles.metricValue} numberOfLines={1}>
+              {user?.region || "Not set"}
+            </Text>
+            <Text style={styles.metricLabel}>Region</Text>
+          </View>
+        </Animated.View>
+
+        {/* Security Section */}
+        <Animated.View style={[styles.sectionBlock, securityStyle]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Security</Text>
+            <Text style={styles.sectionHint}>Devices and alerts</Text>
+          </View>
+          <View style={styles.menuGroupCard}>
+            {securityItems.map((item) => (
+              <TouchableOpacity
+                key={item.title}
+                style={[styles.menuItem, styles.menuItemBorder]}
+                onPress={() => router.push(item.route as any)}
+                activeOpacity={0.86}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
+                  <Ionicons name={item.icon as any} size={18} color="#6B7280" />
+                </View>
+
+                <View style={styles.textContainer}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            ))}
+            <View style={styles.menuItem}>
+              <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
+                <Ionicons
+                  name="finger-print"
+                  size={18}
+                  color={biometricAvailable ? "#6B7280" : "#D1D5DB"}
+                />
+              </View>
+              <View style={styles.textContainer}>
+                <Text
+                  style={[
+                    styles.menuTitle,
+                    !biometricAvailable && { color: "#9CA3AF" },
+                  ]}
+                >
+                  Biometric Login
+                </Text>
+                <Text style={styles.menuSubtitle}>
+                  {biometricAvailable
+                    ? "Use Face ID or fingerprint to sign in"
+                    : "Enable Face ID or fingerprint in device Settings first"}
+                </Text>
+              </View>
+              {biometricLoading ? (
+                <ActivityIndicator size="small" color="#9CA3AF" />
+              ) : (
+                <Toggle
+                  value={biometricOn}
+                  onValueChange={() => handleBiometricToggle(!biometricOn)}
+                  disabled={!biometricAvailable}
+                />
+              )}
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* Account Section */}
+        <Animated.View style={[styles.sectionBlock, accountStyle]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Account</Text>
+            <Text style={styles.sectionHint}>Profile and plan management</Text>
+          </View>
+          <View style={styles.menuGroupCard}>
+            {accountItems.map((item, index) => (
+              <TouchableOpacity
+                key={item.title}
+                style={[
+                  styles.menuItem,
+                  index < accountItems.length - 1 && styles.menuItemBorder,
+                ]}
+                onPress={() => router.push(item.route as any)}
+                activeOpacity={0.86}
+              >
+                <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
+                  <Ionicons name={item.icon as any} size={18} color="#6B7280" />
+                </View>
+
+                <View style={styles.textContainer}>
+                  <Text style={styles.menuTitle}>{item.title}</Text>
+                  <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                </View>
+
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Animated.View>
+
+        {/* Privacy & Data Section */}
+        <Animated.View style={[styles.sectionBlock, privacyStyle]}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Privacy & Data</Text>
+            <Text style={styles.sectionHint}>Your data rights and account</Text>
+          </View>
+          <View style={styles.menuGroupCard}>
+            {/* Health Score */}
             <TouchableOpacity
-              key={item.title}
-              style={[styles.menuItem, index < accountItems.length - 1 && styles.menuItemBorder]}
-              onPress={() => router.push(item.route as any)}
+              style={[styles.menuItem, styles.menuItemBorder]}
+              onPress={() => router.push("/health-score")}
               activeOpacity={0.86}
             >
               <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
-                <Ionicons name={item.icon as any} size={18} color="#6B7280" />
+                <Ionicons name="pulse-outline" size={18} color="#6B7280" />
               </View>
-
               <View style={styles.textContainer}>
-                <Text style={styles.menuTitle}>{item.title}</Text>
-                <Text style={styles.menuSubtitle}>{item.subtitle}</Text>
+                <Text style={styles.menuTitle}>Financial Health Score</Text>
+                <Text style={styles.menuSubtitle}>
+                  See your overall tax & financial health
+                </Text>
               </View>
-
               <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
             </TouchableOpacity>
-          ))}
-        </View>
-      </Animated.View>
 
-      {/* Privacy & Data */}
-      <Animated.View style={[styles.sectionBlock, privacyStyle]}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Privacy & Data</Text>
-          <Text style={styles.sectionHint}>Your data rights and account</Text>
-        </View>
-        <View style={styles.menuGroupCard}>
-          {/* Health Score */}
-          <TouchableOpacity
-            style={[styles.menuItem, styles.menuItemBorder]}
-            onPress={() => router.push("/health-score")}
-            activeOpacity={0.86}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
-              <Ionicons name="pulse-outline" size={18} color="#6B7280" />
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.menuTitle}>Financial Health Score</Text>
-              <Text style={styles.menuSubtitle}>See your overall tax & financial health</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-          </TouchableOpacity>
+            {/* Request My Data */}
+            <TouchableOpacity
+              style={[styles.menuItem, styles.menuItemBorder]}
+              onPress={() => setShowExportModal(true)}
+              disabled={requestingData}
+              activeOpacity={0.86}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
+                <Ionicons name="download-outline" size={18} color="#6B7280" />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={styles.menuTitle}>Request My Data</Text>
+                <Text style={styles.menuSubtitle}>
+                  {requestingData
+                    ? "Submitting request…"
+                    : "Export a copy of your account data"}
+                </Text>
+              </View>
+              {requestingData ? (
+                <Ionicons name="hourglass-outline" size={18} color="#9CA3AF" />
+              ) : (
+                <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+              )}
+            </TouchableOpacity>
 
-          {/* Request My Data */}
-          <TouchableOpacity
-            style={[styles.menuItem, styles.menuItemBorder]}
-            onPress={handleRequestData}
-            disabled={requestingData}
-            activeOpacity={0.86}
-          >
-            <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
-              <Ionicons name="download-outline" size={18} color="#6B7280" />
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={styles.menuTitle}>Request My Data</Text>
-              <Text style={styles.menuSubtitle}>
-                {requestingData ? "Submitting request…" : "Export a copy of your account data"}
-              </Text>
-            </View>
-            {requestingData ? (
-              <Ionicons name="hourglass-outline" size={18} color="#9CA3AF" />
-            ) : (
+            {/* Deactivate Account */}
+            <TouchableOpacity
+              style={styles.menuItem}
+              onPress={() => router.push("/deactivate-account")}
+              activeOpacity={0.86}
+            >
+              <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
+                <Ionicons name="trash-outline" size={18} color="#6B7280" />
+              </View>
+              <View style={styles.textContainer}>
+                <Text style={[styles.menuTitle, { color: "#DC2626" }]}>
+                  Deactivate Account
+                </Text>
+                <Text style={styles.menuSubtitle}>
+                  Permanently deactivate your account
+                </Text>
+              </View>
               <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
-            )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
 
-          {/* Deactivate Account */}
+        {/* Logout */}
+        <Animated.View style={logoutStyle}>
           <TouchableOpacity
-            style={styles.menuItem}
-            onPress={() => router.push("/deactivate-account")}
+            style={styles.logoutButton}
+            onPress={() => router.push("/logout-confirmation")}
             activeOpacity={0.86}
           >
-            <View style={[styles.iconContainer, { backgroundColor: "#F3F4F6" }]}>
-              <Ionicons name="trash-outline" size={18} color="#6B7280" />
-            </View>
-            <View style={styles.textContainer}>
-              <Text style={[styles.menuTitle, { color: "#DC2626" }]}>Deactivate Account</Text>
-              <Text style={styles.menuSubtitle}>Permanently deactivate your account</Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+            <Ionicons name="log-out-outline" size={22} color="#C44736" />
+            <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>
-        </View>
-      </Animated.View>
+        </Animated.View>
+      </ScrollView>
 
-      {/* Logout */}
-      <Animated.View style={logoutStyle}>
-      <TouchableOpacity
-        style={styles.logoutButton}
-        onPress={() => router.push("/logout-confirmation")}
-        activeOpacity={0.86}
-      >
-        <Ionicons name="log-out-outline" size={22} color="#C44736" />
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-      </Animated.View>
-    </ScrollView>
+      {/* TaxPadi Style Confirmation Modal */}
+      <DataExportConfirmationModal
+        visible={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        onConfirm={handleConfirmDataExport}
+        loading={requestingData}
+      />
     </SafeAreaView>
   );
 }
+
+// -------------------------------------------------------------
+// STYLESHEETS
+// -------------------------------------------------------------
+const alertStyles = StyleSheet.create({
+  overlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 28,
+  },
+  dialogCard: {
+    width: "100%",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 28,
+    paddingHorizontal: 24,
+    paddingTop: 28,
+    paddingBottom: 24,
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 24,
+    shadowOffset: { width: 0, height: 10 },
+    elevation: 8,
+  },
+  iconBadge: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: "#FFF2F0",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 18,
+  },
+  dialogTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 21,
+    color: "#111827",
+    letterSpacing: -0.3,
+    textAlign: "center",
+  },
+  dialogMessage: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    color: "#827E7A",
+    textAlign: "center",
+    lineHeight: 20,
+    marginTop: 8,
+    maxWidth: 260,
+  },
+  actionsRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 24,
+    width: "100%",
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: "#EFEBE6",
+    borderRadius: 16,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#111827",
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: "#C44736",
+    borderRadius: 16,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+});
 
 const styles = StyleSheet.create({
   safeArea: {
