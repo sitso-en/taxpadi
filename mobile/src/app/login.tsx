@@ -28,6 +28,7 @@ import { useTransactions } from "@/context/TransactionContext";
 import { usePayments } from "@/context/PaymentContext";
 import { useUser } from "@/context/UserContext";
 import { usePrivacy } from "@/context/PrivacyContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 import { getDeviceInfo } from "@/utils/device";
 
 const countryCodes = [
@@ -49,13 +50,13 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<{ phone?: string; password?: string }>({});
   const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [biometricType, setBiometricType] = useState<"face" | "fingerprint">("fingerprint");
 
   const { showToast } = useToast();
   const { refreshTransactions } = useTransactions();
   const { refreshPayments } = usePayments();
   const { setUser } = useUser();
   const { resetPrivacy } = usePrivacy();
+  const { refresh: refreshSubscription } = useSubscription();
 
   useEffect(() => {
     LocalAuthentication.hasHardwareAsync().then(async (has) => {
@@ -65,10 +66,6 @@ export default function LoginScreen() {
       const enabled = await isBiometricEnabled();
       if (!enabled) return;
       setBiometricAvailable(true);
-      const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-      if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
-        setBiometricType("face");
-      }
     }).catch(() => {});
   }, []);
 
@@ -118,7 +115,7 @@ export default function LoginScreen() {
         active_profile: profile.is_active ?? false,
       });
       resetPrivacy();
-      await Promise.all([refreshTransactions(), refreshPayments()]);
+      await Promise.all([refreshTransactions(), refreshPayments(), refreshSubscription()]);
       router.replace("/(tabs)/dashboard");
     } catch (error: any) {
       showToast(getUserFriendlyError(error), "error");
@@ -174,7 +171,7 @@ export default function LoginScreen() {
       });
 
       resetPrivacy();
-      await Promise.all([refreshTransactions(), refreshPayments()]);
+      await Promise.all([refreshTransactions(), refreshPayments(), refreshSubscription()]);
       router.replace("/(tabs)/dashboard");
     } catch (error: any) {
       showToast(getUserFriendlyError(error), "error");
@@ -344,13 +341,11 @@ export default function LoginScreen() {
                 disabled={loading}
               >
                 <Ionicons
-                  name={biometricType === "face" ? "scan-outline" : "finger-print"}
+                  name="finger-print"
                   size={22}
                   color="#6B7280"
                 />
-                <Text style={styles.biometricBtnText}>
-                  {biometricType === "face" ? "Use Face ID" : "Use Fingerprint"}
-                </Text>
+                <Text style={styles.biometricBtnText}>Sign in with Biometrics</Text>
               </TouchableOpacity>
             )}
 

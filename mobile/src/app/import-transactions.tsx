@@ -293,6 +293,12 @@ export default function TransactionImportScreen() {
             </TouchableOpacity>
             {errors.file ? <Text style={styles.fieldError}>{errors.file}</Text> : null}
 
+            {/* Validate tip */}
+            <View style={styles.tipRow}>
+              <Ionicons name="information-circle-outline" size={14} color="#6B7280" />
+              <Text style={styles.tipText}>Validate your file first to check for conflicts before importing.</Text>
+            </View>
+
             {/* Actions Block */}
             <View style={[styles.row, { marginTop: 8 }]}>
               <TouchableOpacity
@@ -503,6 +509,23 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     marginTop: 10,
     fontFamily: "Inter_400Regular",
+  },
+  tipRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 6,
+    backgroundColor: "#F3F4F6",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    marginBottom: 12,
+  },
+  tipText: {
+    flex: 1,
+    color: "#6B7280",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 17,
   },
   fieldError: {
     color: "#EF4444",

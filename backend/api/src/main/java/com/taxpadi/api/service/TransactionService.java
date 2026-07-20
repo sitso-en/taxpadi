@@ -458,13 +458,25 @@ public class TransactionService {
             String provider, LocalDate statementFrom, LocalDate statementTo) {
         validateFile(file);
 
-        if (importHistoryRepository
-                .existsByUserAndProviderAndStatementFromLessThanEqualAndStatementToGreaterThanEqual(
-                    user, provider, statementTo, statementFrom)) {
+        List<ParsedRow> rows = parseCsv(file);
+
+        // Auto-detect the actual date range from CSV rows — do not rely on form params
+        // which default to today when the user skips the Validate step.
+        List<ParsedRow> validRows = rows.stream()
+            .filter(r -> r.date != null && r.amount != null && r.amount.compareTo(BigDecimal.ZERO) != 0)
+            .toList();
+
+        LocalDate effectiveFrom = validRows.stream()
+            .map(r -> r.date).min(LocalDate::compareTo).orElse(statementFrom);
+        LocalDate effectiveTo = validRows.stream()
+            .map(r -> r.date).max(LocalDate::compareTo).orElse(statementTo);
+
+        if (effectiveFrom != null && effectiveTo != null
+                && importHistoryRepository
+                    .existsByUserAndProviderAndStatementFromLessThanEqualAndStatementToGreaterThanEqual(
+                        user, provider, effectiveTo, effectiveFrom)) {
             throw new ConflictException("Transactions for this period have already been imported");
         }
-
-        List<ParsedRow> rows = parseCsv(file);
 
         List<Transaction> saved = new ArrayList<>();
         List<AmbiguousTransactionItem> ambiguous = new ArrayList<>();
@@ -472,9 +484,7 @@ public class TransactionService {
 
         for (ParsedRow row : rows) {
             if (row.date == null || row.amount == null
-                    || row.amount.compareTo(BigDecimal.ZERO) == 0
-                    || row.date.isBefore(statementFrom)
-                    || row.date.isAfter(statementTo)) {
+                    || row.amount.compareTo(BigDecimal.ZERO) == 0) {
                 skipped++;
                 continue;
             }
@@ -508,8 +518,8 @@ public class TransactionService {
         ImportHistory history = new ImportHistory();
         history.setUser(user);
         history.setProvider(provider);
-        history.setStatementFrom(statementFrom);
-        history.setStatementTo(statementTo);
+        history.setStatementFrom(effectiveFrom);
+        history.setStatementTo(effectiveTo);
         history.setTotalImported(saved.size());
         history.setTotalSkipped(skipped);
         if (!saved.isEmpty()) {
@@ -521,14 +531,14 @@ public class TransactionService {
             .distinct()
             .forEach(year -> updateIncomeTaxCalculationForYear(user, year));
         auditLogService.log(user, "STATEMENT_IMPORTED",
-            "Statement imported from " + provider + " (" + statementFrom + " to " + statementTo
+            "Statement imported from " + provider + " (" + effectiveFrom + " to " + effectiveTo
                 + "). Imported: " + saved.size() + ", Skipped: " + skipped, null);
 
         ImportStatementResponse response = new ImportStatementResponse();
         response.setImportId(history.getImportId());
         response.setProvider(provider);
-        response.setStatementFrom(statementFrom);
-        response.setStatementTo(statementTo);
+        response.setStatementFrom(effectiveFrom);
+        response.setStatementTo(effectiveTo);
         response.setTotalTransactionsFound(rows.size());
         response.setTransactionsImported(saved.size());
         response.setTransactionsSkipped(skipped);
