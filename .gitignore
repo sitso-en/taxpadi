@@ -18,6 +18,7 @@ target/
 
 # Package Files #
 *.jar
+!mobile/android/gradle/wrapper/gradle-wrapper.jar
 *.war
 *.nar
 *.ear
