@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Dimensions,
   KeyboardAvoidingView,
@@ -32,10 +32,15 @@ const SPRING = { damping: 28, stiffness: 220 } as const;
 
 export default function BottomSheet({ visible, onClose, children, avoidKeyboard }: Props) {
   const ty = useSharedValue(800);
+  const [modalVisible, setModalVisible] = useState(visible);
 
   useEffect(() => {
-    if (visible) ty.value = withSpring(0, SPRING);
-    else ty.value = 800;
+    if (visible) {
+      setModalVisible(true);
+      ty.value = withSpring(0, SPRING);
+    } else {
+      ty.value = withSpring(800, SPRING, () => runOnJS(setModalVisible)(false));
+    }
   }, [visible]);
 
   const panGesture = Gesture.Pan()
@@ -84,7 +89,7 @@ export default function BottomSheet({ visible, onClose, children, avoidKeyboard 
 
   return (
     <Modal
-      visible={visible}
+      visible={modalVisible}
       transparent
       animationType="none"
       statusBarTranslucent

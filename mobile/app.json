@@ -10,6 +10,7 @@
     "ios": {
       "icon": "./assets/images/logoA5.png",
       "bundleIdentifier": "com.taxpadi.app",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
@@ -39,6 +40,14 @@
             "image": "./assets/images/splash-icon.png",
             "imageWidth": 76
           }
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/logoA5.png",
+          "color": "#C44736",
+          "sounds": []
         }
       ],
       "expo-image",
