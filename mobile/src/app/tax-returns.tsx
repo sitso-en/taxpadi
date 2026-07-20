@@ -6,13 +6,14 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import BottomSheet from "@/components/BottomSheet";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useTaxReturns } from "../context/TaxReturnsContext";
-import { generateTaxReturn } from "@/services/taxReturns.service";
+import { generateTaxReturn, amendTaxReturn } from "@/services/taxReturns.service";
 import { getUserFriendlyError } from "@/utils/error";
 import { useToast } from "@/context/ToastContext";
 
@@ -41,9 +42,33 @@ export default function TaxReturnsScreen() {
   const [selectedType, setSelectedType] = useState("income_tax");
   const [generating, setGenerating] = useState(false);
 
+  const [amendTarget, setAmendTarget] = useState<any>(null);
+  const [amendReason, setAmendReason] = useState("");
+  const [amending, setAmending] = useState(false);
+
   const currentYear = new Date().getFullYear();
   const submitted = returns.filter((r) => r.status === "submitted");
   const drafts = returns.filter((r) => r.status === "draft");
+
+  const handleAmend = async () => {
+    if (!amendTarget || amending) return;
+    if (!amendReason.trim()) {
+      showToast("Please provide a reason for the amendment.", "error");
+      return;
+    }
+    setAmending(true);
+    try {
+      await amendTaxReturn(amendTarget.id, amendReason.trim());
+      setAmendTarget(null);
+      setAmendReason("");
+      await refreshReturns();
+      showToast("Amendment submitted successfully.", "success");
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setAmending(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (generating) return;
@@ -121,11 +146,42 @@ export default function TaxReturnsScreen() {
 
             {submitted.length > 0 && <Text style={styles.sectionTitle}>Submitted</Text>}
             {submitted.map((item) => (
-              <ReturnCard key={item.id} item={item} />
+              <ReturnCard key={item.id} item={item} onAmend={() => { setAmendTarget(item); setAmendReason(""); }} />
             ))}
           </>
         )}
       </ScrollView>
+
+      {/* ── Amend Modal ── */}
+      <BottomSheet visible={!!amendTarget} onClose={() => setAmendTarget(null)} avoidKeyboard>
+        <View style={styles.sheetContent}>
+          <Text style={styles.modalTitle}>Amend Return</Text>
+          <Text style={styles.modalSub}>
+            {amendTarget ? `${TAX_TYPE_LABELS[amendTarget.taxType] ?? amendTarget.taxType} · Tax Year ${amendTarget.taxYear}` : ""}
+          </Text>
+
+          <Text style={styles.amendLabel}>REASON FOR AMENDMENT</Text>
+          <TextInput
+            style={styles.amendInput}
+            value={amendReason}
+            onChangeText={setAmendReason}
+            placeholder="Describe what needs to be corrected…"
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+
+          <TouchableOpacity
+            style={[styles.genBtn, (!amendReason.trim() || amending) && { opacity: 0.6 }]}
+            onPress={handleAmend}
+            disabled={!amendReason.trim() || amending}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.genBtnText}>{amending ? "Submitting…" : "Submit Amendment"}</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
 
       {/* ── Generate Modal ── */}
       <BottomSheet visible={showGenModal} onClose={() => setShowGenModal(false)}>
@@ -163,7 +219,7 @@ export default function TaxReturnsScreen() {
   );
 }
 
-function ReturnCard({ item, onPress }: { item: any; onPress?: () => void }) {
+function ReturnCard({ item, onPress, onAmend }: { item: any; onPress?: () => void; onAmend?: () => void }) {
   const isDraft = item.status === "draft";
   const Wrapper: any = onPress ? TouchableOpacity : View;
 
@@ -209,6 +265,13 @@ function ReturnCard({ item, onPress }: { item: any; onPress?: () => void }) {
           <Text style={styles.continueText}>Tap to review and submit</Text>
           <Ionicons name="arrow-forward" size={13} color="#C44736" />
         </View>
+      )}
+
+      {!isDraft && onAmend && (
+        <TouchableOpacity style={styles.amendBtn} onPress={onAmend} activeOpacity={0.8}>
+          <Ionicons name="create-outline" size={13} color="#6B7280" />
+          <Text style={styles.amendBtnText}>Amend Return</Text>
+        </TouchableOpacity>
       )}
     </Wrapper>
   );
@@ -528,5 +591,44 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 15,
     fontFamily: "Inter_600SemiBold",
+  },
+
+  // Amend button on card
+  amendBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#F3F4F6",
+  },
+  amendBtnText: {
+    fontSize: 12,
+    fontFamily: "Inter_600SemiBold",
+    color: "#6B7280",
+  },
+
+  // Amend sheet
+  amendLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#6B7280",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginTop: 4,
+  },
+  amendInput: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: "#111827",
+    minHeight: 100,
+    marginBottom: 20,
   },
 });

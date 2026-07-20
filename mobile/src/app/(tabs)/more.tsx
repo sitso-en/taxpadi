@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useUser } from "../../context/UserContext";
 import { useDeadlines } from "../../context/DeadlineContext";
@@ -160,6 +161,7 @@ export default function MoreScreen() {
   ];
 
   return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
     <ScrollView
       style={styles.container}
       showsVerticalScrollIndicator={false}
@@ -365,15 +367,20 @@ export default function MoreScreen() {
         <Text style={styles.logoutText}>Logout</Text>
       </TouchableOpacity>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#F2EDE8",
+  },
+
+  container: {
+    flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 44,
+    paddingTop: 12,
   },
 
   backgroundOrbTop: {

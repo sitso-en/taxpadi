@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { useUser } from "../../context/UserContext";
 import { useNotifications } from "../../context/NotificationContext";
 import { useDeadlines } from "../../context/DeadlineContext";
@@ -18,6 +19,8 @@ import {
   View,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { getTaxProfile } from "@/services/tax-profile.service";
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat("en-GH", {
@@ -35,6 +38,15 @@ export default function HomeScreen() {
   const { liability, recalculate } = useTaxLiability();
   const { suggestion } = useSavings();
   const [recalculating, setRecalculating] = useState(false);
+  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      getTaxProfile()
+        .then((res) => setOnboardingComplete(res.data?.onboarding_complete ?? false))
+        .catch(() => setOnboardingComplete(null));
+    }, [])
+  );
 
   const taxableIncome = liability?.taxable_income ?? 0;
   const totalDeductions = liability?.total_deductions ?? 0;
@@ -65,6 +77,7 @@ export default function HomeScreen() {
   };
 
   return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 80 }}
@@ -96,6 +109,28 @@ export default function HomeScreen() {
           )}
         </TouchableOpacity>
       </View>
+
+      {/* Onboarding banner — persists until profile is complete */}
+      {onboardingComplete === false && (
+        <TouchableOpacity
+          style={styles.onboardingBanner}
+          onPress={() => router.push("/taxpayer-profile")}
+          activeOpacity={0.85}
+        >
+          <View style={styles.onboardingLeft}>
+            <View style={styles.onboardingIconBox}>
+              <Ionicons name="person-outline" size={18} color="#C44736" />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.onboardingTitle}>Complete your tax profile</Text>
+              <Text style={styles.onboardingText}>
+                Add your TIN and tax year start to activate deadlines and full features.
+              </Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#C44736" />
+        </TouchableOpacity>
+      )}
 
       {/* Net Tax Liability Card */}
       <LinearGradient
@@ -183,7 +218,7 @@ export default function HomeScreen() {
       <View style={styles.quickGrid}>
         <TouchableOpacity
           style={styles.quickCard}
-          onPress={() => router.push("/(tabs)/add-transaction")}
+          onPress={() => router.push("/add-transaction")}
         >
           <Ionicons name="add-circle-outline" size={24} color="#C44736" />
           <Text style={styles.quickTitle}>Log Transaction</Text>
@@ -199,7 +234,7 @@ export default function HomeScreen() {
 
         <TouchableOpacity
           style={styles.quickCard}
-          onPress={() => router.push("/(tabs)/create-invoice")}
+          onPress={() => router.push("/create-invoice")}
         >
           <Ionicons name="receipt-outline" size={24} color="#C44736" />
           <Text style={styles.quickTitle}>Create Invoice</Text>
@@ -299,15 +334,20 @@ export default function HomeScreen() {
         );
       })}
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#F2EDE8",
+  },
+
+  container: {
+    flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 44,
+    paddingTop: 12,
   },
 
   header: {
@@ -566,7 +606,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: -20,
+    marginBottom: 0,
   },
 
   sectionTitle: {
@@ -614,5 +654,47 @@ const styles = StyleSheet.create({
   deadlineStatus: {
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
+  },
+
+  onboardingBanner: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+    borderWidth: 1.5,
+    borderColor: "#F8C5BF",
+    gap: 10,
+  },
+
+  onboardingLeft: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+
+  onboardingIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  onboardingTitle: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    fontSize: 14,
+    marginBottom: 2,
+  },
+
+  onboardingText: {
+    color: "#6B7280",
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    lineHeight: 17,
   },
 });

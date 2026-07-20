@@ -20,3 +20,13 @@ export const resolvePenalty = async (penaltyId: string): Promise<ResolvePenaltyR
   });
   return response.data;
 };
+
+export const getPenaltyById = async (id: string) => {
+  const response = await client.get(ENDPOINTS.PENALTY.GET(id));
+  return response.data;
+};
+
+export const disputePenalty = async (id: string, reason: string) => {
+  const response = await client.post(ENDPOINTS.PENALTY.DISPUTE(id), { reason });
+  return response.data;
+};

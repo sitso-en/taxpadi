@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useEffect, useState } from "react";
+import ConfirmModal from "@/components/ConfirmModal";
 import {
   ActivityIndicator,
-  Modal,
   ScrollView,
   StyleSheet,
   Text,
@@ -127,7 +127,7 @@ export default function WithholdingTaxScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.emptyButton}
-                onPress={() => router.push("/(tabs)/add-transaction")}
+                onPress={() => router.push("/add-transaction")}
               >
                 <Text style={styles.emptyButtonText}>Add a Transaction</Text>
               </TouchableOpacity>
@@ -166,33 +166,16 @@ export default function WithholdingTaxScreen() {
         </>
       )}
 
-      {/* Confirm remit modal */}
-      <Modal
+      <ConfirmModal
         visible={!!confirmRemitId}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setConfirmRemitId(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalIconBox}>
-              <Ionicons name="checkmark-circle-outline" size={24} color="#16A34A" />
-            </View>
-            <Text style={styles.modalTitle}>Mark as Remitted?</Text>
-            <Text style={styles.modalText}>
-              Confirm that this withholding amount has been paid to GRA. This cannot be undone.
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setConfirmRemitId(null)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} onPress={handleRemit}>
-                <Text style={styles.confirmText}>Confirm</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setConfirmRemitId(null)}
+        iconName="checkmark-circle-outline"
+        iconColor="#16A34A"
+        title="Mark as Remitted?"
+        message="Confirm that this withholding amount has been paid to GRA. This cannot be undone."
+        confirmLabel="Confirm"
+        onConfirm={handleRemit}
+      />
     </ScrollView>
   );
 }

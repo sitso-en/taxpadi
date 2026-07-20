@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import {
@@ -19,6 +19,7 @@ import { getUserFriendlyError } from "@/utils/error";
 import { useToast } from "@/context/ToastContext";
 import SubscriptionGate from "@/components/SubscriptionGate";
 import { useSubscription } from "@/context/SubscriptionContext";
+import BottomSheet from "@/components/BottomSheet";
 
 const GRA_LOGO = require("../../assets/images/gra.png");
 
@@ -49,10 +50,36 @@ function fmtShort(d: string) {
 const CORNER_SIZE = 22;
 const CORNER_W = 2.5;
 
+const TAX_TYPE_OPTIONS = [
+  { key: "income_tax",     label: "Income Tax" },
+  { key: "vat",            label: "VAT" },
+  { key: "paye",           label: "PAYE" },
+  { key: "withholding",    label: "Withholding Tax" },
+  { key: "corporate_tax",  label: "Corporate Tax" },
+];
+
 export default function ComplianceCertificateScreen() {
   const { isPro } = useSubscription();
   const { showToast } = useToast();
-  const { certificates, loading, downloadCertificate, refreshCertificates } = useCertificates();
+  const { certificates, loading, downloadCertificate, refreshCertificates, requestCertificate } = useCertificates();
+
+  const [showRequest, setShowRequest] = useState(false);
+  const [reqTaxType, setReqTaxType] = useState("income_tax");
+  const [reqYear, setReqYear] = useState(new Date().getFullYear() - 1);
+  const [requesting, setRequesting] = useState(false);
+
+  const handleRequest = async () => {
+    setRequesting(true);
+    try {
+      await requestCertificate(reqTaxType, reqYear);
+      showToast("Certificate request submitted successfully.", "success");
+      setShowRequest(false);
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setRequesting(false);
+    }
+  };
 
   if (!isPro) return (
     <SubscriptionGate
@@ -133,15 +160,24 @@ export default function ComplianceCertificateScreen() {
               </View>
 
               <Text style={styles.noCertHint}>
-                Complete your tax filings and make a payment to receive your compliance certificate from the Ghana Revenue Authority.
+                Complete your tax filings and make a payment, then request your compliance certificate from the Ghana Revenue Authority.
               </Text>
 
               <TouchableOpacity
-                style={styles.goPayBtn}
+                style={styles.requestBtn}
+                onPress={() => setShowRequest(true)}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="shield-checkmark-outline" size={16} color="#FFFFFF" />
+                <Text style={styles.requestBtnText}>Request Certificate</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.goPayBtn, { marginTop: 10 }]}
                 onPress={() => router.push("/payments")}
                 activeOpacity={0.85}
               >
-                <Text style={styles.goPayBtnText}>Make a Payment</Text>
+                <Text style={styles.goPayBtnText}>Make a Payment First</Text>
                 <Ionicons name="arrow-forward" size={15} color="#C44736" />
               </TouchableOpacity>
             </View>
@@ -263,6 +299,16 @@ export default function ComplianceCertificateScreen() {
               </TouchableOpacity>
             </View>
 
+            {/* ── Request new certificate ── */}
+            <TouchableOpacity
+              style={styles.requestNewBtn}
+              onPress={() => setShowRequest(true)}
+              activeOpacity={0.85}
+            >
+              <Ionicons name="add-circle-outline" size={18} color="#C44736" />
+              <Text style={styles.requestNewBtnText}>Request New Certificate</Text>
+            </TouchableOpacity>
+
             {/* ── Previous certificates ── */}
             {previous.length > 0 && (
               <>
@@ -298,6 +344,63 @@ export default function ComplianceCertificateScreen() {
           </>
         )}
       </ScrollView>
+
+      {/* ── Request Certificate Sheet ── */}
+      <BottomSheet visible={showRequest} onClose={() => setShowRequest(false)}>
+        <View style={styles.sheetContent}>
+          <Text style={styles.sheetTitle}>Request Certificate</Text>
+          <Text style={styles.sheetSub}>
+            Select the tax type and year for your compliance certificate request.
+          </Text>
+
+          <Text style={styles.sheetLabel}>TAX TYPE</Text>
+          <View style={styles.chipGrid}>
+            {TAX_TYPE_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.chip, reqTaxType === opt.key && styles.chipActive]}
+                onPress={() => setReqTaxType(opt.key)}
+              >
+                <Text style={[styles.chipText, reqTaxType === opt.key && styles.chipTextActive]}>
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={[styles.sheetLabel, { marginTop: 20 }]}>TAX YEAR</Text>
+          <View style={styles.yearRow}>
+            <TouchableOpacity
+              style={styles.yearBtn}
+              onPress={() => setReqYear((y) => y - 1)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="remove" size={20} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.yearText}>{reqYear}</Text>
+            <TouchableOpacity
+              style={styles.yearBtn}
+              onPress={() => setReqYear((y) => Math.min(y + 1, new Date().getFullYear()))}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="add" size={20} color="#111827" />
+            </TouchableOpacity>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.requestBtn, { marginTop: 28 }, requesting && { opacity: 0.7 }]}
+            onPress={handleRequest}
+            disabled={requesting}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="shield-checkmark-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.requestBtnText}>
+              {requesting ? "Submitting…" : "Submit Request"}
+            </Text>
+          </TouchableOpacity>
+          <View style={{ height: 8 }} />
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -699,5 +802,120 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "Inter_600SemiBold",
     color: "#C44736",
+  },
+
+  // ── Request button (empty state + sheet) ──
+  requestBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#C44736",
+    borderRadius: 14,
+    paddingVertical: 14,
+    shadowColor: "#C44736",
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  requestBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#FFFFFF",
+  },
+
+  // ── Request new (when certs exist) ──
+  requestNewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    borderWidth: 1.5,
+    borderColor: "#C44736",
+    borderRadius: 14,
+    paddingVertical: 13,
+    marginBottom: 28,
+  },
+  requestNewBtnText: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#C44736",
+  },
+
+  // ── Request sheet ──
+  sheetContent: {
+    paddingHorizontal: 22,
+    paddingBottom: 16,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 6,
+  },
+  sheetSub: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+    lineHeight: 19,
+    marginBottom: 22,
+  },
+  sheetLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#C44736",
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  chipGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    backgroundColor: "#EDE8E3",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  chipActive: {
+    backgroundColor: "#FDECEC",
+    borderColor: "#FECACA",
+  },
+  chipText: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "#6B7280",
+  },
+  chipTextActive: {
+    color: "#C44736",
+    fontFamily: "Inter_600SemiBold",
+  },
+  yearRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 28,
+    backgroundColor: "#FFFFFF",
+    borderRadius: 14,
+    paddingVertical: 14,
+  },
+  yearBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: "#F3F4F6",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  yearText: {
+    fontSize: 26,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    minWidth: 80,
+    textAlign: "center",
   },
 });

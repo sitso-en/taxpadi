@@ -14,6 +14,8 @@ import {
   View,
 } from "react-native";
 import { useToast } from "@/context/ToastContext";
+import { SafeAreaView } from "react-native-safe-area-context";
+import ConfirmModal from "@/components/ConfirmModal";
 import { getTransactions, deleteTransaction as deleteTransactionApi } from "@/services/transaction.service";
 import Card from "../../components/Card";
 import ErrorState from "@/components/ErrorState";
@@ -140,6 +142,7 @@ export default function TransactionsScreen() {
   };
 
   return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
     <View style={styles.container}>
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -305,43 +308,31 @@ export default function TransactionsScreen() {
         <Ionicons name="add" size={24} color="#FFFFFF" />
       </TouchableOpacity>
 
-      {/* Delete confirmation modal */}
-      <Modal visible={!!deleteConfirmId} transparent animationType="fade" onRequestClose={() => setDeleteConfirmId(null)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalIconBox}>
-              <Ionicons name="trash-outline" size={24} color="#C44736" />
-            </View>
-            <Text style={styles.modalTitle}>Delete Transaction?</Text>
-            <Text style={styles.modalText}>This action cannot be undone.</Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setDeleteConfirmId(null)}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.confirmDeleteButton}
-                onPress={handleDeleteConfirmed}
-                disabled={deleting}
-              >
-                <Text style={styles.confirmDeleteText}>{deleting ? "Deleting…" : "Delete"}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ConfirmModal
+        visible={!!deleteConfirmId}
+        onClose={() => setDeleteConfirmId(null)}
+        iconName="trash-outline"
+        title="Delete Transaction?"
+        message="This action cannot be undone."
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        onConfirm={handleDeleteConfirmed}
+        loading={deleting}
+      />
     </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#F2EDE8",
+  },
+
+  container: {
+    flex: 1,
     paddingHorizontal: 16,
-    paddingTop: 44,
+    paddingTop: 12,
   },
 
   headerRow: {

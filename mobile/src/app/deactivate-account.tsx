@@ -1,9 +1,9 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router, useNavigation } from "expo-router";
 import React, { useState } from "react";
+import ConfirmModal from "@/components/ConfirmModal";
 import {
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -218,47 +218,24 @@ export default function DeactivateAccountScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Final confirmation modal */}
-      <Modal
+      <ConfirmModal
         visible={showConfirm}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowConfirm(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalIconBox}>
-              <Ionicons name="warning" size={26} color="#DC2626" />
-            </View>
-            <Text style={styles.modalTitle}>Are you absolutely sure?</Text>
-            <Text style={styles.modalText}>
-              You are about to deactivate your TaxPadi account. This will log
-              you out of all devices immediately.
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity
-                style={styles.modalCancelBtn}
-                onPress={() => setShowConfirm(false)}
-              >
-                <Text style={styles.modalCancelText}>Go Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.modalConfirmBtn}
-                onPress={handleDeactivate}
-              >
-                <Text style={styles.modalConfirmText}>Yes, Deactivate</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowConfirm(false)}
+        iconName="warning"
+        iconColor="#DC2626"
+        title="Are you absolutely sure?"
+        message="You are about to deactivate your TaxPadi account. This will log you out of all devices immediately."
+        cancelLabel="Go Back"
+        confirmLabel="Yes, Deactivate"
+        onConfirm={handleDeactivate}
+      />
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 52,
     paddingBottom: 48,
   },
@@ -372,7 +349,7 @@ const styles = StyleSheet.create({
   },
 
   otherInput: {
-    backgroundColor: "#EDE8E3",
+    backgroundColor: "#FFFFFF",
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 12,
@@ -388,7 +365,7 @@ const styles = StyleSheet.create({
   fieldRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EDE8E3",
+    backgroundColor: "#FFFFFF",
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 14,

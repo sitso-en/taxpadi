@@ -19,3 +19,12 @@ export const getCertificateDownloadUrl = async (id: string) => {
   const response = await client.get(ENDPOINTS.CERTIFICATES.DOWNLOAD(id));
   return response.data;
 };
+
+export const requestCertificate = async (payload: {
+  tax_type: string;
+  period_start: string;
+  period_end: string;
+}) => {
+  const response = await client.post(ENDPOINTS.CERTIFICATES.REQUEST, payload);
+  return response.data;
+};

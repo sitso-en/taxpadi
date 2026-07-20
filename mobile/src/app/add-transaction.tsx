@@ -30,7 +30,7 @@ import {
   scanReceiptTransaction,
   createTransaction,
 } from "@/services/transaction.service";
-import { useTransactions } from "../../context/TransactionContext";
+import { useTransactions } from "@/context/TransactionContext";
 
 const WAVE_BAR_PEAKS = [18, 34, 26, 44, 30, 22, 40];
 const WAVE_BAR_DURATIONS = [380, 340, 490, 310, 440, 370, 410];

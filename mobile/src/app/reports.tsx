@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import SubscriptionGate from "@/components/SubscriptionGate";
@@ -13,19 +13,25 @@ import {
 import * as FileSystem from "expo-file-system";
 import * as Sharing from "expo-sharing";
 
+import BottomSheet from "@/components/BottomSheet";
 import {
   exportReport,
   getExportStatus,
-  getReportsSummary,
+  getIncomeStatement,
+  getTaxHistory,
 } from "@/services/reports.service";
 import { getUserFriendlyError } from "@/utils/error";
 import { useToast } from "@/context/ToastContext";
 
-type Summary = {
-  income: { total: number };
-  expenses: { total: number };
-  net_profit: number;
-  tax_liability: number;
+const fmt = (n: number) =>
+  `GH¢ ${Number(n ?? 0).toLocaleString("en-GH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+const TAX_TYPE_LABELS: Record<string, string> = {
+  income_tax: "Income Tax",
+  vat: "VAT",
+  paye: "PAYE",
+  withholding: "Withholding Tax",
+  corporate_tax: "Corporate Tax",
 };
 
 const REPORT_TYPES = [
@@ -61,24 +67,42 @@ const REPORT_TYPES = [
 
 export default function ReportsScreen() {
   const { showToast } = useToast();
-  const [summary, setSummary] = useState<Summary | null>(null);
-  const [loading, setLoading] = useState(true);
   const [exporting, setExporting] = useState<string | null>(null);
 
-  const loadSummary = useCallback(async () => {
+  const [showIncomeStatement, setShowIncomeStatement] = useState(false);
+  const [incomeData, setIncomeData] = useState<any>(null);
+  const [incomeLoading, setIncomeLoading] = useState(false);
+  const [incomeYear, setIncomeYear] = useState(new Date().getFullYear());
+
+  const [showTaxHistory, setShowTaxHistory] = useState(false);
+  const [taxHistoryData, setTaxHistoryData] = useState<any[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const fetchIncomeStatement = async (year: number) => {
+    setIncomeLoading(true);
+    setIncomeData(null);
     try {
-      const res = await getReportsSummary();
-      setSummary(res.data);
+      const res = await getIncomeStatement({ year });
+      setIncomeData(res.data ?? res);
     } catch (error: any) {
       showToast(getUserFriendlyError(error), "error");
     } finally {
-      setLoading(false);
+      setIncomeLoading(false);
     }
-  }, []);
+  };
 
-  useEffect(() => {
-    loadSummary();
-  }, [loadSummary]);
+  const fetchTaxHistory = async () => {
+    setHistoryLoading(true);
+    setTaxHistoryData([]);
+    try {
+      const res = await getTaxHistory();
+      setTaxHistoryData(res.data?.history ?? res.data ?? []);
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
 
   const shareFile = async (fileUrl: string, format: "pdf" | "excel") => {
     const ext = format === "pdf" ? "pdf" : "xlsx";
@@ -142,14 +166,6 @@ export default function ReportsScreen() {
     }
   };
 
-  if (loading) {
-    return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color="#C44736" />
-      </View>
-    );
-  }
-
   return (
     <SubscriptionGate
       feature="Reports & Export"
@@ -172,29 +188,6 @@ export default function ReportsScreen() {
         Generate detailed reports for your records or GRA.
       </Text>
 
-      {/* Business Summary Card */}
-      <View style={styles.summaryCard}>
-        <View style={styles.summaryIcon}>
-          <Ionicons name="analytics-outline" size={28} color="#FFFFFF" />
-        </View>
-
-        <View style={{ flex: 1 }}>
-          <Text style={styles.summaryTitle}>Business Summary</Text>
-          <Text style={styles.summarySubtitle}>
-            Income • GH¢ {Number(summary?.income?.total ?? 0).toFixed(2)}
-          </Text>
-          <Text style={styles.summarySubtitle}>
-            Expenses • GH¢ {Number(summary?.expenses?.total ?? 0).toFixed(2)}
-          </Text>
-          <Text style={styles.summarySubtitle}>
-            Net Profit • GH¢ {Number(summary?.net_profit ?? 0).toFixed(2)}
-          </Text>
-          <Text style={styles.summarySubtitle}>
-            Tax Liability • GH¢ {Number(summary?.tax_liability ?? 0).toFixed(2)}
-          </Text>
-        </View>
-      </View>
-
       {/* Report Cards */}
       {REPORT_TYPES.map((report) => (
         <View key={report.id} style={styles.card}>
@@ -206,6 +199,14 @@ export default function ReportsScreen() {
               <Text style={styles.cardTitle}>{report.title}</Text>
               <Text style={styles.cardSubtitle}>{report.subtitle}</Text>
             </View>
+            {report.id === "income" && (
+              <TouchableOpacity
+                onPress={() => { setShowIncomeStatement(true); fetchIncomeStatement(incomeYear); }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Text style={styles.viewLink}>View</Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           <View style={styles.buttonRow}>
@@ -214,16 +215,9 @@ export default function ReportsScreen() {
               onPress={() => handleExport("pdf", report.exportType)}
               disabled={!!exporting}
             >
-              <Ionicons
-                name="share-outline"
-                size={18}
-                color="#FFFFFF"
-                style={{ marginRight: 5 }}
-              />
+              <Ionicons name="share-outline" size={18} color="#FFFFFF" style={{ marginRight: 5 }} />
               <Text style={styles.pdfText}>
-                {exporting === `${report.exportType}-pdf`
-                  ? "Exporting…"
-                  : "Share PDF"}
+                {exporting === `${report.exportType}-pdf` ? "Exporting…" : "Share PDF"}
               </Text>
             </TouchableOpacity>
 
@@ -232,22 +226,150 @@ export default function ReportsScreen() {
               onPress={() => handleExport("excel", report.exportType)}
               disabled={!!exporting}
             >
-              <Ionicons
-                name="share-outline"
-                size={18}
-                color="#111827"
-                style={{ marginRight: 5 }}
-              />
+              <Ionicons name="share-outline" size={18} color="#111827" style={{ marginRight: 5 }} />
               <Text style={styles.csvText}>
-                {exporting === `${report.exportType}-excel`
-                  ? "Exporting…"
-                  : "Share Excel"}
+                {exporting === `${report.exportType}-excel` ? "Exporting…" : "Share Excel"}
               </Text>
             </TouchableOpacity>
           </View>
         </View>
       ))}
+
+      {/* Tax History card */}
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => { setShowTaxHistory(true); fetchTaxHistory(); }}
+        activeOpacity={0.85}
+      >
+        <View style={styles.topRow}>
+          <View style={styles.iconCircle}>
+            <Ionicons name="time-outline" size={18} color="#C44736" />
+          </View>
+          <View style={styles.textContainer}>
+            <Text style={styles.cardTitle}>Tax History</Text>
+            <Text style={styles.cardSubtitle}>Past filings and payment history</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+        </View>
+      </TouchableOpacity>
     </ScrollView>
+
+    {/* Income Statement Sheet */}
+    <BottomSheet visible={showIncomeStatement} onClose={() => setShowIncomeStatement(false)}>
+      <View style={styles.sheetContent}>
+        <Text style={styles.sheetTitle}>Income Statement</Text>
+
+        {/* Year picker */}
+        <View style={styles.yearPicker}>
+          <TouchableOpacity
+            onPress={() => { const y = incomeYear - 1; setIncomeYear(y); fetchIncomeStatement(y); }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chevron-back" size={20} color="#374151" />
+          </TouchableOpacity>
+          <Text style={styles.yearText}>{incomeYear}</Text>
+          <TouchableOpacity
+            onPress={() => {
+              if (incomeYear >= new Date().getFullYear()) return;
+              const y = incomeYear + 1; setIncomeYear(y); fetchIncomeStatement(y);
+            }}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Ionicons name="chevron-forward" size={20} color={incomeYear >= new Date().getFullYear() ? "#D1D5DB" : "#374151"} />
+          </TouchableOpacity>
+        </View>
+
+        {incomeLoading ? (
+          <ActivityIndicator color="#C44736" style={{ marginVertical: 32 }} />
+        ) : !incomeData ? (
+          <Text style={styles.sheetEmpty}>No data available for {incomeYear}.</Text>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+            {/* Summary totals */}
+            <View style={styles.stmtCard}>
+              <View style={styles.stmtRow}>
+                <Text style={styles.stmtLabel}>Total Income</Text>
+                <Text style={[styles.stmtVal, { color: "#16A34A" }]}>{fmt(incomeData.total_income ?? 0)}</Text>
+              </View>
+              <View style={styles.stmtRow}>
+                <Text style={styles.stmtLabel}>Total Expenses</Text>
+                <Text style={[styles.stmtVal, { color: "#C44736" }]}>{fmt(incomeData.total_expenses ?? 0)}</Text>
+              </View>
+              <View style={[styles.stmtRow, styles.stmtDivider]}>
+                <Text style={[styles.stmtLabel, { fontFamily: "Inter_700Bold", color: "#111827" }]}>Net Profit</Text>
+                <Text style={[styles.stmtVal, { fontFamily: "Inter_700Bold", color: "#111827" }]}>{fmt(incomeData.net_profit ?? incomeData.gross_profit ?? 0)}</Text>
+              </View>
+              {(incomeData.tax_liability ?? 0) > 0 && (
+                <View style={styles.stmtRow}>
+                  <Text style={styles.stmtLabel}>Estimated Tax</Text>
+                  <Text style={styles.stmtVal}>{fmt(incomeData.tax_liability)}</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Income breakdown */}
+            {(incomeData.income_breakdown ?? []).length > 0 && (
+              <>
+                <Text style={styles.breakdownTitle}>Income Breakdown</Text>
+                {(incomeData.income_breakdown ?? []).map((row: any, i: number) => (
+                  <View key={i} style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>{row.category ?? row.label}</Text>
+                    <Text style={[styles.breakdownVal, { color: "#16A34A" }]}>{fmt(row.amount ?? 0)}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+
+            {/* Expense breakdown */}
+            {(incomeData.expense_breakdown ?? []).length > 0 && (
+              <>
+                <Text style={[styles.breakdownTitle, { marginTop: 14 }]}>Expense Breakdown</Text>
+                {(incomeData.expense_breakdown ?? []).map((row: any, i: number) => (
+                  <View key={i} style={styles.breakdownRow}>
+                    <Text style={styles.breakdownLabel}>{row.category ?? row.label}</Text>
+                    <Text style={[styles.breakdownVal, { color: "#C44736" }]}>{fmt(row.amount ?? 0)}</Text>
+                  </View>
+                ))}
+              </>
+            )}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        )}
+      </View>
+    </BottomSheet>
+
+    {/* Tax History Sheet */}
+    <BottomSheet visible={showTaxHistory} onClose={() => setShowTaxHistory(false)}>
+      <View style={styles.sheetContent}>
+        <Text style={styles.sheetTitle}>Tax History</Text>
+        {historyLoading ? (
+          <ActivityIndicator color="#C44736" style={{ marginVertical: 32 }} />
+        ) : taxHistoryData.length === 0 ? (
+          <Text style={styles.sheetEmpty}>No tax history found.</Text>
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
+            {taxHistoryData.map((item: any, i: number) => (
+              <View key={i} style={styles.historyRow}>
+                <View style={styles.historyIconBox}>
+                  <Ionicons name="document-text-outline" size={16} color="#C44736" />
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.historyRowTitle}>
+                    {TAX_TYPE_LABELS[item.tax_type] ?? item.tax_type} · {item.year ?? item.tax_year}
+                  </Text>
+                  <Text style={styles.historyRowSub}>
+                    {item.status === "submitted" ? "Submitted" : item.status}
+                    {item.submitted_at ? ` · ${new Date(item.submitted_at).toLocaleDateString("en-GH", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                  </Text>
+                </View>
+                <Text style={styles.historyRowAmount}>{fmt(item.amount_paid ?? item.tax_liability ?? 0)}</Text>
+              </View>
+            ))}
+            <View style={{ height: 20 }} />
+          </ScrollView>
+        )}
+      </View>
+    </BottomSheet>
     </SubscriptionGate>
   );
 }
@@ -258,11 +380,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#F2EDE8",
     paddingHorizontal: 16,
     paddingTop: 44,
-  },
-
-  centered: {
-    justifyContent: "center",
-    alignItems: "center",
   },
 
   header: {
@@ -283,48 +400,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     lineHeight: 18,
     marginBottom: 20,
-    fontFamily: "Inter_400Regular",
-  },
-
-  summaryCard: {
-    backgroundColor: "#C44736",
-    borderRadius: 20,
-    paddingVertical: 22,
-    paddingHorizontal: 20,
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 20,
-    shadowColor: "#C44736",
-    shadowOpacity: 0.25,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
-  },
-
-  summaryIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
-    borderWidth: 3,
-    borderColor: "rgba(255,255,255,0.5)",
-    backgroundColor: "rgba(255,255,255,0.15)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-    flexShrink: 0,
-  },
-
-  summaryTitle: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontFamily: "Inter_700Bold",
-    marginBottom: 6,
-  },
-
-  summarySubtitle: {
-    color: "rgba(255,255,255,0.82)",
-    fontSize: 13,
-    marginTop: 2,
     fontFamily: "Inter_400Regular",
   },
 
@@ -412,5 +487,134 @@ const styles = StyleSheet.create({
     color: "#111827",
     fontFamily: "Inter_600SemiBold",
     fontSize: 13,
+  },
+
+  viewLink: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#C44736",
+    marginLeft: 8,
+  },
+
+  // Sheets
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 16,
+  },
+  sheetEmpty: {
+    textAlign: "center",
+    color: "#9CA3AF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    marginVertical: 32,
+  },
+  yearPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 24,
+    paddingVertical: 8,
+    marginBottom: 16,
+  },
+  yearText: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+  },
+
+  // Income statement
+  stmtCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+    gap: 10,
+  },
+  stmtRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  stmtLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+  },
+  stmtVal: {
+    fontSize: 14,
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+  },
+  stmtDivider: {
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    paddingTop: 10,
+    marginTop: 2,
+  },
+  breakdownTitle: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: "#C44736",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  breakdownRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  breakdownLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#374151",
+    textTransform: "capitalize",
+  },
+  breakdownVal: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+  },
+
+  // Tax history
+  historyRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#F9FAFB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+  },
+  historyIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  historyRowTitle: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  historyRowSub: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
+    textTransform: "capitalize",
+  },
+  historyRowAmount: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#374151",
   },
 });

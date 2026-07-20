@@ -3,8 +3,6 @@ import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
-  Animated,
-  Easing,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -33,8 +31,6 @@ export default function TaxBotScreen() {
   const [loading, setLoading] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
-  const heroAnim = useRef(new Animated.Value(0)).current;
-  const composerAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     const loadHistory = async () => {
@@ -60,40 +56,13 @@ export default function TaxBotScreen() {
           });
 
           setChat(messages);
-        } else {
-          setChat([
-            {
-              sender: "bot",
-              text: "Hello 👋 I'm TaxBot. How can I help you today?",
-            },
-          ]);
         }
       } catch {
-        setChat([
-          {
-            sender: "bot",
-            text: "Hello 👋 I'm TaxBot. How can I help you today?",
-          },
-        ]);
+        // start with empty chat — hero will be shown
       }
     };
 
     loadHistory();
-
-    Animated.stagger(120, [
-      Animated.timing(heroAnim, {
-        toValue: 1,
-        duration: 520,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.timing(composerAnim, {
-        toValue: 1,
-        duration: 520,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-    ]).start();
   }, []);
 
   const sendMessage = async () => {
@@ -151,205 +120,175 @@ export default function TaxBotScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={["top", "bottom"]}>
-    <KeyboardAvoidingView
-      style={styles.keyboardContainer}
-      behavior="padding"
-    >
-      <View style={styles.innerLayout}>
-        <View style={styles.backgroundOrbTop} />
-        <View style={styles.backgroundOrbBottom} />
-
-        <View style={styles.header}>
-          <TouchableOpacity style={styles.backButton} onPress={() => router.back()} activeOpacity={0.8}>
-            <Ionicons name="chevron-back" size={20} color="#111827" />
-          </TouchableOpacity>
-
-          <View style={styles.headerTextBlock}>
-            <Text style={styles.headerTitle}>TaxBot</Text>
-            <Text style={styles.headerSubtitle}>
-              Ask questions about VAT, PAYE, invoices, compliance, and deadlines.
-            </Text>
-          </View>
-        </View>
-
-        <Animated.View
-          style={[
-            styles.heroCard,
-            {
-              opacity: heroAnim,
-              transform: [
-                {
-                  translateY: heroAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [14, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <View style={styles.heroTopRow}>
-            <View style={styles.botIcon}>
-              <Ionicons name="chatbubbles-outline" size={21} color="#C44736" />
-            </View>
-
-            <View style={styles.heroCopy}>
-              <Text style={styles.heroTitle}>Your AI Tax Assistant</Text>
-              <Text style={styles.heroText}>
-                Fast answers, smarter guidance, and quick help on tax tasks.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.heroTags}>
-            <View style={styles.heroTag}>
-              <Ionicons name="calculator-outline" size={12} color="#C44736" />
-              <Text style={styles.heroTagText}>VAT</Text>
-            </View>
-            <View style={styles.heroTag}>
-              <Ionicons name="receipt-outline" size={12} color="#C44736" />
-              <Text style={styles.heroTagText}>Invoices</Text>
-            </View>
-            <View style={styles.heroTag}>
-              <Ionicons name="calendar-outline" size={12} color="#C44736" />
-              <Text style={styles.heroTagText}>Deadlines</Text>
-            </View>
-          </View>
-        </Animated.View>
-
-        <ScrollView
-          ref={scrollRef}
-          style={styles.chatArea}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.chatContent}
-        >
-          {chat.map((item, index) => (
-            <View
-              key={index}
-              style={[
-                styles.messageContainer,
-                item.sender === "user"
-                  ? styles.userContainer
-                  : styles.botContainer,
-              ]}
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
+      <KeyboardAvoidingView
+        style={styles.keyboardContainer}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
+        <View style={styles.innerLayout}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity
+              onPress={() => router.back()}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
+              <Ionicons name="chevron-back" size={26} color="#111827" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>TaxBot</Text>
+            <View style={{ width: 26 }} />
+          </View>
+
+          <ScrollView
+            ref={scrollRef}
+            style={styles.chatArea}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.chatContent}
+          >
+            {/* Hero — only shown when no chat yet */}
+            {chat.length === 0 && (
+              <View style={styles.heroCard}>
+                <View style={styles.heroTopRow}>
+                  <View style={styles.botIcon}>
+                    <Ionicons name="chatbubbles-outline" size={21} color="#C44736" />
+                  </View>
+
+                  <View style={styles.heroCopy}>
+                    <Text style={styles.heroTitle}>Your AI Tax Assistant</Text>
+                    <Text style={styles.heroText}>
+                      Fast answers, smarter guidance, and quick help on tax tasks.
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.heroTags}>
+                  <View style={styles.heroTag}>
+                    <Ionicons name="calculator-outline" size={12} color="#C44736" />
+                    <Text style={styles.heroTagText}>VAT</Text>
+                  </View>
+                  <View style={styles.heroTag}>
+                    <Ionicons name="receipt-outline" size={12} color="#C44736" />
+                    <Text style={styles.heroTagText}>Invoices</Text>
+                  </View>
+                  <View style={styles.heroTag}>
+                    <Ionicons name="calendar-outline" size={12} color="#C44736" />
+                    <Text style={styles.heroTagText}>Deadlines</Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            {chat.map((item, index) => (
               <View
+                key={index}
                 style={[
-                  styles.messageBubble,
+                  styles.messageContainer,
                   item.sender === "user"
-                    ? styles.userBubble
-                    : styles.botBubble,
+                    ? styles.userContainer
+                    : styles.botContainer,
                 ]}
               >
-                <Text
+                <View
                   style={[
-                    styles.messageText,
-                    item.sender === "user" && styles.userMessageText,
+                    styles.messageBubble,
+                    item.sender === "user"
+                      ? styles.userBubble
+                      : styles.botBubble,
                   ]}
                 >
-                  {item.text}
-                </Text>
+                  <Text
+                    style={[
+                      styles.messageText,
+                      item.sender === "user" && styles.userMessageText,
+                    ]}
+                  >
+                    {item.text}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))}
+            ))}
 
-          {loading && (
-            <View style={styles.thinkingRow}>
-              <ActivityIndicator size="small" color="#C44736" />
-              <Text style={styles.thinkingText}>TaxBot is thinking...</Text>
+            {loading && (
+              <View style={styles.thinkingRow}>
+                <ActivityIndicator size="small" color="#C44736" />
+                <Text style={styles.thinkingText}>TaxBot is thinking...</Text>
+              </View>
+            )}
+          </ScrollView>
+
+          {showSuggestions && chat.length === 0 && (
+            <View style={styles.quickWrap}>
+              <Text style={styles.quickHeader}>Quick prompts</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.quickActions}
+                contentContainerStyle={styles.quickContent}
+              >
+                <TouchableOpacity
+                  style={styles.quickButton}
+                  onPress={() => {
+                    setMessage("What is VAT?");
+                    setShowSuggestions(false);
+                  }}
+                  activeOpacity={0.86}
+                >
+                  <Ionicons name="calculator-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
+                  <Text style={styles.quickText}>What is VAT?</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.quickButton}
+                  onPress={() => {
+                    setMessage("How many invoices do I have?");
+                    setShowSuggestions(false);
+                  }}
+                  activeOpacity={0.86}
+                >
+                  <Ionicons name="receipt-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
+                  <Text style={styles.quickText}>My invoices</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.quickButton}
+                  onPress={() => {
+                    setMessage("Tax deadlines");
+                    setShowSuggestions(false);
+                  }}
+                  activeOpacity={0.86}
+                >
+                  <Ionicons name="calendar-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
+                  <Text style={styles.quickText}>Deadlines</Text>
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           )}
-        </ScrollView>
 
-        {showSuggestions && (
-          <View style={styles.quickWrap}>
-            <Text style={styles.quickHeader}>Quick prompts</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.quickActions}
-              contentContainerStyle={styles.quickContent}
+          {/* Composer */}
+          <View style={styles.composerCard}>
+            <TextInput
+              style={styles.input}
+              placeholder="Ask TaxBot anything..."
+              placeholderTextColor="#9CA3AF"
+              value={message}
+              onChangeText={setMessage}
+              onSubmitEditing={sendMessage}
+              returnKeyType="send"
+            />
+
+            <TouchableOpacity
+              style={styles.sendButton}
+              onPress={sendMessage}
+              activeOpacity={0.85}
             >
-              <TouchableOpacity
-                style={styles.quickButton}
-                onPress={() => {
-                  setMessage("What is VAT?");
-                  setShowSuggestions(false);
-                }}
-                activeOpacity={0.86}
-              >
-                <Ionicons name="calculator-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
-                <Text style={styles.quickText}>What is VAT?</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickButton}
-                onPress={() => {
-                  setMessage("How many invoices do I have?");
-                  setShowSuggestions(false);
-                }}
-                activeOpacity={0.86}
-              >
-                <Ionicons name="receipt-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
-                <Text style={styles.quickText}>My invoices</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={styles.quickButton}
-                onPress={() => {
-                  setMessage("Tax deadlines");
-                  setShowSuggestions(false);
-                }}
-                activeOpacity={0.86}
-              >
-                <Ionicons name="calendar-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
-                <Text style={styles.quickText}>Deadlines</Text>
-              </TouchableOpacity>
-            </ScrollView>
+              <Ionicons
+                name={loading ? "hourglass-outline" : "send"}
+                size={18}
+                color="#FFFFFF"
+              />
+            </TouchableOpacity>
           </View>
-        )}
-
-        <Animated.View
-          style={[
-            styles.composerCard,
-            {
-              opacity: composerAnim,
-              transform: [
-                {
-                  translateY: composerAnim.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [14, 0],
-                  }),
-                },
-              ],
-            },
-          ]}
-        >
-          <TextInput
-            style={styles.input}
-            placeholder="Ask TaxBot anything..."
-            placeholderTextColor="#9CA3AF"
-            value={message}
-            onChangeText={setMessage}
-            onSubmitEditing={sendMessage}
-            returnKeyType="send"
-          />
-
-          <TouchableOpacity
-            style={styles.sendButton}
-            onPress={sendMessage}
-            activeOpacity={0.85}
-          >
-            <Ionicons
-              name={loading ? "hourglass-outline" : "send"}
-              size={18}
-              color="#FFFFFF"
-          />
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
-    </KeyboardAvoidingView>
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -362,71 +301,26 @@ const styles = StyleSheet.create({
 
   keyboardContainer: {
     flex: 1,
-    backgroundColor: "#F2EDE8",
   },
 
   innerLayout: {
     flex: 1,
     paddingHorizontal: 18,
     paddingTop: 12,
-  },
-
-  backgroundOrbTop: {
-    position: "absolute",
-    top: -30,
-    right: -36,
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: "rgba(196, 71, 54, 0.08)",
-  },
-
-  backgroundOrbBottom: {
-    position: "absolute",
-    left: -36,
-    bottom: 110,
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: "rgba(107, 114, 128, 0.07)",
+    paddingBottom: 12,
   },
 
   header: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 12,
-  },
-
-  backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: "rgba(255,255,255,0.88)",
-    justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
-    borderWidth: 1,
-    borderColor: "#EFEFED",
-  },
-
-  headerTextBlock: {
-    flex: 1,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
 
   headerTitle: {
-    fontSize: 30,
+    fontSize: 24,
     fontFamily: "Inter_700Bold",
     color: "#111827",
-    letterSpacing: -0.4,
-  },
-
-  headerSubtitle: {
-    color: "#6B7280",
-    marginTop: 7,
-    fontSize: 13.5,
-    lineHeight: 19,
-    fontFamily: "Inter_400Regular",
-    maxWidth: 330,
   },
 
   heroCard: {
@@ -625,7 +519,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 18,
     padding: 10,
-    marginBottom: 12,
+    marginTop: 8,
     borderWidth: 1,
     borderColor: "#EFEFED",
     shadowColor: "#000",

@@ -224,7 +224,7 @@ export default function VATScreen() {
               </Text>
               <TouchableOpacity
                 style={styles.emptyButton}
-                onPress={() => router.push("/(tabs)/add-transaction")}
+                onPress={() => router.push("/add-transaction")}
               >
                 <Text style={styles.emptyButtonText}>Add a Transaction</Text>
               </TouchableOpacity>

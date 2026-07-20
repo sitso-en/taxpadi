@@ -54,7 +54,7 @@ const fieldStyles = StyleSheet.create({
   fieldRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#EDE8E3",
+    backgroundColor: "#FFFFFF",
     borderRadius: 14,
     paddingHorizontal: 14,
     paddingVertical: 14,
@@ -185,7 +185,7 @@ export default function ChangePasswordScreen() {
 
 const styles = StyleSheet.create({
   scroll: {
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: 52,
     paddingBottom: 48,
   },

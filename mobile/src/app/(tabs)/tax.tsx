@@ -47,7 +47,7 @@ export default function TaxScreen() {
   const netDue = Number(liability?.net_liability ?? 0);
   const totalLiability = Number(liability?.total_liability ?? 0);
   const totalPaid = Number(liability?.total_amount_paid ?? 0);
-  const breakdown: any[] = liability?.breakdown ?? [];
+  const breakdown: any[] = Array.isArray(liability?.breakdown) ? liability.breakdown : [];
   const paidPct = totalLiability > 0 ? Math.min(totalPaid / totalLiability, 1) : 0;
 
   const vat = rates?.vat;
@@ -476,7 +476,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     color: "#111827",
     fontFamily: "Inter_700Bold",
-    marginTop: 23
   },
 
   subtitle: {
@@ -666,7 +665,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
     padding: 20,
-    marginBottom: -35,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOpacity: 0.05,
     shadowRadius: 8,

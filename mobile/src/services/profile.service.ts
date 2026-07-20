@@ -20,6 +20,15 @@ export const switchProfile = async (id: string) => {
   return response.data;
 };
 
+export const updateProfile = async (id: string, data: {
+  label?: string;
+  taxpayerCategory?: string;
+  tin?: string;
+}) => {
+  const response = await client.put(ENDPOINTS.PROFILE.UPDATE(id), data);
+  return response.data;
+};
+
 export const deleteProfile = async (id: string) => {
   const response = await client.delete(ENDPOINTS.PROFILE.DELETE(id));
   return response.data;

@@ -1,13 +1,24 @@
-import React, { useCallback, useEffect } from "react";
-import { KeyboardAvoidingView, Modal, Platform, StyleSheet, TouchableOpacity, View } from "react-native";
+import React, { useEffect } from "react";
+import {
+  Dimensions,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { StatusBar } from "expo-status-bar";
 import Animated, {
   runOnJS,
-  runOnUI,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
+
+const SCREEN_HEIGHT = Dimensions.get("window").height;
 
 type Props = {
   visible: boolean;
@@ -17,31 +28,27 @@ type Props = {
   avoidKeyboard?: boolean;
 };
 
-const SPRING = { damping: 22, stiffness: 220 } as const;
+const SPRING = { damping: 28, stiffness: 220 } as const;
 
 export default function BottomSheet({ visible, onClose, children, avoidKeyboard }: Props) {
   const ty = useSharedValue(800);
 
   useEffect(() => {
-    ty.value = withSpring(visible ? 0 : 800, SPRING);
+    if (visible) ty.value = withSpring(0, SPRING);
+    else ty.value = 800;
   }, [visible]);
 
-  const dismiss = useCallback(() => {
-    "worklet";
-    ty.value = withSpring(800, SPRING, () => runOnJS(onClose)());
-  }, [onClose]);
-
-  const handleClose = useCallback(() => {
-    runOnUI(dismiss)();
-  }, [dismiss]);
-
   const panGesture = Gesture.Pan()
+    .activeOffsetY(5)
     .onUpdate((e) => {
       if (e.translationY > 0) ty.value = e.translationY;
     })
     .onEnd((e) => {
-      if (e.translationY > 120 || e.velocityY > 600) dismiss();
-      else ty.value = withSpring(0, SPRING);
+      if (e.translationY > 120 || e.velocityY > 600) {
+        ty.value = withSpring(800, SPRING, () => runOnJS(onClose)());
+      } else {
+        ty.value = withSpring(0, SPRING);
+      }
     });
 
   const animStyle = useAnimatedStyle(() => ({
@@ -50,10 +57,11 @@ export default function BottomSheet({ visible, onClose, children, avoidKeyboard 
 
   const content = (
     <View style={styles.overlay}>
+      {/* Backdrop — tap to close immediately, no animation needed */}
       <TouchableOpacity
         style={StyleSheet.absoluteFillObject}
         activeOpacity={1}
-        onPress={handleClose}
+        onPress={onClose}
       />
       <GestureDetector gesture={panGesture}>
         <Animated.View style={[styles.sheet, animStyle]}>
@@ -61,7 +69,14 @@ export default function BottomSheet({ visible, onClose, children, avoidKeyboard 
           <View style={styles.handleArea} pointerEvents="box-only">
             <View style={styles.handle} />
           </View>
-          {children}
+          <ScrollView
+            bounces={false}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            nestedScrollEnabled
+          >
+            {children}
+          </ScrollView>
         </Animated.View>
       </GestureDetector>
     </View>
@@ -73,8 +88,9 @@ export default function BottomSheet({ visible, onClose, children, avoidKeyboard 
       transparent
       animationType="none"
       statusBarTranslucent
-      onRequestClose={handleClose}
+      onRequestClose={onClose}
     >
+      <StatusBar style="dark" />
       {avoidKeyboard ? (
         <KeyboardAvoidingView
           style={{ flex: 1 }}
@@ -100,6 +116,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     overflow: "hidden",
+    maxHeight: SCREEN_HEIGHT * 0.85,
   },
   handleArea: {
     paddingVertical: 12,

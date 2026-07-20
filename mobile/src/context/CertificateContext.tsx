@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { getCertificates, getCertificateDownloadUrl } from "@/services/certificates.service";
+import { getCertificates, getCertificateDownloadUrl, requestCertificate } from "@/services/certificates.service";
 
 export type Certificate = {
   id: string;
@@ -19,6 +19,7 @@ type CertificateContextType = {
   loading: boolean;
   refreshCertificates: () => Promise<void>;
   downloadCertificate: (id: string) => Promise<string>;
+  requestCertificate: (taxType: string, year: number) => Promise<void>;
 };
 
 const CertificateContext = createContext<CertificateContextType>(
@@ -63,6 +64,15 @@ export function CertificateProvider({ children }: { children: React.ReactNode })
     return res.data?.pdf_url ?? "";
   };
 
+  const requestNewCertificate = async (taxType: string, year: number): Promise<void> => {
+    await requestCertificate({
+      tax_type: taxType,
+      period_start: `${year}-01-01`,
+      period_end: `${year}-12-31`,
+    });
+    await refreshCertificates();
+  };
+
   const validCertificates = useMemo(
     () => certificates.filter((c) => c.status === "ACTIVE").length,
     [certificates]
@@ -70,7 +80,7 @@ export function CertificateProvider({ children }: { children: React.ReactNode })
 
   return (
     <CertificateContext.Provider
-      value={{ certificates, validCertificates, loading, refreshCertificates, downloadCertificate }}
+      value={{ certificates, validCertificates, loading, refreshCertificates, downloadCertificate, requestCertificate: requestNewCertificate }}
     >
       {children}
     </CertificateContext.Provider>

@@ -1,7 +1,7 @@
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
-import { useState } from "react";
+import { router, useLocalSearchParams } from "expo-router";
+import { useEffect, useState } from "react";
 import { getUserFriendlyError } from "@/utils/error";
 import {
   Linking,
@@ -18,6 +18,7 @@ import * as Sharing from "expo-sharing";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { useInvoices } from "@/context/InvoiceContext";
+import { getInvoice } from "@/services/invoices.service";
 import { useNetwork } from "@/context/NetworkContext";
 import { useToast } from "@/context/ToastContext";
 import OfflineFormNotice from "@/components/OfflineFormNotice";
@@ -34,7 +35,10 @@ type CreatedInvoice = {
 };
 
 export default function CreateInvoiceScreen() {
-  const { addInvoice, send } = useInvoices();
+  const { id } = useLocalSearchParams<{ id?: string }>();
+  const isEditing = !!id;
+
+  const { addInvoice, editInvoice, send } = useInvoices();
   const { isOnline } = useNetwork();
   const { showToast } = useToast();
 
@@ -53,6 +57,23 @@ export default function CreateInvoiceScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Pre-populate form when editing
+  useEffect(() => {
+    if (!id) return;
+    getInvoice(id)
+      .then((res) => {
+        const inv = res.data ?? res;
+        setClientName(inv.client_name ?? "");
+        setClientEmail(inv.client_email ?? "");
+        setClientPhone(inv.client_phone ?? "");
+        setDescription(inv.description ?? "");
+        const sub = inv.subtotal ?? inv.sub_total ?? inv.amount ?? 0;
+        setAmount(sub > 0 ? String(sub) : "");
+        if (inv.due_date) setDueDate(new Date(inv.due_date));
+      })
+      .catch(() => showToast("Could not load invoice details.", "error"));
+  }, [id]);
 
   // Post-creation state
   const [created, setCreated] = useState<CreatedInvoice | null>(null);
@@ -74,29 +95,42 @@ export default function CreateInvoiceScreen() {
     return Object.keys(e).length === 0;
   };
 
-  const handleCreate = async () => {
+  const handleSave = async () => {
     if (!isOnline) { showToast("You're offline.", "info"); return; }
     if (!validate()) return;
     setSaving(true);
     try {
-      const res = await addInvoice({
-        client_name: clientName.trim(),
-        client_email: clientEmail.trim() || undefined,
-        client_phone: clientPhone.trim() || undefined,
-        description: description.trim() || undefined,
-        subtotal,
-        due_date: dueDate.toISOString().split("T")[0],
-      });
-      setCreated({
-        invoiceId: res?.data?.invoice_id ?? "",
-        invoiceRef: res?.data?.invoice_ref ?? "Invoice",
-        vatAmount: res?.data?.vat_amount ?? 0,
-        totalAmount: res?.data?.total_amount ?? subtotal,
-        pdfUrl: res?.data?.pdf_url,
-        clientEmail: clientEmail.trim() || undefined,
-        clientPhone: clientPhone.trim() || undefined,
-        clientName: clientName.trim(),
-      });
+      if (isEditing && id) {
+        await editInvoice(id, {
+          client_name: clientName.trim(),
+          client_email: clientEmail.trim() || undefined,
+          client_phone: clientPhone.trim() || undefined,
+          description: description.trim() || undefined,
+          subtotal,
+          due_date: dueDate.toISOString().split("T")[0],
+        });
+        showToast("Invoice updated.", "success");
+        router.back();
+      } else {
+        const res = await addInvoice({
+          client_name: clientName.trim(),
+          client_email: clientEmail.trim() || undefined,
+          client_phone: clientPhone.trim() || undefined,
+          description: description.trim() || undefined,
+          subtotal,
+          due_date: dueDate.toISOString().split("T")[0],
+        });
+        setCreated({
+          invoiceId: res?.data?.invoice_id ?? "",
+          invoiceRef: res?.data?.invoice_ref ?? "Invoice",
+          vatAmount: res?.data?.vat_amount ?? 0,
+          totalAmount: res?.data?.total_amount ?? subtotal,
+          pdfUrl: res?.data?.pdf_url,
+          clientEmail: clientEmail.trim() || undefined,
+          clientPhone: clientPhone.trim() || undefined,
+          clientName: clientName.trim(),
+        });
+      }
     } catch (e: any) {
       showToast(getUserFriendlyError(e), "error");
     } finally {
@@ -203,9 +237,9 @@ export default function CreateInvoiceScreen() {
         <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back" size={26} color="#111827" />
         </TouchableOpacity>
-        <Text style={styles.title}>New Invoice</Text>
+        <Text style={styles.title}>{isEditing ? "Edit Invoice" : "New Invoice"}</Text>
       </View>
-      <Text style={styles.subtitle}>Create and send professional invoices</Text>
+      <Text style={styles.subtitle}>{isEditing ? "Update the invoice details below" : "Create and send professional invoices"}</Text>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.formScroll} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
         <OfflineFormNotice />
@@ -306,8 +340,10 @@ export default function CreateInvoiceScreen() {
           )}
         </View>
 
-        <TouchableOpacity style={[styles.createBtn, saving && { opacity: 0.6 }]} onPress={handleCreate} disabled={saving} activeOpacity={0.88}>
-          <Text style={styles.createBtnText}>{saving ? "Creating…" : "Create Invoice"}</Text>
+        <TouchableOpacity style={[styles.createBtn, saving && { opacity: 0.6 }]} onPress={handleSave} disabled={saving} activeOpacity={0.88}>
+          <Text style={styles.createBtnText}>
+            {saving ? (isEditing ? "Saving…" : "Creating…") : (isEditing ? "Save Changes" : "Create Invoice")}
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

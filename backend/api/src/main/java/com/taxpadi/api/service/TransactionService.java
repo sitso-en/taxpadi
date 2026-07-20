@@ -512,7 +512,9 @@ public class TransactionService {
         history.setStatementTo(statementTo);
         history.setTotalImported(saved.size());
         history.setTotalSkipped(skipped);
-        importHistoryRepository.save(history);
+        if (!saved.isEmpty()) {
+            importHistoryRepository.save(history);
+        }
 
         saved.stream()
             .map(tx -> tx.getTransactionDate().getYear())

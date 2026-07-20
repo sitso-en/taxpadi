@@ -18,8 +18,10 @@ import {
   getPayeRecords,
   getPayeEmployees,
   addPayeEmployee,
+  updatePayeEmployee,
   remitPayeRecord,
   deactivatePayeEmployee,
+  getPayeAnnualReturn,
 } from "@/services/paye.service";
 import { usePrivacy } from "@/context/PrivacyContext";
 import { useToast } from "@/context/ToastContext";
@@ -72,6 +74,23 @@ export default function PAYEScreen() {
   const [deactivateEndDate, setDeactivateEndDate] = useState(new Date());
   const [showDeactivateDatePicker, setShowDeactivateDatePicker] = useState(false);
   const [deactivating, setDeactivating] = useState(false);
+
+  // Edit employee sheet
+  const [editEmployee, setEditEmployee] = useState<any | null>(null);
+  const [editEmpName, setEditEmpName] = useState("");
+  const [editEmpPosition, setEditEmpPosition] = useState("");
+  const [editEmpSalary, setEditEmpSalary] = useState("");
+  const [editEmpTransport, setEditEmpTransport] = useState("");
+  const [editEmpHousing, setEditEmpHousing] = useState("");
+  const [editEmpSsnit, setEditEmpSsnit] = useState("");
+  const [editingEmployee, setEditingEmployee] = useState(false);
+  const [editEmpError, setEditEmpError] = useState("");
+
+  // Annual return sheet
+  const [showAnnualReturn, setShowAnnualReturn] = useState(false);
+  const [annualYear, setAnnualYear] = useState(new Date().getFullYear());
+  const [annualData, setAnnualData] = useState<any>(null);
+  const [annualLoading, setAnnualLoading] = useState(false);
 
   const loadRecords = async () => {
     const res = await getPayeRecords();
@@ -181,6 +200,55 @@ export default function PAYEScreen() {
     }
   };
 
+  const openEditEmployee = (emp: any) => {
+    setEditEmployee(emp);
+    setEditEmpName(emp.full_name ?? "");
+    setEditEmpPosition(emp.position ?? "");
+    setEditEmpSalary(String(emp.gross_salary ?? ""));
+    setEditEmpTransport(emp.transport_allowance ? String(emp.transport_allowance) : "");
+    setEditEmpHousing(emp.housing_allowance ? String(emp.housing_allowance) : "");
+    setEditEmpSsnit(emp.social_security_no ?? "");
+    setEditEmpError("");
+  };
+
+  const handleEditEmployee = async () => {
+    if (!editEmployee) return;
+    if (!editEmpName.trim()) { setEditEmpError("Name is required."); return; }
+    if (!editEmpSalary.trim() || Number(editEmpSalary) <= 0) { setEditEmpError("Enter a valid gross salary."); return; }
+    setEditingEmployee(true);
+    setEditEmpError("");
+    try {
+      await updatePayeEmployee(editEmployee.employee_id, {
+        full_name: editEmpName.trim(),
+        position: editEmpPosition.trim() || undefined,
+        gross_salary: Number(editEmpSalary),
+        transport_allowance: editEmpTransport ? Number(editEmpTransport) : undefined,
+        housing_allowance: editEmpHousing ? Number(editEmpHousing) : undefined,
+        social_security_no: editEmpSsnit.trim() || undefined,
+      });
+      showToast("Employee updated.", "success");
+      setEditEmployee(null);
+      await loadEmployees();
+    } catch (error: any) {
+      setEditEmpError(getUserFriendlyError(error));
+    } finally {
+      setEditingEmployee(false);
+    }
+  };
+
+  const fetchAnnualReturn = async (year: number) => {
+    setAnnualLoading(true);
+    setAnnualData(null);
+    try {
+      const res = await getPayeAnnualReturn(String(year));
+      setAnnualData(res.data ?? res);
+    } catch {
+      showToast("Could not load annual return.", "error");
+    } finally {
+      setAnnualLoading(false);
+    }
+  };
+
   const Row = ({ label, value }: { label: string; value: string }) => (
     <>
       <View style={styles.row}>
@@ -264,18 +332,35 @@ export default function PAYEScreen() {
                     Monthly PAYE: {amountsHidden ? "••••" : fmt(emp.monthly_paye ?? 0)}
                   </Text>
                 </View>
-                <TouchableOpacity
-                  style={styles.deactivateBtn}
-                  onPress={() => { setDeactivateEmployee(emp); setDeactivateEndDate(new Date()); }}
-                >
-                  <Ionicons name="person-remove-outline" size={16} color="#9CA3AF" />
-                </TouchableOpacity>
+                <View style={{ flexDirection: "row", gap: 4 }}>
+                  <TouchableOpacity
+                    style={styles.deactivateBtn}
+                    onPress={() => openEditEmployee(emp)}
+                  >
+                    <Ionicons name="create-outline" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.deactivateBtn}
+                    onPress={() => { setDeactivateEmployee(emp); setDeactivateEndDate(new Date()); }}
+                  >
+                    <Ionicons name="person-remove-outline" size={16} color="#9CA3AF" />
+                  </TouchableOpacity>
+                </View>
               </View>
             ))
           )}
 
           {/* Monthly PAYE History */}
-          <Text style={[styles.section, { marginTop: 8 }]}>PAYE History</Text>
+          <View style={[styles.sectionRow, { marginTop: 8 }]}>
+            <Text style={styles.section}>PAYE History</Text>
+            <TouchableOpacity
+              style={styles.addBtn}
+              onPress={() => { setShowAnnualReturn(true); fetchAnnualReturn(annualYear); }}
+            >
+              <Ionicons name="bar-chart-outline" size={14} color="#C44736" />
+              <Text style={styles.addBtnText}>Annual Return</Text>
+            </TouchableOpacity>
+          </View>
 
           {monthlyHistory.length === 0 ? (
             <View style={styles.emptyState}>
@@ -315,6 +400,158 @@ export default function PAYEScreen() {
           )}
         </>
       )}
+
+      {/* Edit Employee Sheet */}
+      <BottomSheet visible={!!editEmployee} onClose={() => setEditEmployee(null)} avoidKeyboard>
+        <ScrollView style={styles.sheetContent} keyboardShouldPersistTaps="handled">
+          <Text style={styles.sheetTitle}>Edit Employee</Text>
+          <Text style={styles.sheetSub}>Changes apply from the next payroll period.</Text>
+
+          <Text style={styles.fieldLabel}>FULL NAME *</Text>
+          <TextInput
+            style={[styles.fieldInput, editEmpError && !editEmpName.trim() ? styles.fieldInputError : null]}
+            placeholder="e.g. Ama Owusu"
+            placeholderTextColor="#9CA3AF"
+            value={editEmpName}
+            onChangeText={(t) => { setEditEmpName(t); setEditEmpError(""); }}
+          />
+
+          <Text style={styles.fieldLabel}>POSITION</Text>
+          <TextInput
+            style={styles.fieldInput}
+            placeholder="e.g. Accountant"
+            placeholderTextColor="#9CA3AF"
+            value={editEmpPosition}
+            onChangeText={setEditEmpPosition}
+          />
+
+          <Text style={styles.fieldLabel}>GROSS SALARY (GHS) *</Text>
+          <TextInput
+            style={[styles.fieldInput, editEmpError && !editEmpSalary.trim() ? styles.fieldInputError : null]}
+            placeholder="e.g. 2500"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="numeric"
+            value={editEmpSalary}
+            onChangeText={(t) => { setEditEmpSalary(t); setEditEmpError(""); }}
+          />
+
+          <Text style={styles.fieldLabel}>TRANSPORT ALLOWANCE (GHS)</Text>
+          <TextInput
+            style={styles.fieldInput}
+            placeholder="e.g. 200"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="numeric"
+            value={editEmpTransport}
+            onChangeText={setEditEmpTransport}
+          />
+
+          <Text style={styles.fieldLabel}>HOUSING ALLOWANCE (GHS)</Text>
+          <TextInput
+            style={styles.fieldInput}
+            placeholder="e.g. 300"
+            placeholderTextColor="#9CA3AF"
+            keyboardType="numeric"
+            value={editEmpHousing}
+            onChangeText={setEditEmpHousing}
+          />
+
+          <Text style={styles.fieldLabel}>SSNIT NUMBER</Text>
+          <TextInput
+            style={styles.fieldInput}
+            placeholder="Optional"
+            placeholderTextColor="#9CA3AF"
+            value={editEmpSsnit}
+            onChangeText={setEditEmpSsnit}
+            autoCapitalize="characters"
+          />
+
+          {editEmpError ? <Text style={styles.fieldError}>{editEmpError}</Text> : null}
+
+          <TouchableOpacity
+            style={[styles.button, editingEmployee && { opacity: 0.7 }]}
+            onPress={handleEditEmployee}
+            disabled={editingEmployee}
+          >
+            <Text style={styles.buttonText}>{editingEmployee ? "Saving…" : "Save Changes"}</Text>
+          </TouchableOpacity>
+          <View style={{ height: 20 }} />
+        </ScrollView>
+      </BottomSheet>
+
+      {/* Annual Return Sheet */}
+      <BottomSheet visible={showAnnualReturn} onClose={() => setShowAnnualReturn(false)}>
+        <View style={styles.sheetContent}>
+          <Text style={styles.sheetTitle}>PAYE Annual Return</Text>
+
+          {/* Year picker */}
+          <View style={styles.yearPicker}>
+            <TouchableOpacity
+              onPress={() => { const y = annualYear - 1; setAnnualYear(y); fetchAnnualReturn(y); }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-back" size={20} color="#374151" />
+            </TouchableOpacity>
+            <Text style={styles.yearText}>{annualYear}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (annualYear >= new Date().getFullYear()) return;
+                const y = annualYear + 1; setAnnualYear(y); fetchAnnualReturn(y);
+              }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Ionicons name="chevron-forward" size={20} color={annualYear >= new Date().getFullYear() ? "#D1D5DB" : "#374151"} />
+            </TouchableOpacity>
+          </View>
+
+          {annualLoading ? (
+            <ActivityIndicator color="#C44736" style={{ marginTop: 32, marginBottom: 32 }} />
+          ) : !annualData ? (
+            <Text style={styles.annualEmpty}>No data available for {annualYear}.</Text>
+          ) : (
+            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 400 }}>
+              {/* Totals */}
+              <View style={styles.annualTotalsCard}>
+                <View style={styles.annualTotalRow}>
+                  <Text style={styles.annualTotalLabel}>Total Gross Salary</Text>
+                  <Text style={styles.annualTotalVal}>{fmt(annualData.total_gross_salary ?? 0)}</Text>
+                </View>
+                <View style={styles.annualTotalRow}>
+                  <Text style={styles.annualTotalLabel}>Total PAYE Deducted</Text>
+                  <Text style={styles.annualTotalVal}>{fmt(annualData.total_paye_deducted ?? 0)}</Text>
+                </View>
+                <View style={styles.annualTotalRow}>
+                  <Text style={styles.annualTotalLabel}>Total Remitted</Text>
+                  <Text style={[styles.annualTotalVal, { color: "#16A34A" }]}>{fmt(annualData.total_remitted ?? 0)}</Text>
+                </View>
+                <View style={[styles.annualTotalRow, { borderBottomWidth: 0 }]}>
+                  <Text style={styles.annualTotalLabel}>Outstanding</Text>
+                  <Text style={[styles.annualTotalVal, { color: "#C44736" }]}>{fmt(annualData.outstanding ?? 0)}</Text>
+                </View>
+              </View>
+
+              {/* Per-employee breakdown */}
+              {(annualData.employees ?? []).length > 0 && (
+                <>
+                  <Text style={styles.annualBreakdownTitle}>Employee Breakdown</Text>
+                  {(annualData.employees ?? []).map((emp: any, i: number) => (
+                    <View key={emp.employee_id ?? i} style={styles.annualEmpRow}>
+                      <View style={styles.employeeAvatar}>
+                        <Text style={styles.employeeAvatarText}>{(emp.full_name ?? "?").charAt(0).toUpperCase()}</Text>
+                      </View>
+                      <View style={{ flex: 1, marginLeft: 10 }}>
+                        <Text style={styles.annualEmpName}>{emp.full_name}</Text>
+                        <Text style={styles.annualEmpPaye}>PAYE: {fmt(emp.total_paye ?? 0)}</Text>
+                      </View>
+                      <Text style={styles.annualEmpGross}>{fmt(emp.total_gross_salary ?? 0)}</Text>
+                    </View>
+                  ))}
+                </>
+              )}
+              <View style={{ height: 24 }} />
+            </ScrollView>
+          )}
+        </View>
+      </BottomSheet>
 
       {/* Add Employee Modal */}
       <BottomSheet visible={showAddModal} onClose={() => { setShowAddModal(false); resetAddForm(); }} avoidKeyboard>
@@ -791,5 +1028,88 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     textAlign: "center",
     lineHeight: 18,
+  },
+
+  // Year picker
+  yearPicker: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 24,
+    paddingVertical: 12,
+    marginBottom: 16,
+  },
+  yearText: {
+    fontSize: 20,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+  },
+
+  // Annual return
+  annualEmpty: {
+    textAlign: "center",
+    color: "#9CA3AF",
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    marginVertical: 32,
+  },
+  annualTotalsCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 16,
+  },
+  annualTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
+  },
+  annualTotalLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+  },
+  annualTotalVal: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+  },
+  annualBreakdownTitle: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: "#C44736",
+    letterSpacing: 0.5,
+    textTransform: "uppercase",
+    marginBottom: 10,
+  },
+  annualEmpRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFFFFF",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOpacity: 0.03,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  annualEmpName: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+  },
+  annualEmpPaye: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+    marginTop: 2,
+  },
+  annualEmpGross: {
+    fontSize: 13,
+    fontFamily: "Inter_700Bold",
+    color: "#374151",
   },
 });

@@ -9,10 +9,15 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import BottomSheet from "@/components/BottomSheet";
+import { getPenaltyById, disputePenalty } from "@/services/penalty.service";
+import { getUserFriendlyError } from "@/utils/error";
+import { useToast } from "@/context/ToastContext";
 
 const TAX_TYPE_LABEL: Record<string, string> = {
   income_tax: "Income Tax",
@@ -28,7 +33,47 @@ const fmt = (n: number) =>
 export default function DeadlinesScreen() {
   const { deadlines, penalties, loading, error, toggleDeadline, refreshDeadlines, upcomingCount, overdueCount } =
     useDeadlines();
+  const { showToast } = useToast();
   const [refreshing, setRefreshing] = useState(false);
+
+  const [selectedPenalty, setSelectedPenalty] = useState<any>(null);
+  const [penaltyDetail, setPenaltyDetail] = useState<any>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [showDispute, setShowDispute] = useState(false);
+  const [disputeReason, setDisputeReason] = useState("");
+  const [disputing, setDisputing] = useState(false);
+
+  const openPenaltyDetail = async (penalty: any) => {
+    setSelectedPenalty(penalty);
+    setPenaltyDetail(null);
+    const id = penalty.existing_penalty_id;
+    if (!id) return;
+    setDetailLoading(true);
+    try {
+      const res = await getPenaltyById(id);
+      setPenaltyDetail(res.data ?? res);
+    } catch {
+      // use list data as fallback
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const handleDispute = async () => {
+    if (!selectedPenalty?.existing_penalty_id || !disputeReason.trim()) return;
+    setDisputing(true);
+    try {
+      await disputePenalty(selectedPenalty.existing_penalty_id, disputeReason.trim());
+      setShowDispute(false);
+      setSelectedPenalty(null);
+      setDisputeReason("");
+      showToast("Dispute submitted successfully.", "success");
+    } catch (error: any) {
+      showToast(getUserFriendlyError(error), "error");
+    } finally {
+      setDisputing(false);
+    }
+  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -209,7 +254,7 @@ export default function DeadlinesScreen() {
               <>
                 <Text style={styles.sectionTitle}>Outstanding Penalties</Text>
                 {activePenalties.map((p, i) => (
-                  <View key={p.existing_penalty_id || i} style={styles.penaltyCard}>
+                  <TouchableOpacity key={p.existing_penalty_id || i} style={styles.penaltyCard} onPress={() => openPenaltyDetail(p)} activeOpacity={0.85}>
                     <View style={styles.penaltyTop}>
                       <View style={styles.penaltyIconBox}>
                         <Ionicons name="warning-outline" size={16} color="#DC2626" />
@@ -245,7 +290,11 @@ export default function DeadlinesScreen() {
                         </View>
                       )}
                     </View>
-                  </View>
+                    <View style={styles.penaltyTapHint}>
+                      <Text style={styles.penaltyTapText}>Tap for details & dispute options</Text>
+                      <Ionicons name="chevron-forward" size={13} color="#9CA3AF" />
+                    </View>
+                  </TouchableOpacity>
                 ))}
               </>
             )}
@@ -254,6 +303,102 @@ export default function DeadlinesScreen() {
 
         <Text style={styles.footer}>Filing on time saves you from penalties and surcharges.</Text>
       </ScrollView>
+
+      {/* Penalty detail sheet */}
+      <BottomSheet visible={!!selectedPenalty && !showDispute} onClose={() => setSelectedPenalty(null)}>
+        <View style={styles.sheetContent}>
+          <View style={styles.sheetIconRow}>
+            <View style={styles.sheetIconBox}>
+              <Ionicons name="warning-outline" size={20} color="#DC2626" />
+            </View>
+            <View style={{ flex: 1, marginLeft: 12 }}>
+              <Text style={styles.sheetTitle}>
+                {TAX_TYPE_LABEL[selectedPenalty?.tax_type] ?? selectedPenalty?.tax_type}
+              </Text>
+              <Text style={styles.sheetSub}>
+                {selectedPenalty?.days_late}d late · deadline{" "}
+                {selectedPenalty?.deadline_date
+                  ? new Date(selectedPenalty.deadline_date).toLocaleDateString("en-GH", { day: "numeric", month: "short", year: "numeric" })
+                  : "—"}
+              </Text>
+            </View>
+          </View>
+
+          {detailLoading ? (
+            <ActivityIndicator color="#C44736" style={{ marginVertical: 20 }} />
+          ) : (
+            <View style={styles.detailCard}>
+              {[
+                { label: "Base Penalty", val: penaltyDetail?.base_penalty ?? selectedPenalty?.base_penalty },
+                { label: "Daily Penalty", val: penaltyDetail?.daily_penalty ?? selectedPenalty?.daily_penalty, suffix: "/day" },
+                { label: "Interest", val: penaltyDetail?.interest_amount ?? selectedPenalty?.interest_amount },
+              ].map((row) =>
+                (row.val ?? 0) > 0 ? (
+                  <View key={row.label} style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>{row.label}</Text>
+                    <Text style={styles.detailVal}>
+                      {`GH¢ ${Number(row.val).toLocaleString("en-GH", { minimumFractionDigits: 2 })}${row.suffix ?? ""}`}
+                    </Text>
+                  </View>
+                ) : null
+              )}
+              <View style={styles.detailTotalRow}>
+                <Text style={styles.detailTotalLabel}>Total Penalty</Text>
+                <Text style={styles.detailTotalVal}>
+                  {`GH¢ ${Number(penaltyDetail?.total_penalty ?? selectedPenalty?.total_penalty ?? 0).toLocaleString("en-GH", { minimumFractionDigits: 2 })}`}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          {(penaltyDetail?.guidance?.message ?? penaltyDetail?.message) && (
+            <View style={styles.guidanceBox}>
+              <Ionicons name="information-circle-outline" size={16} color="#D97706" style={{ marginTop: 1 }} />
+              <Text style={styles.guidanceText}>{penaltyDetail.guidance?.message ?? penaltyDetail.message}</Text>
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={styles.disputeBtn}
+            onPress={() => setShowDispute(true)}
+            activeOpacity={0.85}
+          >
+            <Ionicons name="shield-checkmark-outline" size={16} color="#FFFFFF" />
+            <Text style={styles.disputeBtnText}>Dispute This Penalty</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
+
+      {/* Dispute sheet */}
+      <BottomSheet visible={showDispute} onClose={() => setShowDispute(false)} avoidKeyboard>
+        <View style={styles.sheetContent}>
+          <Text style={styles.sheetTitle}>Dispute Penalty</Text>
+          <Text style={styles.sheetSub}>
+            Explain why this penalty should be reviewed or waived by the GRA.
+          </Text>
+
+          <Text style={styles.disputeInputLabel}>YOUR REASON</Text>
+          <TextInput
+            style={styles.disputeInput}
+            value={disputeReason}
+            onChangeText={setDisputeReason}
+            placeholder="e.g. Filing was delayed due to system errors on the GRA portal…"
+            placeholderTextColor="#9CA3AF"
+            multiline
+            numberOfLines={4}
+            textAlignVertical="top"
+          />
+
+          <TouchableOpacity
+            style={[styles.disputeBtn, (!disputeReason.trim() || disputing) && { opacity: 0.6 }]}
+            onPress={handleDispute}
+            disabled={!disputeReason.trim() || disputing}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.disputeBtnText}>{disputing ? "Submitting…" : "Submit Dispute"}</Text>
+          </TouchableOpacity>
+        </View>
+      </BottomSheet>
     </SafeAreaView>
   );
 }
@@ -545,5 +690,147 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     color: "#9CA3AF",
     marginTop: 16,
+  },
+
+  // Penalty tap hint
+  penaltyTapHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 3,
+    marginTop: 8,
+  },
+  penaltyTapText: {
+    fontSize: 11,
+    fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
+  },
+
+  // Penalty detail sheet
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  sheetIconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  sheetIconBox: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    backgroundColor: "#FEE2E2",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  sheetTitle: {
+    fontSize: 17,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 2,
+  },
+  sheetSub: {
+    fontSize: 12,
+    fontFamily: "Inter_400Regular",
+    color: "#9CA3AF",
+  },
+  detailCard: {
+    backgroundColor: "#F9FAFB",
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 12,
+    gap: 10,
+  },
+  detailRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  detailLabel: {
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+  },
+  detailVal: {
+    fontSize: 13,
+    fontFamily: "Inter_500Medium",
+    color: "#374151",
+  },
+  detailTotalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E7EB",
+    paddingTop: 10,
+    marginTop: 2,
+  },
+  detailTotalLabel: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+  },
+  detailTotalVal: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    color: "#DC2626",
+  },
+  guidanceBox: {
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "#FFFBEB",
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  guidanceText: {
+    flex: 1,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    color: "#92400E",
+    lineHeight: 20,
+  },
+  disputeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: "#C44736",
+    borderRadius: 14,
+    paddingVertical: 15,
+    shadowColor: "#C44736",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  disputeBtnText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+
+  // Dispute form
+  disputeInputLabel: {
+    fontSize: 11,
+    fontFamily: "Inter_600SemiBold",
+    color: "#6B7280",
+    letterSpacing: 0.5,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  disputeInput: {
+    backgroundColor: "#F9FAFB",
+    borderWidth: 1.5,
+    borderColor: "#E5E7EB",
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: "Inter_400Regular",
+    color: "#111827",
+    minHeight: 100,
+    marginBottom: 20,
   },
 });

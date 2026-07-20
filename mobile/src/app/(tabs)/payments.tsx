@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { getUserFriendlyError } from "@/utils/error";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -20,6 +20,7 @@ import { useNetwork } from "@/context/NetworkContext";
 import { usePrivacy } from "@/context/PrivacyContext";
 import ErrorState from "@/components/ErrorState";
 import { usePayments } from "../../context/PaymentContext";
+import { getPaymentStatus, confirmPayment } from "@/services/payment.service";
 import { useTaxLiability } from "@/context/TaxLiabilityContext";
 
 const fmt = (n: number) =>
@@ -49,6 +50,11 @@ export default function PaymentsScreen() {
   const [paymentMethod, setPaymentMethod] = useState<"momo" | "bank" | "vault">("momo");
   const [paying, setPaying] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => { if (pollRef.current) clearInterval(pollRef.current); };
+  }, []);
 
   const netLiability = liability?.net_liability ?? 0;
 
@@ -64,6 +70,44 @@ export default function PaymentsScreen() {
 
   const remainingBalance = Math.max(netLiability - totalPaid, 0);
   const paidPct = netLiability > 0 ? Math.min((totalPaid / netLiability) * 100, 100) : 0;
+
+  const startPolling = (paymentId: string) => {
+    let attempts = 0;
+    pollRef.current = setInterval(async () => {
+      attempts++;
+      try {
+        const statusRes = await getPaymentStatus(paymentId);
+        const status = (statusRes.data?.status ?? statusRes.status ?? "").toUpperCase();
+        if (["SUCCESS", "PAID"].includes(status)) {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          const ref = statusRes.data?.payment_reference ?? statusRes.payment_reference ?? "";
+          try { await confirmPayment(paymentId, { status: "SUCCESS", payment_reference: ref }); } catch {}
+          await refreshPayments(false);
+          showToast("Payment confirmed!", "success");
+          setPaying(false);
+        } else if (status === "FAILED") {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          await refreshPayments(false);
+          showToast("Payment failed. Please try again.", "error");
+          setPaying(false);
+        } else if (attempts >= 20) {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          await refreshPayments(false);
+          showToast("Payment is taking longer than expected. Pull down to refresh.", "info");
+          setPaying(false);
+        }
+      } catch {
+        if (attempts >= 20) {
+          clearInterval(pollRef.current!);
+          pollRef.current = null;
+          setPaying(false);
+        }
+      }
+    }, 3000);
+  };
 
   const handlePayment = async () => {
     if (!isOnline) {
@@ -93,12 +137,20 @@ export default function PaymentsScreen() {
       if (url) {
         await Linking.openURL(url);
         showToast("Complete your payment in the browser. Your history will update shortly.", "info");
+        setPaying(false);
       } else {
-        showToast("Payment initiated. Your history will update shortly.", "success");
+        const paymentId = response.data?.payment_id;
+        if (paymentId) {
+          showToast("Payment initiated. Checking status…", "info");
+          startPolling(paymentId);
+          // setPaying stays true until polling resolves
+        } else {
+          showToast("Payment initiated. Your history will update shortly.", "success");
+          setPaying(false);
+        }
       }
     } catch (err: any) {
       showToast(getUserFriendlyError(err), "error");
-    } finally {
       setPaying(false);
     }
   };

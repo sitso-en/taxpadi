@@ -3,9 +3,9 @@ import { useLocalSearchParams, router } from "expo-router";
 import { useState, useEffect } from "react";
 import { Dropdown } from "react-native-element-dropdown";
 import { getUserFriendlyError } from "@/utils/error";
+import ConfirmModal from "@/components/ConfirmModal";
 import {
   ActivityIndicator,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -258,26 +258,16 @@ export default function EditTransactionScreen() {
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Delete confirmation */}
-      <Modal visible={showDeleteModal} transparent animationType="fade" onRequestClose={() => setShowDeleteModal(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalIconBox}>
-              <Ionicons name="trash-outline" size={24} color="#C44736" />
-            </View>
-            <Text style={styles.modalTitle}>Delete Transaction?</Text>
-            <Text style={styles.modalText}>This action cannot be undone.</Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} onPress={() => setShowDeleteModal(false)}>
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmDeleteButton} onPress={removeTransaction} disabled={deleting}>
-                <Text style={styles.confirmDeleteText}>{deleting ? "Deleting…" : "Delete"}</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <ConfirmModal
+        visible={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        iconName="trash-outline"
+        title="Delete Transaction?"
+        message="This action cannot be undone."
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
+        onConfirm={removeTransaction}
+        loading={deleting}
+      />
     </SafeAreaView>
   );
 }

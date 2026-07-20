@@ -113,10 +113,11 @@ export default function NotificationPreferencesScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back" size={26} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.title}>Notifications</Text>
+        <View style={{ width: 26 }} />
       </View>
 
       <Text style={styles.subtitle}>
@@ -170,13 +171,13 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 20,
   },
   title: {
     fontSize: 24,
     color: "#111827",
     fontFamily: "Inter_700Bold",
-    marginLeft: 10,
   },
   subtitle: {
     color: "#6B7280",
@@ -207,11 +208,15 @@ const styles = StyleSheet.create({
   },
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: "#ECECEC",
+    borderColor: "#EFEFED",
     overflow: "hidden",
-    marginBottom: 24,
+    shadowColor: "#000",
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
   row: {
     flexDirection: "row",

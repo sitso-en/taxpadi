@@ -13,6 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import Toggle from "@/components/Toggle";
 import { getSubscriptionStatus } from "@/services/subscriptions.service";
 import { requestDataExport } from "@/services/user.service";
@@ -269,6 +270,7 @@ export default function SettingsScreen() {
   };
 
   return (
+    <SafeAreaView style={styles.safeArea} edges={["top"]}>
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 60 }}
@@ -507,15 +509,20 @@ export default function SettingsScreen() {
       </TouchableOpacity>
       </Animated.View>
     </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
     backgroundColor: "#F2EDE8",
-    paddingHorizontal: 18,
-    paddingTop: 52,
+  },
+
+  container: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingTop: 16,
   },
 
   backgroundOrbTop: {
@@ -541,7 +548,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 16,
+    marginBottom: 18,
   },
 
   backButton: {
@@ -613,7 +620,7 @@ const styles = StyleSheet.create({
   },
 
   heroWrap: {
-    marginBottom: 12,
+    marginBottom: 10,
   },
 
   avatarWrap: {
@@ -674,10 +681,10 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     borderRadius: 999,
     paddingHorizontal: 10,
-    paddingVertical: 6,
+    paddingVertical: 5,
     alignSelf: "flex-start",
-    marginTop: 10,
-    marginBottom: 6,
+    marginTop: 7,
+    marginBottom: 4,
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
@@ -698,8 +705,8 @@ const styles = StyleSheet.create({
 
   metricsRow: {
     flexDirection: "row",
-    gap: 10,
-    marginBottom: 10,
+    gap: 12,
+    marginBottom: 12,
   },
 
   metricCard: {
@@ -731,7 +738,7 @@ const styles = StyleSheet.create({
   },
 
   sectionBlock: {
-    marginTop: 10,
+    marginTop: 14,
   },
 
   sectionHeader: {

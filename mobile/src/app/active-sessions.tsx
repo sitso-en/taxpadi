@@ -106,10 +106,11 @@ export default function ActiveSessionsScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
+        <TouchableOpacity onPress={() => router.back()} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Ionicons name="chevron-back" size={26} color="#111827" />
         </TouchableOpacity>
         <Text style={styles.title}>Active Sessions</Text>
+        <View style={{ width: 26 }} />
       </View>
 
       <Text style={styles.subtitle}>
@@ -210,14 +211,14 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginBottom: 10,
   },
 
   title: {
-    fontSize: 28,
+    fontSize: 24,
     color: "#111827",
     fontFamily: "Inter_700Bold",
-    marginLeft: 10,
   },
 
   subtitle: {
@@ -230,16 +231,16 @@ const styles = StyleSheet.create({
   logoutAll: {
     backgroundColor: "#C44736",
     paddingVertical: 14,
-    borderRadius: 16,
+    borderRadius: 18,
     marginBottom: 16,
     flexDirection: "row",
     justifyContent: "center",
     alignItems: "center",
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
+    shadowColor: "#C44736",
+    shadowOpacity: 0.25,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
-    elevation: 5,
+    elevation: 4,
   },
 
   logoutAllText: {
@@ -250,11 +251,11 @@ const styles = StyleSheet.create({
 
   infoBanner: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
+    borderRadius: 18,
     padding: 16,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#ECECEC",
+    borderColor: "#EFEFED",
   },
 
   infoBannerText: {
@@ -265,15 +266,15 @@ const styles = StyleSheet.create({
 
   card: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 16,
-    padding: 16,
+    borderRadius: 20,
+    padding: 18,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: "#ECECEC",
+    borderColor: "#EFEFED",
     shadowColor: "#000",
     shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
 

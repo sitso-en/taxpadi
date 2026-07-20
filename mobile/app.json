@@ -1,22 +1,22 @@
 {
   "expo": {
-    "name": "taxpadi-frontend",
-    "slug": "taxpadi-frontend",
+    "name": "TaxPadi",
+    "slug": "taxpadi",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "taxpadifrontend",
+    "icon": "./assets/images/logoA5.png",
+    "scheme": "taxpadi",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
-      "bundleIdentifier": "com.vankwesi.taxpadifrontend",
+      "icon": "./assets/images/logoA5.png",
+      "bundleIdentifier": "com.taxpadi.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#F2EDE8",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"

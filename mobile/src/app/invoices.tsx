@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useMemo, useState } from "react";
+import ConfirmModal from "@/components/ConfirmModal";
 import {
   ActivityIndicator,
   RefreshControl,
@@ -50,6 +51,7 @@ export default function InvoicesScreen() {
   const { amountsHidden } = usePrivacy();
   const [selectedFilter, setSelectedFilter] = React.useState("All");
   const [refreshing, setRefreshing] = useState(false);
+  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -172,7 +174,12 @@ export default function InvoicesScreen() {
                   const cfg = STATUS_CONFIG[key];
 
                   return (
-                    <View key={invoice.id} style={styles.card}>
+                    <TouchableOpacity
+                      key={invoice.id}
+                      style={styles.card}
+                      onPress={() => router.push(`/invoice-detail?id=${invoice.id}`)}
+                      activeOpacity={0.85}
+                    >
                       {/* Top row: ref + badge */}
                       <View style={styles.cardTopRow}>
                         <Text style={styles.invoiceRef}>{invoice.invoiceRef}</Text>
@@ -207,14 +214,14 @@ export default function InvoicesScreen() {
                           </TouchableOpacity>
                           <TouchableOpacity
                             style={styles.actionBtnGhost}
-                            onPress={() => cancel(invoice.id)}
+                            onPress={() => setCancelTargetId(invoice.id)}
                             activeOpacity={0.75}
                           >
                             <Text style={styles.actionBtnGhostText}>Cancel</Text>
                           </TouchableOpacity>
                         </View>
                       )}
-                    </View>
+                    </TouchableOpacity>
                   );
                 })
               )}
@@ -222,6 +229,22 @@ export default function InvoicesScreen() {
           )}
         </ScrollView>
       </View>
+
+      <ConfirmModal
+        visible={!!cancelTargetId}
+        onClose={() => setCancelTargetId(null)}
+        iconName="close-circle-outline"
+        title="Cancel Invoice?"
+        message="This action cannot be undone."
+        cancelLabel="No, Keep It"
+        confirmLabel="Yes, Cancel"
+        onConfirm={async () => {
+          if (!cancelTargetId) return;
+          const id = cancelTargetId;
+          setCancelTargetId(null);
+          await cancel(id);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -505,5 +528,72 @@ const styles = StyleSheet.create({
     color: "#6B7280",
     fontSize: 13,
     fontFamily: "Inter_500Medium",
+  },
+
+  // Cancel modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 32,
+  },
+  modalCard: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 20,
+    padding: 24,
+    width: "100%",
+    alignItems: "center",
+  },
+  modalIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: 16,
+    backgroundColor: "#FDECEC",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 14,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 6,
+  },
+  modalText: {
+    color: "#6B7280",
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: "row",
+    gap: 12,
+    width: "100%",
+  },
+  modalKeepBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#EDE8E3",
+    alignItems: "center",
+  },
+  modalKeepText: {
+    fontFamily: "Inter_600SemiBold",
+    color: "#111827",
+    fontSize: 14,
+  },
+  modalConfirmBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 12,
+    backgroundColor: "#C44736",
+    alignItems: "center",
+  },
+  modalConfirmText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
   },
 });

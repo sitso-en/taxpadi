@@ -20,6 +20,8 @@ export const ENDPOINTS = {
     LIST: "/api/v1/penalties",
     BY_TAX_TYPE: (taxType: string) => `/api/v1/penalties/${taxType}`,
     RESOLVE: "/api/v1/penalties/resolve",
+    GET: (id: string) => `/api/v1/tax/penalties/${id}`,
+    DISPUTE: (id: string) => `/api/v1/tax/penalties/${id}/dispute`,
   },
   NOTIFICATIONS: {
     LIST: "/api/v1/notifications",
@@ -131,6 +133,7 @@ export const ENDPOINTS = {
     LIST: "/api/v1/certificates",
     GET: (id: string) => `/api/v1/certificates/${id}`,
     DOWNLOAD: (id: string) => `/api/v1/certificates/${id}/download`,
+    REQUEST: "/api/v1/compliance/certificates/request",
   },
   SAVINGS_VAULT: {
     GET: "/api/v1/vault",

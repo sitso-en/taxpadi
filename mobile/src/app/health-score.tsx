@@ -163,7 +163,7 @@ export default function HealthScoreScreen() {
           </Text>
           <TouchableOpacity
             style={styles.emptyBtn}
-            onPress={() => router.push("/(tabs)/add-transaction")}
+            onPress={() => router.push("/add-transaction")}
           >
             <Text style={styles.emptyBtnText}>Add a Transaction</Text>
           </TouchableOpacity>

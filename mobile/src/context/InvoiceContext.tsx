@@ -3,6 +3,7 @@ import {
   getInvoices,
   getInvoiceStats,
   createInvoice,
+  updateInvoice,
   markInvoicePaid,
   cancelInvoice,
   sendInvoice,
@@ -41,6 +42,7 @@ type InvoiceContextType = {
     subtotal: number;
     due_date?: string;
   }) => Promise<any>;
+  editInvoice: (id: string, data: { client_name?: string; client_email?: string; client_phone?: string; description?: string; subtotal?: number; due_date?: string; }) => Promise<void>;
   markPaid: (id: string) => Promise<void>;
   cancel: (id: string) => Promise<void>;
   send: (id: string, channel: "email" | "whatsapp" | "download") => Promise<any>;
@@ -118,6 +120,11 @@ export function InvoiceProvider({ children }: { children: React.ReactNode }) {
     return res;
   };
 
+  const editInvoice = async (id: string, data: { client_name?: string; client_email?: string; client_phone?: string; description?: string; subtotal?: number; due_date?: string; }) => {
+    await updateInvoice(id, data);
+    await refreshInvoices(false);
+  };
+
   const markPaid = async (id: string) => {
     await markInvoicePaid(id);
     setInvoices((prev) => prev.map((inv) => (inv.id === id ? { ...inv, status: "paid" } : inv)));
@@ -133,7 +140,7 @@ export function InvoiceProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <InvoiceContext.Provider
-      value={{ invoices, stats, loading, error, refreshInvoices, addInvoice, markPaid, cancel, send }}
+      value={{ invoices, stats, loading, error, refreshInvoices, addInvoice, editInvoice, markPaid, cancel, send }}
     >
       {children}
     </InvoiceContext.Provider>

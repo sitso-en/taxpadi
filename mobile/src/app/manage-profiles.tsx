@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
+import ConfirmModal from "@/components/ConfirmModal";
 import {
   ActivityIndicator,
   Modal,
@@ -12,9 +13,11 @@ import {
   View,
 } from "react-native";
 
+import BottomSheet from "@/components/BottomSheet";
 import { useToast } from "@/context/ToastContext";
 import {
   createProfile,
+  updateProfile,
   deleteProfile,
   getProfiles,
   switchProfile,
@@ -51,6 +54,12 @@ export default function ManageProfilesScreen() {
   const [label, setLabel] = useState("");
   const [category, setCategory] = useState<string>("individual");
   const [tin, setTin] = useState("");
+
+  const [editTarget, setEditTarget] = useState<Profile | null>(null);
+  const [editLabel, setEditLabel] = useState("");
+  const [editCategory, setEditCategory] = useState<string>("individual");
+  const [editTin, setEditTin] = useState("");
+  const [editing, setEditing] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -94,6 +103,41 @@ export default function ManageProfilesScreen() {
       showToast("Failed to delete profile.", "error");
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const openEdit = (profile: Profile) => {
+    setEditTarget(profile);
+    setEditLabel(profile.label);
+    setEditCategory(profile.taxpayerCategory);
+    setEditTin(profile.tin ?? "");
+  };
+
+  const handleEdit = async () => {
+    if (!editTarget || !editLabel.trim()) {
+      showToast("Profile label is required.", "error");
+      return;
+    }
+    setEditing(true);
+    try {
+      await updateProfile(editTarget.profileId, {
+        label: editLabel.trim(),
+        taxpayerCategory: editCategory,
+        tin: editTin.trim() || undefined,
+      });
+      setProfiles((prev) =>
+        prev.map((p) =>
+          p.profileId === editTarget.profileId
+            ? { ...p, label: editLabel.trim(), taxpayerCategory: editCategory, tin: editTin.trim() || null }
+            : p
+        )
+      );
+      setEditTarget(null);
+      showToast("Profile updated.", "success");
+    } catch {
+      showToast("Failed to update profile.", "error");
+    } finally {
+      setEditing(false);
     }
   };
 
@@ -188,6 +232,13 @@ export default function ManageProfilesScreen() {
                   <Text style={styles.activeBadgeText}>Active</Text>
                 </View>
               )}
+              <TouchableOpacity
+                onPress={() => openEdit(profile)}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={{ marginLeft: 8 }}
+              >
+                <Ionicons name="create-outline" size={18} color="#9CA3AF" />
+              </TouchableOpacity>
             </View>
 
             {!profile.activeProfile && (
@@ -224,36 +275,69 @@ export default function ManageProfilesScreen() {
         ))
       )}
 
-      {/* Delete confirmation modal */}
-      <Modal
-        visible={!!deleteTarget}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setDeleteTarget(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalIconBox}>
-              <Ionicons name="trash-outline" size={24} color="#C44736" />
-            </View>
-            <Text style={styles.modalTitle}>Delete Profile?</Text>
-            <Text style={styles.modalText}>
-              "{deleteTarget?.label}" will be permanently deleted. This cannot be undone.
-            </Text>
-            <View style={styles.modalButtons}>
+      {/* Edit profile sheet */}
+      <BottomSheet visible={!!editTarget} onClose={() => setEditTarget(null)} avoidKeyboard>
+        <View style={styles.sheetContent}>
+          <Text style={styles.sheetTitle}>Edit Profile</Text>
+
+          <Text style={styles.inputLabel}>Label</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Personal, Business"
+            placeholderTextColor="#9CA3AF"
+            value={editLabel}
+            onChangeText={setEditLabel}
+          />
+
+          <Text style={styles.inputLabel}>Category</Text>
+          <View style={styles.categoryRow}>
+            {CATEGORIES.map((c) => (
               <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={() => setDeleteTarget(null)}
+                key={c}
+                style={[styles.categoryChip, editCategory === c && styles.categoryChipActive]}
+                onPress={() => setEditCategory(c)}
               >
-                <Text style={styles.cancelText}>Cancel</Text>
+                <Text style={[styles.categoryChipText, editCategory === c && styles.categoryChipTextActive]}>
+                  {CATEGORY_LABELS[c]}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmDeleteButton} onPress={handleDelete}>
-                <Text style={styles.confirmDeleteText}>Delete</Text>
-              </TouchableOpacity>
-            </View>
+            ))}
           </View>
+
+          <Text style={styles.inputLabel}>TIN (optional)</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. C0012345678"
+            placeholderTextColor="#9CA3AF"
+            value={editTin}
+            onChangeText={setEditTin}
+            autoCapitalize="characters"
+          />
+
+          <TouchableOpacity
+            style={[styles.saveBtn, (!editLabel.trim() || editing) && { opacity: 0.6 }]}
+            onPress={handleEdit}
+            disabled={!editLabel.trim() || editing}
+            activeOpacity={0.85}
+          >
+            {editing ? (
+              <ActivityIndicator color="#FFFFFF" size="small" />
+            ) : (
+              <Text style={styles.saveBtnText}>Save Changes</Text>
+            )}
+          </TouchableOpacity>
         </View>
-      </Modal>
+      </BottomSheet>
+
+      <ConfirmModal
+        visible={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        iconName="trash-outline"
+        title="Delete Profile?"
+        message={`"${deleteTarget?.label}" will be permanently deleted. This cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={handleDelete}
+      />
 
       {/* Create profile modal */}
       <Modal
@@ -634,5 +718,33 @@ const styles = StyleSheet.create({
 
   categoryChipTextActive: {
     color: "#FFFFFF",
+  },
+
+  sheetContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 32,
+  },
+  sheetTitle: {
+    fontSize: 18,
+    fontFamily: "Inter_700Bold",
+    color: "#111827",
+    marginBottom: 16,
+  },
+  saveBtn: {
+    backgroundColor: "#C44736",
+    borderRadius: 12,
+    paddingVertical: 15,
+    alignItems: "center",
+    marginTop: 8,
+    shadowColor: "#C44736",
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  saveBtnText: {
+    color: "#FFFFFF",
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
   },
 });

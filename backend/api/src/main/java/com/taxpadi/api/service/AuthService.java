@@ -457,14 +457,21 @@ public class AuthService {
 
         String tokenHash = hashToken(request.getBiometricToken());
 
-        DeviceToken deviceToken = new DeviceToken();
-        deviceToken.setUser(user);
+        // Upsert: if an active record already exists for this user+device, update its token hash
+        Optional<DeviceToken> existing = deviceTokenRepository
+                .findByUserAndDeviceInfoAndIsActive(user, request.getDeviceInfo(), true);
+
+        DeviceToken deviceToken = existing.orElseGet(() -> {
+            DeviceToken dt = new DeviceToken();
+            dt.setUser(user);
+            dt.setDeviceInfo(request.getDeviceInfo());
+            return dt;
+        });
         deviceToken.setTokenHash(tokenHash);
-        deviceToken.setDeviceInfo(request.getDeviceInfo());
         deviceTokenRepository.save(deviceToken);
 
         auditLogService.log(user, "BIOMETRIC_REGISTERED", "Device: " + request.getDeviceInfo(), ipAddress);
-        log.info("Biometric registered for userId={}", user.getUserId());
+        log.info("Biometric {} for userId={}", existing.isPresent() ? "re-registered" : "registered", user.getUserId());
         return new RegisterBiometricResponse(true, request.getDeviceInfo());
     }
 

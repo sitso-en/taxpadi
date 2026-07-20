@@ -111,10 +111,18 @@ export default function TransactionImportScreen() {
 
     try {
       const response = await validateTransactionImport(provider, file.uri, file.name, file.mimeType ?? "application/octet-stream");
-      const isSafe = response.data?.safe_to_import ?? response.safe_to_import;
+      const data = response.data ?? response;
+      const isSafe = data.safe_to_import;
+      const count = data.total_transactions_detected ?? 0;
+
+      // Auto-fill date range from what the backend detected in the CSV
+      if (data.detected_from) setStatementFrom(new Date(data.detected_from));
+      if (data.detected_to)   setStatementTo(new Date(data.detected_to));
 
       showToast(
-        isSafe ? "Statement is safe to import." : "Warning: Import contains overlapping date ranges.",
+        isSafe
+          ? `Safe to import — ${count} transaction${count !== 1 ? "s" : ""} detected. Dates auto-filled.`
+          : "Warning: this period overlaps a previous import.",
         isSafe ? "success" : "info"
       );
     } catch (error: any) {
