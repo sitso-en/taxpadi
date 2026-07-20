@@ -59,7 +59,7 @@ export default function PrivacyPolicyScreen() {
           </P>
           <P>
             {/* PLACEHOLDER: Replace with your registered address and company registration number */}
-            Registered Address: [INSERT REGISTERED OFFICE ADDRESS], Ghana.{"\n"}
+            Registered Address: Kumasi, Ghana.{"\n"}
             Contact: support@taxpadi.com
           </P>
         </Section>
@@ -101,10 +101,10 @@ export default function PrivacyPolicyScreen() {
           <P>We do not sell your personal data. We share it only as follows:</P>
           <Bullet>GRA and other regulatory authorities: where we are legally required to disclose information, or where you explicitly submit a tax return or request a compliance certificate.</Bullet>
           <Bullet>Paystack Ghana Limited: for processing subscription and tax payment transactions. Paystack is PCI-DSS compliant.</Bullet>
-          <Bullet>Wigal / Arkesel SMS: for OTP and notification delivery via SMS. Only your phone number is shared for this purpose.</Bullet>
+          <Bullet>Wigal: for OTP and notification delivery via SMS. Only your phone number is shared for this purpose.</Bullet>
           <Bullet>Firebase (Google): for push notification delivery. Device tokens are transmitted to Firebase servers.</Bullet>
-          <Bullet>AWS S3: for secure storage of generated PDF documents (tax returns, invoices, compliance certificates).</Bullet>
-          <Bullet>Anthropic (TaxBot): anonymised query text may be processed by Anthropic's Claude API to generate tax guidance responses. No personally identifiable financial data is included in these queries.</Bullet>
+          <Bullet>Cloudinary: for secure storage of generated PDF documents (tax returns, invoices, compliance certificates).</Bullet>
+          <Bullet>Google Gemini (TaxBot): anonymised query text may be processed by Google's Gemini API to generate tax guidance responses. No personally identifiable financial data is included in these queries.</Bullet>
           <Bullet>Service providers acting on our behalf under data processing agreements with equivalent protections to this policy.</Bullet>
         </Section>
 
@@ -145,7 +145,7 @@ export default function PrivacyPolicyScreen() {
 
         <Section title="10. International Transfers">
           <P>
-            Some of our third-party service providers (including AWS, Firebase, and Anthropic) operate outside Ghana. Where data is transferred internationally, we ensure appropriate safeguards are in place, including standard contractual clauses or equivalent mechanisms.
+            Some of our third-party service providers (including Cloudinary, Firebase, and Google Gemini) operate outside Ghana. Where data is transferred internationally, we ensure appropriate safeguards are in place, including standard contractual clauses or equivalent mechanisms.
           </P>
         </Section>
 
@@ -161,7 +161,7 @@ export default function PrivacyPolicyScreen() {
             For privacy-related queries or to exercise your rights, contact:{"\n\n"}
             TaxPadi Ghana Limited{"\n"}
             Email: support@taxpadi.com{"\n"}
-            [INSERT REGISTERED OFFICE ADDRESS], Ghana
+            Kumasi, Ghana
           </P>
         </Section>
 

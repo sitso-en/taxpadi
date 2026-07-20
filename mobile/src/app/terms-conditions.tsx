@@ -83,7 +83,7 @@ export default function TermsConditionsScreen() {
           <Bullet>Offering access to third-party financial product referrals (insurance, loans) from partner institutions.</Bullet>
         </Section>
 
-        <Section title="4. Tax Disclaimer — Important">
+        <Section title="4. Tax Disclaimer - Important">
           <P>
             TaxPadi is a financial technology tool, NOT a licensed tax advisor, accountant, or tax agent. The calculations, estimates, and information provided by TaxPadi:
           </P>
@@ -138,7 +138,7 @@ export default function TermsConditionsScreen() {
 
         <Section title="9. Third-Party Services">
           <P>
-            TaxPadi integrates with third-party services including Paystack (payments), Arkesel/Wigal (SMS), Firebase (push notifications), AWS S3 (document storage), and Anthropic Claude (TaxBot AI). Your use of these services is subject to their respective terms and privacy policies. TaxPadi is not responsible for the conduct or reliability of third-party services.
+            TaxPadi integrates with third-party services including Paystack (payments), Wigal (SMS), Firebase (push notifications), Cloudinary (document storage), and Google Gemini (TaxBot AI). Your use of these services is subject to their respective terms and privacy policies. TaxPadi is not responsible for the conduct or reliability of third-party services.
           </P>
         </Section>
 
@@ -196,8 +196,8 @@ export default function TermsConditionsScreen() {
             {/* PLACEHOLDER: Replace with your verified support email and address */}
             For questions about these Terms:{"\n\n"}
             TaxPadi Ghana Limited{"\n"}
-            Email: support@taxpadi.com{"\n"}
-            [INSERT REGISTERED OFFICE ADDRESS], Ghana
+            Email: kassimadnan00@gmail.com {"\n"}   
+            Kumasi, Ghana
           </P>
         </Section>
 
