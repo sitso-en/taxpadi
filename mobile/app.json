@@ -24,7 +24,13 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.taxpadi.api",
-      "googleServicesFile": "./android/app/google-services.json"
+      "googleServicesFile": "./android/app/google-services.json",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
+      ]
     },
     "web": {
       "output": "static",
@@ -63,8 +69,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "6722adad-31f6-41db-9649-4f7aa8f7583a"
+        "projectId": "70600557-5414-4956-bf05-23195d366349"
       }
-    }
+    },
+    "owner": "sitsofe"
   }
 }

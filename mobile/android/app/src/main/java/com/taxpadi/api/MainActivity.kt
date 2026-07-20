@@ -1,4 +1,4 @@
-package com.vankwesi.taxpadifrontend
+package com.taxpadi.api
 import expo.modules.splashscreen.SplashScreenManager
 
 import android.os.Build
