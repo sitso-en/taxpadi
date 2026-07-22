@@ -16,11 +16,10 @@ import java.util.Map;
 @Service
 public class OcrService {
 
-    private static final String MODEL = "gemini-2.0-flash";
-    private static final String GEMINI_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent";
+    private static final String MODEL = "meta-llama/llama-4-scout-17b-16e-instruct";
+    private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-    @Value("${gemini.api-key}")
+    @Value("${groq.api-key}")
     private String apiKey;
 
     private final RestClient restClient = RestClient.create();
@@ -29,39 +28,41 @@ public class OcrService {
     public OcrResult extractFromImage(byte[] imageBytes, String mediaType) {
         String base64 = Base64.getEncoder().encodeToString(imageBytes);
 
+        String prompt =
+            "Extract transaction details from this receipt and respond with ONLY a JSON object in this exact format: " +
+            "{\"amount\":120.00,\"description\":\"Merchant - item description\",\"category\":\"general_expense\",\"transaction_date\":\"2024-01-15\",\"confidence\":\"high\"} " +
+            "category must be one of: supplies, food_drinks, transport, utilities, equipment, rent_commercial, services, general_expense. " +
+            "confidence must be: high (clear image, all fields visible), medium (some fields unclear), low (poor image quality). " +
+            "Use today's date if transaction_date is not visible. Return only the JSON, no other text.";
+
         Map<String, Object> requestBody = Map.of(
-            "contents", List.of(Map.of(
+            "model", MODEL,
+            "messages", List.of(Map.of(
                 "role", "user",
-                "parts", List.of(
-                    Map.of("inlineData", Map.of("mimeType", mediaType, "data", base64)),
-                    Map.of("text",
-                        "Extract transaction details from this receipt and respond with ONLY a JSON object in this exact format: " +
-                        "{\"amount\":120.00,\"description\":\"Merchant - item description\",\"category\":\"general_expense\",\"transaction_date\":\"2024-01-15\",\"confidence\":\"high\"} " +
-                        "category must be one of: supplies, food_drinks, transport, utilities, equipment, rent_commercial, services, general_expense. " +
-                        "confidence must be: high (clear image, all fields visible), medium (some fields unclear), low (poor image quality). " +
-                        "Use today's date if transaction_date is not visible. Return only the JSON, no other text."
-                    )
+                "content", List.of(
+                    Map.of("type", "text", "text", prompt),
+                    Map.of("type", "image_url", "image_url",
+                        Map.of("url", "data:" + mediaType + ";base64," + base64))
                 )
             )),
-            "generationConfig", Map.of("maxOutputTokens", 300)
+            "max_tokens", 300
         );
 
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> response = restClient.post()
-                .uri(GEMINI_URL + "?key=" + apiKey)
+                .uri(GROQ_URL)
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
                 .body(requestBody)
                 .retrieve()
                 .body(Map.class);
 
             @SuppressWarnings("unchecked")
-            List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
+            List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
             @SuppressWarnings("unchecked")
-            Map<String, Object> firstContent = (Map<String, Object>) candidates.get(0).get("content");
-            @SuppressWarnings("unchecked")
-            List<Map<String, Object>> parts = (List<Map<String, Object>>) firstContent.get("parts");
-            String jsonText = (String) parts.get(0).get("text");
+            Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+            String jsonText = (String) message.get("content");
 
             // Extract JSON from response (model may wrap it in backticks)
             jsonText = jsonText.trim();
