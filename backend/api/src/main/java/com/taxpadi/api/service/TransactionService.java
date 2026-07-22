@@ -95,7 +95,7 @@ public class TransactionService {
         int safeLimit = Math.min(limit, 100);
 
         Page<Transaction> results = transactionRepository.findFiltered(
-            user, type, category, entryMethod, taxDeductible, withholdingApplicable,
+            user.getUserId(), type, category, entryMethod, taxDeductible, withholdingApplicable,
             dateFrom, dateTo, search, PageRequest.of(safePage, safeLimit));
 
         PaginationInfo pagination = new PaginationInfo();

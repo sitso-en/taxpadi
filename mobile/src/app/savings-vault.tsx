@@ -46,7 +46,7 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; label: string }
 
 export default function SavingsVaultScreen() {
   const { isPro } = useSubscription();
-  const { vault, transactions, suggestion, loading, error, refreshVault, contribute, linkMomo } = useSavings();
+  const { vault, totalSaved, transactions, suggestion, loading, error, refreshVault, contribute, linkMomo } = useSavings();
   const { amountsHidden, toggleAmountsHidden } = usePrivacy();
 
   if (!isPro) return (
@@ -206,7 +206,7 @@ export default function SavingsVaultScreen() {
 
               <Text style={styles.heroLabel}>VAULT BALANCE</Text>
               <Text style={styles.heroAmount}>
-                {amountsHidden ? "GH¢ ••••••" : fmt(vault?.balance ?? 0)}
+                {amountsHidden ? "GH¢ ••••••" : fmt(totalSaved)}
               </Text>
 
               <View style={styles.heroFooter}>

@@ -323,7 +323,7 @@ export default function TransactionsScreen() {
         {/* Animated filter panel */}
         <Animated.View
           style={{
-            height: filterAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 116] }),
+            height: filterAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 150] }),
             opacity: filterAnim,
             marginBottom: filterAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 12] }),
             overflow: "hidden",

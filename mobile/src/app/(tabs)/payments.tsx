@@ -239,19 +239,19 @@ export default function PaymentsScreen() {
           {/* Stats row */}
           <View style={styles.heroStats}>
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatVal}>{amountsHidden ? "••••" : fmt(netLiability)}</Text>
+              <Text style={styles.heroStatVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{amountsHidden ? "••••" : fmt(netLiability)}</Text>
               <Text style={styles.heroStatLabel}>Total Liability</Text>
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStat}>
-              <Text style={[styles.heroStatVal, { color: "#86EFAC" }]}>
+              <Text style={[styles.heroStatVal, { color: "#86EFAC" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
                 {amountsHidden ? "••••" : fmt(totalPaid)}
               </Text>
               <Text style={styles.heroStatLabel}>Paid</Text>
             </View>
             <View style={styles.heroStatDivider} />
             <View style={styles.heroStat}>
-              <Text style={styles.heroStatVal}>{amountsHidden ? "••••" : fmt(remainingBalance)}</Text>
+              <Text style={styles.heroStatVal} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{amountsHidden ? "••••" : fmt(remainingBalance)}</Text>
               <Text style={styles.heroStatLabel}>Remaining</Text>
             </View>
           </View>

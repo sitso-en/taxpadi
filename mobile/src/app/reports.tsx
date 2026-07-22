@@ -104,7 +104,7 @@ export default function ReportsScreen() {
     }
   };
 
-  const shareFile = async (fileUrl: string, format: "pdf" | "excel") => {
+  const shareFileFromUrl = async (fileUrl: string, format: "pdf" | "excel") => {
     const ext = format === "pdf" ? "pdf" : "xlsx";
     const mimeType =
       format === "pdf"
@@ -113,6 +113,16 @@ export default function ReportsScreen() {
     const localUri = `${FileSystem.cacheDirectory}taxpadi_report_${Date.now()}.${ext}`;
     const { uri } = await FileSystem.downloadAsync(fileUrl, localUri);
     await Sharing.shareAsync(uri, { mimeType, dialogTitle: "Share Report" });
+  };
+
+  const shareFileFromBase64 = async (b64: string, fileName: string, format: "pdf" | "excel") => {
+    const mimeType =
+      format === "pdf"
+        ? "application/pdf"
+        : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    const localUri = `${FileSystem.cacheDirectory}${fileName}`;
+    await FileSystem.writeAsStringAsync(localUri, b64, { encoding: FileSystem.EncodingType.Base64 });
+    await Sharing.shareAsync(localUri, { mimeType, dialogTitle: "Share Report" });
   };
 
   const handleExport = async (format: "pdf" | "excel", reportType: string) => {
@@ -125,7 +135,7 @@ export default function ReportsScreen() {
       // Synchronous path: file_url returned immediately
       const directUrl: string | undefined = res.data?.file_url;
       if (directUrl) {
-        await shareFile(directUrl, format);
+        await shareFileFromUrl(directUrl, format);
         return;
       }
 
@@ -143,11 +153,16 @@ export default function ReportsScreen() {
         const jobStatus: string = statusRes.data?.status;
 
         if (jobStatus === "done") {
+          const fileData: string | undefined = statusRes.data?.file_data;
+          const fileName: string = statusRes.data?.file_name ?? `taxpadi-report.${format === "pdf" ? "pdf" : "xlsx"}`;
           const fileUrl: string | undefined = statusRes.data?.file_url ?? statusRes.data?.fileUrl;
-          if (fileUrl) {
-            await shareFile(fileUrl, format);
+
+          if (fileData) {
+            await shareFileFromBase64(fileData, fileName, format);
+          } else if (fileUrl) {
+            await shareFileFromUrl(fileUrl, format);
           } else {
-            showToast("File URL not found.", "error");
+            showToast("File not found in response.", "error");
           }
           return;
         }
@@ -285,54 +300,47 @@ export default function ReportsScreen() {
           <Text style={styles.sheetEmpty}>No data available for {incomeYear}.</Text>
         ) : (
           <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 420 }}>
-            {/* Summary totals */}
-            <View style={styles.stmtCard}>
-              <View style={styles.stmtRow}>
-                <Text style={styles.stmtLabel}>Total Income</Text>
-                <Text style={[styles.stmtVal, { color: "#16A34A" }]}>{fmt(incomeData.total_income ?? 0)}</Text>
-              </View>
-              <View style={styles.stmtRow}>
-                <Text style={styles.stmtLabel}>Total Expenses</Text>
-                <Text style={[styles.stmtVal, { color: "#C44736" }]}>{fmt(incomeData.total_expenses ?? 0)}</Text>
-              </View>
-              <View style={[styles.stmtRow, styles.stmtDivider]}>
-                <Text style={[styles.stmtLabel, { fontFamily: "Inter_700Bold", color: "#111827" }]}>Net Profit</Text>
-                <Text style={[styles.stmtVal, { fontFamily: "Inter_700Bold", color: "#111827" }]}>{fmt(incomeData.net_profit ?? incomeData.gross_profit ?? 0)}</Text>
-              </View>
-              {(incomeData.tax_liability ?? 0) > 0 && (
-                <View style={styles.stmtRow}>
-                  <Text style={styles.stmtLabel}>Estimated Tax</Text>
-                  <Text style={styles.stmtVal}>{fmt(incomeData.tax_liability)}</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Income breakdown */}
-            {(incomeData.income_breakdown ?? []).length > 0 && (
-              <>
-                <Text style={styles.breakdownTitle}>Income Breakdown</Text>
-                {(incomeData.income_breakdown ?? []).map((row: any, i: number) => (
-                  <View key={i} style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>{row.category ?? row.label}</Text>
-                    <Text style={[styles.breakdownVal, { color: "#16A34A" }]}>{fmt(row.amount ?? 0)}</Text>
+            {(() => {
+              const monthly: any[] = incomeData.monthly_summary ?? [];
+              const totalIncome = monthly.reduce((s: number, m: any) => s + Number(m.total_income ?? 0), 0);
+              const totalExpenses = monthly.reduce((s: number, m: any) => s + Number(m.total_expenses ?? 0), 0);
+              const netProfit = monthly.reduce((s: number, m: any) => s + Number(m.net_profit ?? 0), 0);
+              return (
+                <>
+                  {/* Summary totals */}
+                  <View style={styles.stmtCard}>
+                    <View style={styles.stmtRow}>
+                      <Text style={styles.stmtLabel}>Total Income</Text>
+                      <Text style={[styles.stmtVal, { color: "#16A34A" }]}>{fmt(totalIncome)}</Text>
+                    </View>
+                    <View style={styles.stmtRow}>
+                      <Text style={styles.stmtLabel}>Total Expenses</Text>
+                      <Text style={[styles.stmtVal, { color: "#C44736" }]}>{fmt(totalExpenses)}</Text>
+                    </View>
+                    <View style={[styles.stmtRow, styles.stmtDivider]}>
+                      <Text style={[styles.stmtLabel, { fontFamily: "Inter_700Bold", color: "#111827" }]}>Net Profit</Text>
+                      <Text style={[styles.stmtVal, { fontFamily: "Inter_700Bold", color: "#111827" }]}>{fmt(netProfit)}</Text>
+                    </View>
                   </View>
-                ))}
-              </>
-            )}
 
-            {/* Expense breakdown */}
-            {(incomeData.expense_breakdown ?? []).length > 0 && (
-              <>
-                <Text style={[styles.breakdownTitle, { marginTop: 14 }]}>Expense Breakdown</Text>
-                {(incomeData.expense_breakdown ?? []).map((row: any, i: number) => (
-                  <View key={i} style={styles.breakdownRow}>
-                    <Text style={styles.breakdownLabel}>{row.category ?? row.label}</Text>
-                    <Text style={[styles.breakdownVal, { color: "#C44736" }]}>{fmt(row.amount ?? 0)}</Text>
-                  </View>
-                ))}
-              </>
-            )}
-            <View style={{ height: 20 }} />
+                  {/* Monthly breakdown */}
+                  {monthly.length > 0 && (
+                    <>
+                      <Text style={styles.breakdownTitle}>Monthly Breakdown</Text>
+                      {monthly.map((m: any, i: number) => (
+                        <View key={i} style={styles.breakdownRow}>
+                          <Text style={styles.breakdownLabel}>{m.month}</Text>
+                          <Text style={[styles.breakdownVal, { color: Number(m.net_profit ?? 0) >= 0 ? "#16A34A" : "#C44736" }]}>
+                            {fmt(m.net_profit ?? 0)}
+                          </Text>
+                        </View>
+                      ))}
+                    </>
+                  )}
+                  <View style={{ height: 20 }} />
+                </>
+              );
+            })()}
           </ScrollView>
         )}
       </View>

@@ -70,9 +70,18 @@ export default function TaxScreen() {
   }, [selectedYear]);
 
   const netDue = Number(liability?.net_liability ?? 0);
-  const totalLiability = Number(liability?.total_liability ?? 0);
+  const totalLiability = Number(liability?.tax_liability ?? 0);
   const totalPaid = Number(liability?.total_amount_paid ?? 0);
-  const breakdown: any[] = Array.isArray(liability?.breakdown) ? liability.breakdown : [];
+  const rawBreakdown = liability?.breakdown;
+  const breakdown: any[] = Array.isArray(rawBreakdown)
+    ? rawBreakdown
+    : rawBreakdown && typeof rawBreakdown === "object"
+    ? Object.entries(rawBreakdown as Record<string, number>).map(([tax_type, tax_liability]) => ({
+        tax_type,
+        tax_liability: Number(tax_liability),
+        taxable_income: 0,
+      }))
+    : [];
   const paidPct = totalLiability > 0 ? Math.min(totalPaid / totalLiability, 1) : 0;
 
   const vat = rates?.vat;
@@ -168,21 +177,21 @@ export default function TaxScreen() {
           <View style={styles.statRow}>
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Total Liability</Text>
-              <Text style={styles.statValue}>
+              <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
                 {amountsHidden ? "••••••" : fmt(totalLiability)}
               </Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Paid</Text>
-              <Text style={[styles.statValue, { color: "#86efac" }]}>
+              <Text style={[styles.statValue, { color: "#86efac" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
                 {amountsHidden ? "••••••" : fmt(totalPaid)}
               </Text>
             </View>
             <View style={styles.statDivider} />
             <View style={styles.statItem}>
               <Text style={styles.statLabel}>Remaining</Text>
-              <Text style={[styles.statValue, { color: "#fca5a5" }]}>
+              <Text style={[styles.statValue, { color: "#fca5a5" }]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
                 {amountsHidden ? "••••••" : fmt(Math.max(netDue, 0))}
               </Text>
             </View>

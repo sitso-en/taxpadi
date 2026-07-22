@@ -249,7 +249,7 @@ export default function HomeScreen() {
       <View style={styles.grid}>
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Income</Text>
-          <Text style={styles.summaryAmount}>
+          <Text style={styles.summaryAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
             {amountsHidden ? "••••••" : formatCurrency(monthlyStats.income)}
           </Text>
           <Text style={styles.summaryCaption}>{periodCaption}</Text>
@@ -257,7 +257,7 @@ export default function HomeScreen() {
 
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Expenses</Text>
-          <Text style={styles.summaryAmount}>
+          <Text style={styles.summaryAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
             {amountsHidden ? "••••••" : formatCurrency(monthlyStats.expenses)}
           </Text>
           <Text style={styles.summaryCaption}>{periodCaption}</Text>
@@ -265,7 +265,7 @@ export default function HomeScreen() {
 
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Est. Tax Due</Text>
-          <Text style={styles.summaryAmount}>
+          <Text style={styles.summaryAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
             {amountsHidden ? "••••••" : monthlyStats.taxEstimate != null
               ? formatCurrency(monthlyStats.taxEstimate)
               : "—"}
@@ -277,7 +277,7 @@ export default function HomeScreen() {
 
         <Card style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Tax Paid</Text>
-          <Text style={styles.summaryAmount}>
+          <Text style={styles.summaryAmount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
             {amountsHidden ? "••••••" : formatCurrency(monthlyStats.paid)}
           </Text>
           <Text style={styles.summaryCaption}>{periodCaption}</Text>

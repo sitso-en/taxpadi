@@ -36,21 +36,36 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
         Pageable pageable
     );
 
-    @Query("""
-      SELECT t FROM Transaction t
-      WHERE t.user = :user
-        AND (:type IS NULL OR t.type = :type)
-        AND (:category IS NULL OR t.category = :category)
-        AND (:entryMethod IS NULL OR t.entryMethod = :entryMethod)
-        AND (:taxDeductible IS NULL OR t.taxDeductible = :taxDeductible)
-        AND (:withholdingApplicable IS NULL OR t.withholdingApplicable = :withholdingApplicable)
-        AND (:dateFrom IS NULL OR t.transactionDate >= :dateFrom)
-        AND (:dateTo IS NULL OR t.transactionDate <= :dateTo)
-        AND (:search IS NULL OR t.description ILIKE CONCAT('%', CAST(:search AS String), '%'))
-      ORDER BY t.transactionDate DESC
-      """)
+    @Query(value = """
+      SELECT * FROM transactions
+      WHERE is_active = true
+        AND user_id = :userId
+        AND (:type IS NULL OR type = CAST(:type AS TEXT))
+        AND (:category IS NULL OR category = CAST(:category AS TEXT))
+        AND (:entryMethod IS NULL OR entry_method = CAST(:entryMethod AS TEXT))
+        AND (:taxDeductible IS NULL OR tax_deductible = :taxDeductible)
+        AND (:withholdingApplicable IS NULL OR withholding_applicable = :withholdingApplicable)
+        AND (:dateFrom IS NULL OR transaction_date >= CAST(:dateFrom AS DATE))
+        AND (:dateTo IS NULL OR transaction_date <= CAST(:dateTo AS DATE))
+        AND (CAST(:search AS TEXT) IS NULL OR description ILIKE '%' || CAST(:search AS TEXT) || '%')
+      ORDER BY transaction_date DESC
+      """,
+      countQuery = """
+      SELECT COUNT(*) FROM transactions
+      WHERE is_active = true
+        AND user_id = :userId
+        AND (:type IS NULL OR type = CAST(:type AS TEXT))
+        AND (:category IS NULL OR category = CAST(:category AS TEXT))
+        AND (:entryMethod IS NULL OR entry_method = CAST(:entryMethod AS TEXT))
+        AND (:taxDeductible IS NULL OR tax_deductible = :taxDeductible)
+        AND (:withholdingApplicable IS NULL OR withholding_applicable = :withholdingApplicable)
+        AND (:dateFrom IS NULL OR transaction_date >= CAST(:dateFrom AS DATE))
+        AND (:dateTo IS NULL OR transaction_date <= CAST(:dateTo AS DATE))
+        AND (CAST(:search AS TEXT) IS NULL OR description ILIKE '%' || CAST(:search AS TEXT) || '%')
+      """,
+      nativeQuery = true)
     Page<Transaction> findFiltered(
-        @Param("user") User user,
+        @Param("userId") UUID userId,
         @Param("type") String type,
         @Param("category") String category,
         @Param("entryMethod") String entryMethod,

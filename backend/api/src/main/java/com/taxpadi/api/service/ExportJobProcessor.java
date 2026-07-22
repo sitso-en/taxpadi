@@ -33,6 +33,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.List;
 
 @Component
@@ -40,11 +41,9 @@ public class ExportJobProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(ExportJobProcessor.class);
 
-    private final CloudinaryService cloudinaryService;
     private final StringRedisTemplate redis;
 
-    public ExportJobProcessor(CloudinaryService cloudinaryService, StringRedisTemplate redis) {
-        this.cloudinaryService = cloudinaryService;
+    public ExportJobProcessor(StringRedisTemplate redis) {
         this.redis = redis;
     }
 
@@ -54,16 +53,18 @@ public class ExportJobProcessor {
                         List<Transaction> transactions, List<TaxReturn> taxReturns) {
         String key = "export:" + jobId;
         try {
-            String publicId = "exports/" + user.getUserId() + "/taxpadi-data-export-" + dateFrom + "-to-" + dateTo;
-            String fileUrl;
+            byte[] bytes;
+            String fileName;
             if ("pdf".equals(format)) {
-                byte[] bytes = buildPdf(user, dateFrom, dateTo, transactions, taxReturns);
-                fileUrl = cloudinaryService.uploadPdf(bytes, publicId + ".pdf", "taxpadi-report-data.pdf");
+                bytes = buildPdf(user, dateFrom, dateTo, transactions, taxReturns);
+                fileName = "taxpadi-report-" + dateFrom + "-to-" + dateTo + ".pdf";
             } else {
-                byte[] bytes = buildExcel(transactions, taxReturns);
-                fileUrl = cloudinaryService.uploadPdf(bytes, publicId + ".xlsx", "taxpadi-report-data.xlsx");
+                bytes = buildExcel(transactions, taxReturns);
+                fileName = "taxpadi-report-" + dateFrom + "-to-" + dateTo + ".xlsx";
             }
-            redis.opsForValue().set(key, "{\"status\":\"done\",\"fileUrl\":\"" + fileUrl + "\"}", Duration.ofHours(1));
+            String b64 = Base64.getEncoder().encodeToString(bytes);
+            String json = "{\"status\":\"done\",\"file_name\":\"" + fileName + "\",\"file_data\":\"" + b64 + "\"}";
+            redis.opsForValue().set(key, json, Duration.ofHours(1));
         } catch (Exception e) {
             log.error("Export job {} failed: {}", jobId, e.getMessage());
             redis.opsForValue().set(key, "{\"status\":\"failed\",\"error\":\"Export generation failed\"}", Duration.ofHours(1));

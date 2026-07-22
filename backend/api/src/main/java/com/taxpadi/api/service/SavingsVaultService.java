@@ -135,11 +135,11 @@ public class SavingsVaultService {
                 .collect(Collectors.toList());
 
         BigDecimal totalCredited = pageResult.getContent().stream()
-                .filter(t -> "DEPOSIT".equals(t.getType()) && "SUCCESSFUL".equals(t.getStatus()))
+                .filter(t -> "DEPOSIT".equals(t.getType()) && VaultTransactionStatus.SUCCESSFUL == t.getStatus())
                 .map(VaultTransaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         BigDecimal totalDebited = pageResult.getContent().stream()
-                .filter(t -> "WITHDRAWAL".equals(t.getType()) && "SUCCESSFUL".equals(t.getStatus()))
+                .filter(t -> "WITHDRAWAL".equals(t.getType()) && VaultTransactionStatus.SUCCESSFUL == t.getStatus())
                 .map(VaultTransaction::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -165,7 +165,7 @@ public class SavingsVaultService {
         BigDecimal alreadySaved = vault.getBalance();
         BigDecimal remaining = currentLiability.subtract(alreadySaved).max(BigDecimal.ZERO);
 
-        if (alreadySaved.compareTo(currentLiability) >= 0) {
+        if (currentLiability.compareTo(BigDecimal.ZERO) > 0 && alreadySaved.compareTo(currentLiability) >= 0) {
             suggested = BigDecimal.ZERO;
         }
 

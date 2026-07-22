@@ -17,7 +17,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import Toggle from "@/components/Toggle";
 import { getSubscriptionStatus } from "@/services/subscriptions.service";
-import { requestDataExport } from "@/services/user.service";
+import { getMe, requestDataExport } from "@/services/user.service";
 import { biometricRegister } from "@/services/auth.service";
 import {
   isBiometricEnabled,
@@ -35,7 +35,7 @@ const PLAN_NICKNAMES: Record<string, string> = {
   annual: "goofy_euler",
 };
 
-const menuItems = [
+const STATIC_MENU_ITEMS = [
   {
     title: "Active Sessions",
     subtitle: "Manage your logged-in devices",
@@ -56,20 +56,6 @@ const menuItems = [
     icon: "lock-closed-outline",
     route: "/change-password",
     color: "#8B5CF6",
-  },
-  {
-    title: "Taxpayer Profile",
-    subtitle: "Tax registrations and modules",
-    icon: "person-circle-outline",
-    route: "/taxpayer-profile",
-    color: "#C44736",
-  },
-  {
-    title: "Manage Plan",
-    subtitle: "View and manage your subscription",
-    icon: "swap-horizontal-outline",
-    route: "/manage-plan",
-    color: "#34A853",
   },
 ];
 
@@ -153,6 +139,8 @@ export default function SettingsScreen() {
   const { user } = useUser();
   const { showToast } = useToast();
   const [planNickname, setPlanNickname] = useState(PLAN_NICKNAMES.free);
+  const [taxpayerCategory, setTaxpayerCategory] = useState(user?.taxpayer_category || "");
+  const [region, setRegion] = useState(user?.region || "");
   const [requestingData, setRequestingData] = useState(false);
   const [showExportModal, setShowExportModal] = useState(false);
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -188,6 +176,14 @@ export default function SettingsScreen() {
         setPlanNickname(
           PLAN_NICKNAMES[plan] ?? PLAN_NICKNAMES[tier] ?? PLAN_NICKNAMES.free
         );
+      })
+      .catch(() => {});
+
+    getMe()
+      .then((res) => {
+        const d = res.data ?? {};
+        if (d.taxpayer_category) setTaxpayerCategory(d.taxpayer_category);
+        if (d.region) setRegion(d.region);
       })
       .catch(() => {});
 
@@ -240,8 +236,25 @@ export default function SettingsScreen() {
         .toUpperCase()
     : "U";
 
-  const securityItems = menuItems.slice(0, 3);
-  const accountItems = menuItems.slice(3);
+  const securityItems = STATIC_MENU_ITEMS;
+  const accountItems = [
+    {
+      title: "Taxpayer Profile",
+      subtitle: taxpayerCategory
+        ? `${taxpayerCategory}${region ? " · " + region : ""}`
+        : "Tax registrations and modules",
+      icon: "person-circle-outline",
+      route: "/taxpayer-profile",
+      color: "#C44736",
+    },
+    {
+      title: "Manage Plan",
+      subtitle: `# ${planNickname}`,
+      icon: "swap-horizontal-outline",
+      route: "/manage-plan",
+      color: "#34A853",
+    },
+  ];
 
   const handleBiometricToggle = async (value: boolean) => {
     if (biometricLoading) return;
@@ -439,7 +452,7 @@ export default function SettingsScreen() {
           <View style={styles.metricCard}>
             <Ionicons name="person-outline" size={16} color="#6B7280" />
             <Text style={styles.metricValue} numberOfLines={1}>
-              {user?.taxpayer_category || "Taxpayer"}
+              {taxpayerCategory || "Taxpayer"}
             </Text>
             <Text style={styles.metricLabel}>Category</Text>
           </View>
@@ -447,7 +460,7 @@ export default function SettingsScreen() {
           <View style={styles.metricCard}>
             <Ionicons name="location-outline" size={16} color="#6B7280" />
             <Text style={styles.metricValue} numberOfLines={1}>
-              {user?.region || "Not set"}
+              {region || "Not set"}
             </Text>
             <Text style={styles.metricLabel}>Region</Text>
           </View>

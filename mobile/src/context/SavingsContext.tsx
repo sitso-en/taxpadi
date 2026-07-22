@@ -31,6 +31,7 @@ export function SavingsProvider({ children }: { children: React.ReactNode }) {
   const [vault, setVault] = useState<any>(null);
   const [transactions, setTransactions] = useState<any[]>([]);
   const [suggestion, setSuggestion] = useState<any>(null);
+  const [effectiveBalance, setEffectiveBalance] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
 
@@ -52,6 +53,15 @@ export function SavingsProvider({ children }: { children: React.ReactNode }) {
     setVault(freshVault);
     setTransactions(freshTx);
 
+    const txBalance = freshTx
+      .filter((t: any) => t.status === "SUCCESSFUL")
+      .reduce((sum: number, t: any) => {
+        const amt = parseFloat(t.amount) || 0;
+        return t.type === "DEPOSIT" ? sum + amt : sum - amt;
+      }, 0);
+    const computedBalance = (freshVault?.balance > 0) ? freshVault.balance : Math.max(0, txBalance);
+    setEffectiveBalance(computedBalance);
+
     let freshSuggestion = null;
     try {
       const sugRes = await getVaultSuggestion();
@@ -71,9 +81,21 @@ export function SavingsProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     readCache<CacheShape>(CACHE_KEY, CACHE_TTL).then(async (cached) => {
       if (cached) {
-        setVault(cached.data.vault);
-        setTransactions(cached.data.transactions);
+        const cachedVault = cached.data.vault;
+        const cachedTx = cached.data.transactions ?? [];
+        setVault(cachedVault);
+        setTransactions(cachedTx);
         setSuggestion(cached.data.suggestion);
+        // Compute effectiveBalance from cached data so subtitles/stats show immediately
+        const txBalance = cachedTx
+          .filter((t: any) => t.status === "SUCCESSFUL")
+          .reduce((sum: number, t: any) => {
+            const amt = parseFloat(t.amount) || 0;
+            return t.type === "DEPOSIT" ? sum + amt : sum - amt;
+          }, 0);
+        setEffectiveBalance(
+          cachedVault?.balance > 0 ? cachedVault.balance : Math.max(0, txBalance)
+        );
         setLoading(false);
         if (cached.isStale) doFetch(true);
       } else {
@@ -99,7 +121,7 @@ export function SavingsProvider({ children }: { children: React.ReactNode }) {
     <SavingsContext.Provider
       value={{
         vault,
-        totalSaved: vault?.balance ?? 0,
+        totalSaved: effectiveBalance,
         transactions,
         suggestion,
         loading,

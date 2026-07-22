@@ -15,6 +15,8 @@ import { useDeadlines } from "../../context/DeadlineContext";
 import { useSavings } from "../../context/SavingsContext";
 import { useReferrals } from "../../context/ReferralContext";
 import { useCertificates } from "../../context/CertificateContext";
+import { useInvoices } from "../../context/InvoiceContext";
+import { useTaxReturns } from "../../context/TaxReturnsContext";
 import { getSubscriptionStatus } from "../../services/subscriptions.service";
 
 const PLAN_NICKNAMES: Record<string, string> = {
@@ -29,6 +31,8 @@ export default function MoreScreen() {
   const { totalSaved } = useSavings();
   const { availableOffers } = useReferrals();
   const { validCertificates } = useCertificates();
+  const { invoices } = useInvoices();
+  const { returns: taxReturns } = useTaxReturns();
 
   const [planNickname, setPlanNickname] = useState<string>(PLAN_NICKNAMES.free);
 
@@ -93,7 +97,9 @@ export default function MoreScreen() {
     },
     {
       title: "Invoices",
-      subtitle: "Create and manage invoices",
+      subtitle: invoices.length === 0
+        ? "No invoices yet"
+        : `${invoices.length} invoice${invoices.length > 1 ? "s" : ""}`,
       icon: "receipt-outline",
       route: "/invoices",
       color: "#C44736",
@@ -139,7 +145,9 @@ export default function MoreScreen() {
     },
     {
       title: "Tax Returns",
-      subtitle: "File and manage your tax returns",
+      subtitle: taxReturns.length === 0
+        ? "No returns filed yet"
+        : `${taxReturns.length} return${taxReturns.length > 1 ? "s" : ""} filed`,
       icon: "document-attach-outline",
       route: "/tax-returns",
       color: "#EA4335",
@@ -153,7 +161,7 @@ export default function MoreScreen() {
     },
     {
       title: "Settings",
-      subtitle: "Profile, plan and preferences",
+      subtitle: `# ${planNickname}`,
       icon: "settings-outline",
       route: "/settings",
       color: "#6B7280",
@@ -229,7 +237,7 @@ export default function MoreScreen() {
       <View style={styles.statsGrid}>
         <View style={styles.statCard}>
           <Ionicons name="wallet-outline" size={18} color="#6B7280" />
-          <Text style={styles.statValue}>{totalSaved === 0 ? "GH¢ 0" : `GH¢ ${totalSaved.toFixed(2)}`}</Text>
+          <Text style={styles.statValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{totalSaved === 0 ? "GH¢ 0" : `GH¢ ${totalSaved.toFixed(2)}`}</Text>
           <Text style={styles.statLabel}>Saved</Text>
         </View>
 

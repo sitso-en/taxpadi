@@ -1,7 +1,10 @@
 package com.taxpadi.api.service;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -29,6 +32,7 @@ import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.RefreshToken;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.repository.RefreshTokenRepository;
+import com.taxpadi.api.repository.TransactionRepository;
 import com.taxpadi.api.repository.UserRepository;
 
 @Service
@@ -41,17 +45,20 @@ public class UserService {
     private final BCryptPasswordEncoder passwordEncoder;
     private final AuditLogService auditLogService;
     private final DataExportService dataExportService;
+    private final TransactionRepository transactionRepository;
 
     public UserService(UserRepository userRepository,
                        RefreshTokenRepository refreshTokenRepository,
                        BCryptPasswordEncoder passwordEncoder,
                        AuditLogService auditLogService,
-                       DataExportService dataExportService) {
+                       DataExportService dataExportService,
+                       TransactionRepository transactionRepository) {
         this.userRepository = userRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.auditLogService = auditLogService;
         this.dataExportService = dataExportService;
+        this.transactionRepository = transactionRepository;
     }
 
     public UserProfileResponse getProfile(User user) {
@@ -134,7 +141,27 @@ public class UserService {
     }
 
     public HealthScoreResponse getHealthScore(User user) {
-        throw new NotFoundException("Not enough activity to calculate a score yet");
+        int score = 0;
+        Map<String, Object> breakdown = new LinkedHashMap<>();
+
+        // Profile completeness (40 pts)
+        int profileScore = 0;
+        if (user.getTin() != null && !user.getTin().isBlank()) profileScore += 20;
+        if (user.getTaxpayerCategory() != null) profileScore += 10;
+        if (user.getRegion() != null && !user.getRegion().isBlank()) profileScore += 10;
+        score += profileScore;
+        breakdown.put("profile_completeness", profileScore);
+
+        // Transaction activity (60 pts) — based on last 12 months
+        LocalDate today = LocalDate.now();
+        long txCount = transactionRepository.countByUserAndDateRange(user, today.minusYears(1), today);
+        int txScore = txCount >= 20 ? 60 : txCount >= 10 ? 45 : txCount >= 5 ? 30 : txCount >= 1 ? 15 : 0;
+        score += txScore;
+        breakdown.put("transaction_activity", txScore);
+        breakdown.put("transactions_last_12_months", txCount);
+
+        String grade = score >= 80 ? "A" : score >= 60 ? "B" : score >= 40 ? "C" : score >= 20 ? "D" : "F";
+        return new HealthScoreResponse(score, grade, breakdown, LocalDateTime.now());
     }
 
     public DataRequestResponse requestData(User user) {
