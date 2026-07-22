@@ -19,8 +19,8 @@ export const getTaxReturn = async (id: string) => {
 
 export const generateTaxReturn = async (taxType: string, taxYear: number, month?: number) => {
   const response = await client.post(ENDPOINTS.TAX_RETURNS.GENERATE, {
-    taxType,
-    taxYear,
+    tax_type: taxType,
+    tax_year: taxYear,
     month,
   });
   return response.data;

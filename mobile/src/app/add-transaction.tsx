@@ -109,6 +109,14 @@ export default function AddTransactionScreen() {
     }
   }, []);
 
+  // Reset deductible/withholding when switching to expense
+  useEffect(() => {
+    if (type === "expense") {
+      setIsDeductible(false);
+      setWithholdingApplicable(false);
+    }
+  }, [type]);
+
   // Reset form every time the screen comes into focus
   useFocusEffect(
     useCallback(() => {
@@ -432,39 +440,39 @@ export default function AddTransactionScreen() {
           />
         )}
 
-        {/* Tax Deductible */}
-        <TouchableOpacity
-          style={[styles.checkRow, isDeductible && styles.checkRowActive]}
-          onPress={() => setIsDeductible(!isDeductible)}
-          activeOpacity={0.7}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.switchTitle}>Tax Deductible</Text>
-            <Text style={styles.switchSubtitle}>Reduces your tax liability</Text>
-          </View>
-          <View style={[styles.checkbox, isDeductible && styles.checkboxActive]}>
-            {isDeductible && (
-              <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-            )}
-          </View>
-        </TouchableOpacity>
+        {/* Tax Deductible — income only */}
+        {type === "income" && (
+          <TouchableOpacity
+            style={[styles.checkRow, isDeductible && styles.checkRowActive]}
+            onPress={() => setIsDeductible(!isDeductible)}
+            activeOpacity={0.7}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchTitle}>Tax Deductible</Text>
+              <Text style={styles.switchSubtitle}>Reduces your tax liability</Text>
+            </View>
+            <View style={[styles.checkbox, isDeductible && styles.checkboxActive]}>
+              {isDeductible && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+            </View>
+          </TouchableOpacity>
+        )}
 
-        {/* Withholding Tax */}
-        <TouchableOpacity
-          style={[styles.checkRow, withholdingApplicable && styles.checkRowActive]}
-          onPress={() => setWithholdingApplicable(!withholdingApplicable)}
-          activeOpacity={0.7}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.switchTitle}>Withholding Tax Applicable</Text>
-            <Text style={styles.switchSubtitle}>Subject to WHT deduction</Text>
-          </View>
-          <View style={[styles.checkbox, withholdingApplicable && styles.checkboxActive]}>
-            {withholdingApplicable && (
-              <Ionicons name="checkmark" size={14} color="#FFFFFF" />
-            )}
-          </View>
-        </TouchableOpacity>
+        {/* Withholding Tax — income only */}
+        {type === "income" && (
+          <TouchableOpacity
+            style={[styles.checkRow, withholdingApplicable && styles.checkRowActive]}
+            onPress={() => setWithholdingApplicable(!withholdingApplicable)}
+            activeOpacity={0.7}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.switchTitle}>Withholding Tax Applicable</Text>
+              <Text style={styles.switchSubtitle}>Subject to WHT deduction</Text>
+            </View>
+            <View style={[styles.checkbox, withholdingApplicable && styles.checkboxActive]}>
+              {withholdingApplicable && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Attach */}
         <Text style={styles.label}>ATTACH</Text>

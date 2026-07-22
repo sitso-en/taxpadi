@@ -222,34 +222,38 @@ export default function EditTransactionScreen() {
           />
         )}
 
-        {/* Toggles */}
-        <TouchableOpacity
-          style={[styles.toggle, taxDeductible && styles.toggleActive]}
-          onPress={() => setTaxDeductible((v) => !v)}
-          activeOpacity={0.8}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Tax Deductible</Text>
-            <Text style={styles.toggleSub}>This expense reduces your taxable income</Text>
-          </View>
-          <View style={[styles.checkbox, taxDeductible && styles.checkboxActive]}>
-            {taxDeductible && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
-          </View>
-        </TouchableOpacity>
+        {/* Toggles — income only */}
+        {isIncome && (
+          <TouchableOpacity
+            style={[styles.toggle, taxDeductible && styles.toggleActive]}
+            onPress={() => setTaxDeductible((v) => !v)}
+            activeOpacity={0.8}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleTitle}>Tax Deductible</Text>
+              <Text style={styles.toggleSub}>This income reduces your taxable amount</Text>
+            </View>
+            <View style={[styles.checkbox, taxDeductible && styles.checkboxActive]}>
+              {taxDeductible && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+            </View>
+          </TouchableOpacity>
+        )}
 
-        <TouchableOpacity
-          style={[styles.toggle, withholdingApplicable && styles.toggleActive]}
-          onPress={() => setWithholdingApplicable((v) => !v)}
-          activeOpacity={0.8}
-        >
-          <View style={{ flex: 1 }}>
-            <Text style={styles.toggleTitle}>Withholding Tax Applicable</Text>
-            <Text style={styles.toggleSub}>WHT will be withheld on this transaction</Text>
-          </View>
-          <View style={[styles.checkbox, withholdingApplicable && styles.checkboxActive]}>
-            {withholdingApplicable && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
-          </View>
-        </TouchableOpacity>
+        {isIncome && (
+          <TouchableOpacity
+            style={[styles.toggle, withholdingApplicable && styles.toggleActive]}
+            onPress={() => setWithholdingApplicable((v) => !v)}
+            activeOpacity={0.8}
+          >
+            <View style={{ flex: 1 }}>
+              <Text style={styles.toggleTitle}>Withholding Tax Applicable</Text>
+              <Text style={styles.toggleSub}>WHT will be withheld on this transaction</Text>
+            </View>
+            <View style={[styles.checkbox, withholdingApplicable && styles.checkboxActive]}>
+              {withholdingApplicable && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
+            </View>
+          </TouchableOpacity>
+        )}
 
         {/* Save */}
         <TouchableOpacity
