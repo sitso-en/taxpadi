@@ -26,9 +26,13 @@ public class RedisConfig {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
-        mapper.activateDefaultTyping(
+        // Use AS_PROPERTY format (stores type as "@class" field) — avoids the
+        // AS_ARRAY wrapper format which causes START_ARRAY deserialization errors
+        // with nested collection types.
+        mapper.activateDefaultTypingAsProperty(
                 mapper.getPolymorphicTypeValidator(),
-                ObjectMapper.DefaultTyping.NON_FINAL);
+                ObjectMapper.DefaultTyping.NON_FINAL,
+                "@class");
         GenericJackson2JsonRedisSerializer serializer = new GenericJackson2JsonRedisSerializer(mapper);
 
         RedisCacheConfiguration config = RedisCacheConfiguration.defaultCacheConfig()

@@ -27,9 +27,8 @@ public class TaxbotService {
 
     private static final Logger log = LoggerFactory.getLogger(TaxbotService.class);
     private static final int RATE_LIMIT = 50;
-    private static final String MODEL = "gemini-2.0-flash";
-    private static final String GEMINI_URL =
-        "https://generativelanguage.googleapis.com/v1beta/models/" + MODEL + ":generateContent";
+    private static final String MODEL = "llama-3.3-70b-versatile";
+    private static final String GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
     private static final String SYSTEM_PROMPT =
         "You are TaxBot, a Ghana tax assistant built into TaxPadi. " +
         "You help users understand GRA rules, PAYE, VAT, withholding tax, income tax brackets, deadlines, filing procedures " +
@@ -41,7 +40,7 @@ public class TaxbotService {
     private final TaxbotConversationRepository conversationRepository;
     private final RestClient restClient;
 
-    @Value("${gemini.api-key}")
+    @Value("${groq.api-key}")
     private String apiKey;
 
     public TaxbotService(TaxbotConversationRepository conversationRepository) {
@@ -66,44 +65,43 @@ public class TaxbotService {
         }
 
         if (apiKey == null || apiKey.isBlank()) {
-            log.error("GEMINI_API_KEY is not configured — TaxBot cannot function.");
+            log.error("GROQ_API_KEY is not configured — TaxBot cannot function.");
             throw new BadRequestException("TaxBot is not available right now. Please try again later.");
         }
 
         Map<String, Object> requestBody = Map.of(
-            "system_instruction", Map.of("parts", List.of(Map.of("text", SYSTEM_PROMPT))),
-            "contents", List.of(Map.of(
-                "role", "user",
-                "parts", List.of(Map.of("text", question))
-            )),
-            "generationConfig", Map.of("maxOutputTokens", 1024)
+            "model", MODEL,
+            "messages", List.of(
+                Map.of("role", "system", "content", SYSTEM_PROMPT),
+                Map.of("role", "user", "content", question)
+            ),
+            "max_tokens", 1024
         );
 
         Map<String, Object> response;
         try {
             @SuppressWarnings("unchecked")
             Map<String, Object> raw = restClient.post()
-                .uri(GEMINI_URL + "?key=" + apiKey)
+                .uri(GROQ_URL)
                 .header("Content-Type", "application/json")
+                .header("Authorization", "Bearer " + apiKey)
                 .body(requestBody)
                 .retrieve()
                 .body(Map.class);
             response = raw;
         } catch (HttpClientErrorException e) {
-            log.error("Gemini API error {} — body: {}", e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("Groq API error {} — body: {}", e.getStatusCode(), e.getResponseBodyAsString());
             throw new BadRequestException("TaxBot is temporarily unavailable. Please try again shortly.");
         } catch (RestClientException e) {
-            log.error("Gemini connection failed: {}", e.getMessage());
+            log.error("Groq connection failed: {}", e.getMessage());
             throw new BadRequestException("TaxBot is temporarily unavailable. Please try again shortly.");
         }
 
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> candidates = (List<Map<String, Object>>) response.get("candidates");
+        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
         @SuppressWarnings("unchecked")
-        Map<String, Object> firstContent = (Map<String, Object>) candidates.get(0).get("content");
-        @SuppressWarnings("unchecked")
-        List<Map<String, Object>> parts = (List<Map<String, Object>>) firstContent.get("parts");
-        String answer = (String) parts.get(0).get("text");
+        Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
+        String answer = (String) message.get("content");
 
         TaxbotConversation conversation = new TaxbotConversation();
         conversation.setUser(user);

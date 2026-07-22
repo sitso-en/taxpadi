@@ -137,19 +137,17 @@ public class ReportService {
         return response;
     }
 
+    @SuppressWarnings("unchecked")
     public Map<String, String> getExportStatus(String jobId) {
         String raw = redis.opsForValue().get("export:" + jobId);
         if (raw == null) {
             throw new NotFoundException("Export job not found or has expired.");
         }
-        // Parse the simple JSON manually to avoid adding a full Jackson dependency here
-        Map<String, String> result = new LinkedHashMap<>();
-        raw = raw.replaceAll("[{}\"]", "");
-        for (String pair : raw.split(",")) {
-            String[] kv = pair.split(":", 2);
-            if (kv.length == 2) result.put(kv[0].trim(), kv[1].trim());
+        try {
+            return new com.fasterxml.jackson.databind.ObjectMapper().readValue(raw, Map.class);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to parse export status", e);
         }
-        return result;
     }
 
     private Map<String, Object> buildJsonMap(User user, LocalDate from, LocalDate to,

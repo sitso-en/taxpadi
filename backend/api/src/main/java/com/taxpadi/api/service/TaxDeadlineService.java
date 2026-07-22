@@ -128,33 +128,22 @@ public class TaxDeadlineService {
                         LocalDate.of(year + 1, 4, 30), yearStart, yearEnd));
             }
 
-            // VAT — per quarter that had income
+            // VAT — per month that had income (GRA requires monthly VAT returns)
             if (vatOk) {
-                int[][] quarters = {{1, 3}, {4, 6}, {7, 9}, {10, 12}};
-                LocalDate[] dueDates = {
-                    LocalDate.of(year, 4, 30),
-                    LocalDate.of(year, 7, 31),
-                    LocalDate.of(year, 10, 31),
-                    LocalDate.of(year + 1, 1, 31)
-                };
-                String[] qNames = {"Q1 (Jan–Mar)", "Q2 (Apr–Jun)", "Q3 (Jul–Sep)", "Q4 (Oct–Dec)"};
-
-                for (int q = 0; q < 4; q++) {
-                    final int startM = quarters[q][0];
-                    final int endM   = quarters[q][1];
-                    boolean hasIncome = incomeByMonth.stream().anyMatch(row -> {
-                        int m = ((Number) row[1]).intValue();
-                        return m >= startM && m <= endM;
-                    });
-                    if (hasIncome) {
-                        LocalDate qStart = LocalDate.of(year, startM, 1);
-                        LocalDate qEnd   = LocalDate.of(year, endM, 1)
-                                .withDayOfMonth(LocalDate.of(year, endM, 1).lengthOfMonth());
-                        result.add(buildDto(user, "vat",
-                                "VAT Filing — " + qNames[q] + " " + year,
-                                "Submit VAT return and payment for " + qNames[q] + " " + year + " to GRA.",
-                                dueDates[q], qStart, qEnd));
-                    }
+                Set<Integer> incomeMonths = incomeByMonth.stream()
+                        .map(row -> ((Number) row[1]).intValue())
+                        .collect(Collectors.toSet());
+                for (int m = 1; m <= 12; m++) {
+                    if (!incomeMonths.contains(m)) continue;
+                    LocalDate mStart = LocalDate.of(year, m, 1);
+                    LocalDate mEnd   = mStart.withDayOfMonth(mStart.lengthOfMonth());
+                    LocalDate due    = mEnd.plusMonths(1).withDayOfMonth(
+                            mEnd.plusMonths(1).lengthOfMonth());
+                    String monthName = mStart.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
+                    result.add(buildDto(user, "vat",
+                            "VAT Filing — " + monthName + " " + year,
+                            "Submit VAT return and payment for " + monthName + " " + year + " to GRA.",
+                            due, mStart, mEnd));
                 }
             }
 
@@ -292,7 +281,7 @@ public class TaxDeadlineService {
         String month = periodStart.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
         return switch (taxType) {
             case "income_tax"  -> "Annual Income Tax Filing " + year;
-            case "vat"         -> "VAT Filing — " + quarterLabel(periodStart) + " " + year;
+            case "vat"         -> "VAT Filing — " + month + " " + year;
             case "paye"        -> "PAYE Remittance — " + month + " " + year;
             case "withholding" -> "Withholding Tax — " + month + " " + year;
             default            -> taxType + " — " + periodStart;
@@ -304,7 +293,7 @@ public class TaxDeadlineService {
         String month = periodStart.getMonth().getDisplayName(TextStyle.FULL, Locale.ENGLISH);
         return switch (taxType) {
             case "income_tax"  -> "File your annual income tax return with GRA for the " + year + " tax year.";
-            case "vat"         -> "Submit VAT return and payment for " + quarterLabel(periodStart) + " " + year + " to GRA.";
+            case "vat"         -> "Submit VAT return and payment for " + month + " " + year + " to GRA.";
             case "paye"        -> "Remit PAYE deductions to GRA for employees for " + month + " " + year + ".";
             case "withholding" -> "Remit withholding tax deductions to GRA for " + month + " " + year + ".";
             default            -> "File " + taxType + " for period " + periodStart + " to " + periodEnd + ".";
@@ -314,16 +303,8 @@ public class TaxDeadlineService {
     private String frequency(String taxType) {
         return switch (taxType) {
             case "income_tax" -> "annual";
-            case "vat"        -> "quarterly";
+            case "vat"        -> "monthly";
             default           -> "monthly";
         };
-    }
-
-    private String quarterLabel(LocalDate periodStart) {
-        int m = periodStart.getMonthValue();
-        if (m <= 3)  return "Q1 (Jan\u2013Mar)";
-        if (m <= 6)  return "Q2 (Apr\u2013Jun)";
-        if (m <= 9)  return "Q3 (Jul\u2013Sep)";
-        return "Q4 (Oct\u2013Dec)";
     }
 }
