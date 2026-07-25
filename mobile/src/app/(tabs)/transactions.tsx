@@ -19,6 +19,7 @@ import ConfirmModal from "@/components/ConfirmModal";
 import { getTransactions, deleteTransaction as deleteTransactionApi } from "@/services/transaction.service";
 import Card from "../../components/Card";
 import ErrorState from "@/components/ErrorState";
+import { formatCategory } from "@/data/categories";
 
 const LIMIT = 20;
 
@@ -409,7 +410,7 @@ export default function TransactionsScreen() {
                       </Text>
                       <Text style={styles.transactionMeta} numberOfLines={1}>
                         {[
-                          transaction.category,
+                          formatCategory(transaction.category),
                           transaction.tax_deductible ? "Deductible" : null,
                           transaction.withholding_applicable ? "WHT" : null,
                         ]

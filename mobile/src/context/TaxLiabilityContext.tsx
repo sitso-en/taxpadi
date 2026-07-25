@@ -40,7 +40,14 @@ export function TaxLiabilityProvider({ children }: { children: React.ReactNode }
       setLiability(data);
       setError(false);
       writeCache(CACHE_KEY, data);
-    } catch {
+    } catch (err: any) {
+      const status = err?.response?.status;
+      // Fresh accounts have no calculations yet — treat 404/422 as empty, not an error
+      if (status === 404 || status === 422) {
+        setLiability(null);
+        setError(false);
+        return;
+      }
       if (!silent) setError(true);
     }
   };

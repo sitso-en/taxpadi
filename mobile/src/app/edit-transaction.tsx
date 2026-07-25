@@ -24,16 +24,11 @@ import {
   updateTransaction,
   deleteTransaction,
 } from "@/services/transaction.service";
-
-const categories = [
-  { label: "Sales", value: "Sales" },
-  { label: "Transport", value: "Transport" },
-  { label: "Utilities", value: "Utilities" },
-  { label: "Food", value: "Food" },
-  { label: "Salary", value: "Salary" },
-  { label: "Rent", value: "Rent" },
-  { label: "Other", value: "Other" },
-];
+import {
+  getCategories,
+  whtRateForCategory,
+  formatWhtRate,
+} from "@/data/categories";
 
 export default function EditTransactionScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -168,31 +163,29 @@ export default function EditTransactionScreen() {
         {/* Fields */}
         <Text style={styles.label}>DESCRIPTION</Text>
         <TextInput
-          style={[styles.input, errors.description && styles.inputError]}
+          style={[styles.input, { fontFamily: "Inter_400Regular" }, errors.description && styles.inputError]}
           value={description}
           onChangeText={(t) => { setDescription(t); if (errors.description) setErrors((e) => ({ ...e, description: undefined })); }}
           placeholder="What was this for?"
           placeholderTextColor="#9CA3AF"
-          fontFamily="Inter_400Regular"
         />
         {errors.description ? <Text style={styles.fieldError}>{errors.description}</Text> : null}
 
         <Text style={styles.label}>AMOUNT (GHS)</Text>
         <TextInput
-          style={[styles.input, errors.amount && styles.inputError]}
+          style={[styles.input, { fontFamily: "Inter_400Regular" }, errors.amount && styles.inputError]}
           value={amount}
           onChangeText={(t) => { setAmount(t); if (errors.amount) setErrors((e) => ({ ...e, amount: undefined })); }}
           keyboardType="numeric"
           placeholder="0.00"
           placeholderTextColor="#9CA3AF"
-          fontFamily="Inter_400Regular"
         />
         {errors.amount ? <Text style={styles.fieldError}>{errors.amount}</Text> : null}
 
         <Text style={styles.label}>CATEGORY</Text>
         <Dropdown
           style={[styles.dropdown, errors.category && styles.inputError]}
-          data={categories}
+          data={getCategories(isIncome ? "income" : "expense")}
           labelField="label"
           valueField="value"
           value={category}
@@ -222,8 +215,8 @@ export default function EditTransactionScreen() {
           />
         )}
 
-        {/* Toggles — income only */}
-        {isIncome && (
+        {/* Tax Deductible — expense only */}
+        {!isIncome && (
           <TouchableOpacity
             style={[styles.toggle, taxDeductible && styles.toggleActive]}
             onPress={() => setTaxDeductible((v) => !v)}
@@ -231,7 +224,7 @@ export default function EditTransactionScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.toggleTitle}>Tax Deductible</Text>
-              <Text style={styles.toggleSub}>This income reduces your taxable amount</Text>
+              <Text style={styles.toggleSub}>This expense reduces your taxable income</Text>
             </View>
             <View style={[styles.checkbox, taxDeductible && styles.checkboxActive]}>
               {taxDeductible && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
@@ -239,6 +232,7 @@ export default function EditTransactionScreen() {
           </TouchableOpacity>
         )}
 
+        {/* Withholding Tax — income only */}
         {isIncome && (
           <TouchableOpacity
             style={[styles.toggle, withholdingApplicable && styles.toggleActive]}
@@ -247,7 +241,17 @@ export default function EditTransactionScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.toggleTitle}>Withholding Tax Applicable</Text>
-              <Text style={styles.toggleSub}>WHT will be withheld on this transaction</Text>
+              <Text style={styles.toggleSub}>
+                {(() => {
+                  const rate = whtRateForCategory(category);
+                  if (!rate) return "Select an income type above to apply WHT";
+                  const amt = Number(amount);
+                  const label = `${formatWhtRate(rate)} withheld`;
+                  return amt > 0
+                    ? `${label} · GH₵ ${(amt * rate).toFixed(2)}`
+                    : label;
+                })()}
+              </Text>
             </View>
             <View style={[styles.checkbox, withholdingApplicable && styles.checkboxActive]}>
               {withholdingApplicable && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}

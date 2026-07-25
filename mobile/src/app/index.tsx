@@ -1,4 +1,4 @@
-import { getAccessToken } from "@/utils/storage";
+import { getAccessToken, getRefreshToken, hasOnboarded } from "@/utils/storage";
 import { router } from "expo-router";
 import React, { useEffect, useRef } from "react";
 import {
@@ -162,11 +162,18 @@ export default function SplashScreen() {
       }).start(() => resolve());
     });
 
-    const token = await getAccessToken();
+    // A valid refresh token means the user is still "logged in" even if the
+    // short-lived access token has expired — the API layer renews it on demand.
+    const accessToken = await getAccessToken();
+    const refreshToken = await getRefreshToken();
 
-    if (token) {
+    if (accessToken || refreshToken) {
       router.replace("/(tabs)/dashboard");
+    } else if (await hasOnboarded()) {
+      // Returning user whose session has ended — send them to sign in, not onboarding.
+      router.replace("/login");
     } else {
+      // Genuine first launch.
       router.replace("/welcome");
     }
   };

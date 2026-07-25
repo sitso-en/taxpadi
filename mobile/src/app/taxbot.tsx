@@ -3,6 +3,8 @@ import { router } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
+  Animated,
+  Easing,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -16,108 +18,145 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 import {
   askTaxBot,
+  clearConversationHistory,
   getConversationHistory,
 } from "@/services/taxbot.service";
+import ConfirmModal from "@/components/ConfirmModal";
+import { useToast } from "@/context/ToastContext";
 
 type ChatMessage = {
   sender: "user" | "bot";
   text: string;
 };
 
+const QUICK_PROMPTS = [
+  { icon: "calculator-outline", label: "What is VAT?", prompt: "What is VAT?" },
+  { icon: "receipt-outline", label: "My invoices", prompt: "How many invoices do I have?" },
+  { icon: "calendar-outline", label: "Deadlines", prompt: "What are my upcoming tax deadlines?" },
+  { icon: "cash-outline", label: "PAYE", prompt: "How is PAYE calculated in Ghana?" },
+] as const;
+
+function TypingDots() {
+  const dots = [useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current, useRef(new Animated.Value(0)).current];
+
+  useEffect(() => {
+    const animations = dots.map((dot, i) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(i * 160),
+          Animated.timing(dot, { toValue: 1, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+          Animated.timing(dot, { toValue: 0, duration: 300, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ])
+      )
+    );
+    animations.forEach((a) => a.start());
+    return () => animations.forEach((a) => a.stop());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <View style={styles.dotsRow}>
+      {dots.map((dot, i) => (
+        <Animated.View
+          key={i}
+          style={[
+            styles.dot,
+            {
+              opacity: dot.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }),
+              transform: [{ translateY: dot.interpolate({ inputRange: [0, 1], outputRange: [0, -3] }) }],
+            },
+          ]}
+        />
+      ))}
+    </View>
+  );
+}
+
+function BotAvatar() {
+  return (
+    <View style={styles.botAvatar}>
+      <Ionicons name="sparkles" size={13} color="#FFFFFF" />
+    </View>
+  );
+}
+
 export default function TaxBotScreen() {
+  const { showToast } = useToast();
   const [message, setMessage] = useState("");
-  const [showSuggestions, setShowSuggestions] = useState(true);
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
+
+  const scrollToEnd = () =>
+    setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 150);
 
   useEffect(() => {
     const loadHistory = async () => {
       try {
         const response = await getConversationHistory();
-
-        if (
-          response.success &&
-          response.data.conversations.length > 0
-        ) {
+        if (response.success && response.data.conversations.length > 0) {
+          // History arrives newest-first; render oldest-first so the newest sits at the bottom.
           const messages: ChatMessage[] = [];
-
-          response.data.conversations.forEach((conversation) => {
-            messages.push({
-              sender: "user",
-              text: conversation.question,
-            });
-
-            messages.push({
-              sender: "bot",
-              text: conversation.answer,
-            });
+          [...response.data.conversations].reverse().forEach((c) => {
+            messages.push({ sender: "user", text: c.question });
+            messages.push({ sender: "bot", text: c.answer });
           });
-
           setChat(messages);
+          scrollToEnd();
         }
       } catch {
         // start with empty chat — hero will be shown
       }
     };
-
     loadHistory();
   }, []);
 
-  const sendMessage = async () => {
-    if (loading) return;
-
-    if (!message.trim()) return;
+  const send = async (text: string) => {
+    const trimmed = text.trim();
+    if (loading || !trimmed) return;
 
     setLoading(true);
-
-    setShowSuggestions(false);
-
-    const userText = message;
-
-    setChat((previous) => [
-      ...previous,
-      {
-        sender: "user",
-        text: userText,
-      },
-    ]);
-
+    setChat((prev) => [...prev, { sender: "user", text: trimmed }]);
     setMessage("");
+    scrollToEnd();
 
     try {
-      const response = await askTaxBot(userText);
-
+      const response = await askTaxBot(trimmed);
       if (response.success) {
-        setChat((previous) => [
-          ...previous,
-          {
-            sender: "bot",
-            text: response.data.answer,
-          },
-        ]);
+        setChat((prev) => [...prev, { sender: "bot", text: response.data.answer }]);
       }
     } catch (error: any) {
-      setChat((previous) => [
-        ...previous,
+      setChat((prev) => [
+        ...prev,
         {
           sender: "bot",
-          text:
-            error?.response?.data?.message ??
-            "Sorry, I'm unable to answer right now.",
+          text: error?.response?.data?.message ?? "Sorry, I'm unable to answer right now.",
         },
       ]);
     } finally {
       setLoading(false);
-
-      setTimeout(() => {
-        scrollRef.current?.scrollToEnd({
-          animated: true,
-        });
-      }, 200);
+      scrollToEnd();
     }
   };
+
+  const handleClear = async () => {
+    setClearing(true);
+    try {
+      await clearConversationHistory();
+      setChat([]);
+      showToast("Chat cleared.", "success");
+    } catch {
+      showToast("Couldn't clear the chat. Please try again.", "error");
+    } finally {
+      setClearing(false);
+      setConfirmClear(false);
+    }
+  };
+
+  const hasChat = chat.length > 0;
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top"]}>
@@ -131,11 +170,31 @@ export default function TaxBotScreen() {
             <TouchableOpacity
               onPress={() => router.back()}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={styles.headerBtn}
             >
               <Ionicons name="chevron-back" size={26} color="#111827" />
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>TaxBot</Text>
-            <View style={{ width: 26 }} />
+
+            <View style={styles.headerTitleWrap}>
+              <BotAvatar />
+              <View>
+                <Text style={styles.headerTitle}>TaxBot</Text>
+                <Text style={styles.headerSubtitle}>Ghana tax assistant</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              onPress={() => setConfirmClear(true)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              style={[styles.headerBtn, { alignItems: "flex-end" }]}
+              disabled={!hasChat}
+            >
+              <Ionicons
+                name="trash-outline"
+                size={21}
+                color={hasChat ? "#C44736" : "transparent"}
+              />
+            </TouchableOpacity>
           </View>
 
           <ScrollView
@@ -143,122 +202,69 @@ export default function TaxBotScreen() {
             style={styles.chatArea}
             showsVerticalScrollIndicator={false}
             contentContainerStyle={styles.chatContent}
+            keyboardShouldPersistTaps="handled"
           >
             {/* Hero — only shown when no chat yet */}
-            {chat.length === 0 && (
+            {!hasChat && (
               <View style={styles.heroCard}>
-                <View style={styles.heroTopRow}>
-                  <View style={styles.botIcon}>
-                    <Ionicons name="chatbubbles-outline" size={21} color="#C44736" />
-                  </View>
-
-                  <View style={styles.heroCopy}>
-                    <Text style={styles.heroTitle}>Your AI Tax Assistant</Text>
-                    <Text style={styles.heroText}>
-                      Fast answers, smarter guidance, and quick help on tax tasks.
-                    </Text>
-                  </View>
+                <View style={styles.heroIcon}>
+                  <Ionicons name="sparkles" size={22} color="#C44736" />
                 </View>
-
-                <View style={styles.heroTags}>
-                  <View style={styles.heroTag}>
-                    <Ionicons name="calculator-outline" size={12} color="#C44736" />
-                    <Text style={styles.heroTagText}>VAT</Text>
-                  </View>
-                  <View style={styles.heroTag}>
-                    <Ionicons name="receipt-outline" size={12} color="#C44736" />
-                    <Text style={styles.heroTagText}>Invoices</Text>
-                  </View>
-                  <View style={styles.heroTag}>
-                    <Ionicons name="calendar-outline" size={12} color="#C44736" />
-                    <Text style={styles.heroTagText}>Deadlines</Text>
-                  </View>
-                </View>
+                <Text style={styles.heroTitle}>Hi, I'm TaxBot 👋</Text>
+                <Text style={styles.heroText}>
+                  Ask me anything about VAT, PAYE, withholding tax, deadlines, or your
+                  invoices. I'm here to make Ghana tax simple.
+                </Text>
               </View>
             )}
 
-            {chat.map((item, index) => (
-              <View
-                key={index}
-                style={[
-                  styles.messageContainer,
-                  item.sender === "user"
-                    ? styles.userContainer
-                    : styles.botContainer,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.messageBubble,
-                    item.sender === "user"
-                      ? styles.userBubble
-                      : styles.botBubble,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.messageText,
-                      item.sender === "user" && styles.userMessageText,
-                    ]}
-                  >
-                    {item.text}
-                  </Text>
+            {chat.map((item, index) =>
+              item.sender === "bot" ? (
+                <View key={index} style={styles.botRow}>
+                  <BotAvatar />
+                  <View style={[styles.messageBubble, styles.botBubble]}>
+                    <Text style={styles.messageText}>{item.text}</Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              ) : (
+                <View key={index} style={styles.userRow}>
+                  <View style={[styles.messageBubble, styles.userBubble]}>
+                    <Text style={[styles.messageText, styles.userMessageText]}>{item.text}</Text>
+                  </View>
+                </View>
+              )
+            )}
 
             {loading && (
-              <View style={styles.thinkingRow}>
-                <ActivityIndicator size="small" color="#C44736" />
-                <Text style={styles.thinkingText}>TaxBot is thinking...</Text>
+              <View style={styles.botRow}>
+                <BotAvatar />
+                <View style={[styles.messageBubble, styles.botBubble, styles.typingBubble]}>
+                  <TypingDots />
+                </View>
               </View>
             )}
           </ScrollView>
 
-          {showSuggestions && chat.length === 0 && (
+          {/* Quick prompts — only before the conversation starts */}
+          {!hasChat && (
             <View style={styles.quickWrap}>
-              <Text style={styles.quickHeader}>Quick prompts</Text>
+              <Text style={styles.quickHeader}>Try asking</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                style={styles.quickActions}
                 contentContainerStyle={styles.quickContent}
               >
-                <TouchableOpacity
-                  style={styles.quickButton}
-                  onPress={() => {
-                    setMessage("What is VAT?");
-                    setShowSuggestions(false);
-                  }}
-                  activeOpacity={0.86}
-                >
-                  <Ionicons name="calculator-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
-                  <Text style={styles.quickText}>What is VAT?</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.quickButton}
-                  onPress={() => {
-                    setMessage("How many invoices do I have?");
-                    setShowSuggestions(false);
-                  }}
-                  activeOpacity={0.86}
-                >
-                  <Ionicons name="receipt-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
-                  <Text style={styles.quickText}>My invoices</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.quickButton}
-                  onPress={() => {
-                    setMessage("Tax deadlines");
-                    setShowSuggestions(false);
-                  }}
-                  activeOpacity={0.86}
-                >
-                  <Ionicons name="calendar-outline" size={14} color="#C44736" style={{ marginRight: 6 }} />
-                  <Text style={styles.quickText}>Deadlines</Text>
-                </TouchableOpacity>
+                {QUICK_PROMPTS.map((q) => (
+                  <TouchableOpacity
+                    key={q.label}
+                    style={styles.quickButton}
+                    onPress={() => send(q.prompt)}
+                    activeOpacity={0.86}
+                  >
+                    <Ionicons name={q.icon as any} size={14} color="#C44736" style={{ marginRight: 6 }} />
+                    <Text style={styles.quickText}>{q.label}</Text>
+                  </TouchableOpacity>
+                ))}
               </ScrollView>
             </View>
           )}
@@ -271,24 +277,37 @@ export default function TaxBotScreen() {
               placeholderTextColor="#9CA3AF"
               value={message}
               onChangeText={setMessage}
-              onSubmitEditing={sendMessage}
+              onSubmitEditing={() => send(message)}
               returnKeyType="send"
+              multiline
             />
-
             <TouchableOpacity
-              style={styles.sendButton}
-              onPress={sendMessage}
+              style={[styles.sendButton, (!message.trim() || loading) && styles.sendButtonDisabled]}
+              onPress={() => send(message)}
               activeOpacity={0.85}
+              disabled={!message.trim() || loading}
             >
-              <Ionicons
-                name={loading ? "hourglass-outline" : "send"}
-                size={18}
-                color="#FFFFFF"
-              />
+              {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Ionicons name="arrow-up" size={20} color="#FFFFFF" />
+              )}
             </TouchableOpacity>
           </View>
         </View>
       </KeyboardAvoidingView>
+
+      <ConfirmModal
+        visible={confirmClear}
+        onClose={() => setConfirmClear(false)}
+        iconName="trash-outline"
+        iconColor="#C44736"
+        title="Clear chat?"
+        message="This permanently deletes your entire TaxBot conversation history. This can't be undone."
+        confirmLabel="Clear chat"
+        onConfirm={handleClear}
+        loading={clearing}
+      />
     </SafeAreaView>
   );
 }
@@ -298,11 +317,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#F2EDE8",
   },
-
   keyboardContainer: {
     flex: 1,
   },
-
   innerLayout: {
     flex: 1,
     paddingHorizontal: 18,
@@ -310,24 +327,50 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
 
+  // Header
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 16,
   },
-
+  headerBtn: {
+    width: 40,
+    justifyContent: "center",
+  },
+  headerTitleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   headerTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontFamily: "Inter_700Bold",
     color: "#111827",
+    letterSpacing: -0.2,
+  },
+  headerSubtitle: {
+    fontSize: 11.5,
+    fontFamily: "Inter_400Regular",
+    color: "#6B7280",
+    marginTop: 1,
   },
 
+  botAvatar: {
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: "#C44736",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+
+  // Hero
   heroCard: {
     backgroundColor: "#FFFFFF",
     borderRadius: 20,
-    padding: 16,
-    marginBottom: 14,
+    padding: 20,
+    marginBottom: 16,
     borderWidth: 1,
     borderColor: "#EFEFED",
     shadowColor: "#000",
@@ -336,99 +379,58 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
-
-  heroTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-
-  botIcon: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+  heroIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 23,
     backgroundColor: "#FCE8E6",
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 12,
+    marginBottom: 14,
     borderWidth: 1,
     borderColor: "#F8C5BF",
   },
-
-  heroCopy: {
-    flex: 1,
-    minWidth: 0,
-  },
-
   heroTitle: {
-    fontSize: 17,
+    fontSize: 19,
     fontFamily: "Inter_700Bold",
     color: "#111827",
-    letterSpacing: -0.2,
+    letterSpacing: -0.3,
   },
-
   heroText: {
     color: "#6B7280",
-    marginTop: 4,
-    lineHeight: 18,
-    fontSize: 13,
+    marginTop: 6,
+    lineHeight: 20,
+    fontSize: 13.5,
     fontFamily: "Inter_400Regular",
   },
 
-  heroTags: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    marginTop: 12,
-  },
-
-  heroTag: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF8F6",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: "#F8C5BF",
-  },
-
-  heroTagText: {
-    marginLeft: 5,
-    color: "#C44736",
-    fontSize: 11.5,
-    fontFamily: "Inter_600SemiBold",
-  },
-
+  // Chat
   chatArea: {
     flex: 1,
   },
-
   chatContent: {
     paddingBottom: 8,
   },
-
-  messageContainer: {
-    width: "100%",
-    marginBottom: 10,
-  },
-
-  botContainer: {
-    alignItems: "flex-start",
-  },
-
-  userContainer: {
+  botRow: {
+    flexDirection: "row",
     alignItems: "flex-end",
+    gap: 8,
+    marginBottom: 12,
+    maxWidth: "88%",
   },
-
+  userRow: {
+    alignItems: "flex-end",
+    marginBottom: 12,
+  },
   messageBubble: {
-    maxWidth: "78%",
-    paddingHorizontal: 13,
+    paddingHorizontal: 14,
     paddingVertical: 11,
-    borderRadius: 16,
+    borderRadius: 18,
   },
-
   botBubble: {
+    flexShrink: 1,
     backgroundColor: "#FFFFFF",
+    borderTopLeftRadius: 6,
     borderWidth: 1,
     borderColor: "#EFEFED",
     shadowColor: "#000",
@@ -437,42 +439,41 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-
   userBubble: {
+    maxWidth: "82%",
     backgroundColor: "#C44736",
+    borderTopRightRadius: 6,
   },
-
+  typingBubble: {
+    paddingVertical: 14,
+  },
   messageText: {
     color: "#111827",
     fontFamily: "Inter_400Regular",
-    flexShrink: 1,
-    lineHeight: 19,
-    fontSize: 13.5,
+    lineHeight: 20,
+    fontSize: 14,
   },
-
   userMessageText: {
     color: "#FFFFFF",
   },
 
-  thinkingRow: {
+  dotsRow: {
     flexDirection: "row",
+    gap: 5,
     alignItems: "center",
-    marginTop: 4,
-    marginBottom: 8,
+  },
+  dot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    backgroundColor: "#C44736",
   },
 
-  thinkingText: {
-    marginLeft: 10,
-    color: "#6B7280",
-    fontFamily: "Inter_400Regular",
-    fontSize: 12.5,
-  },
-
+  // Quick prompts
   quickWrap: {
     marginTop: 8,
     marginBottom: 10,
   },
-
   quickHeader: {
     color: "#6B7280",
     fontFamily: "Inter_600SemiBold",
@@ -481,44 +482,39 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
-
-  quickActions: {
-    marginHorizontal: -2,
-  },
-
   quickContent: {
     paddingRight: 6,
+    gap: 10,
   },
-
   quickButton: {
     backgroundColor: "#FFFFFF",
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 11,
+    paddingHorizontal: 12,
     paddingVertical: 9,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: "#EFEFED",
-    marginRight: 10,
     shadowColor: "#000",
     shadowOpacity: 0.03,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
-
   quickText: {
     color: "#111827",
     fontFamily: "Inter_600SemiBold",
     fontSize: 11.5,
   },
 
+  // Composer
   composerCard: {
     flexDirection: "row",
-    alignItems: "center",
+    alignItems: "flex-end",
     backgroundColor: "#FFFFFF",
-    borderRadius: 18,
-    padding: 10,
+    borderRadius: 20,
+    padding: 8,
+    paddingLeft: 8,
     marginTop: 8,
     borderWidth: 1,
     borderColor: "#EFEFED",
@@ -528,28 +524,26 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
-
   input: {
     flex: 1,
+    maxHeight: 120,
     minHeight: 44,
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingTop: Platform.OS === "ios" ? 12 : 8,
+    paddingBottom: Platform.OS === "ios" ? 12 : 8,
     fontFamily: "Inter_400Regular",
+    fontSize: 14,
     color: "#111827",
   },
-
   sendButton: {
     width: 44,
     height: 44,
-    borderRadius: 14,
+    borderRadius: 16,
     backgroundColor: "#C44736",
     justifyContent: "center",
     alignItems: "center",
-    marginLeft: 8,
-    shadowColor: "#C44736",
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 3,
+  },
+  sendButtonDisabled: {
+    backgroundColor: "#E0B8B1",
   },
 });

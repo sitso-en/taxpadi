@@ -84,11 +84,11 @@ export default function TaxReturnReviewScreen() {
       router.replace({
         pathname: "/tax-return-confirmation",
         params: {
-          returnId: submitData.returnId ?? returnId,
-          graReference: submitData.graReference ?? "",
-          taxType: submitData.taxType ?? preview?.returnDetails?.taxType ?? "",
-          submittedAt: submitData.submittedAt ?? new Date().toISOString(),
-          nextStep: submitData.nextStep ?? "",
+          returnId: submitData.return_id ?? returnId,
+          graReference: submitData.gra_reference ?? "",
+          taxType: submitData.tax_type ?? preview?.return_details?.tax_type ?? "",
+          submittedAt: submitData.submitted_at ?? new Date().toISOString(),
+          nextStep: submitData.next_step ?? "",
         },
       });
     } catch (error: any) {
@@ -110,11 +110,11 @@ export default function TaxReturnReviewScreen() {
   }
 
   const taxpayer = preview?.taxpayer;
-  const details = preview?.returnDetails;
+  const details = preview?.return_details;
   const financials = preview?.financials;
   const warnings: any[] = preview?.warnings ?? [];
-  const readyToSubmit: boolean = preview?.readyToSubmit ?? false;
-  const breakdown: any[] = financials?.bracketBreakdown ?? [];
+  const readyToSubmit: boolean = preview?.ready_to_submit ?? false;
+  const breakdown: any[] = financials?.bracket_breakdown ?? [];
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
@@ -156,17 +156,17 @@ export default function TaxReturnReviewScreen() {
           <>
             <SectionLabel title="Taxpayer" />
             <View style={styles.card}>
-              <DetailRow label="Name" value={taxpayer.fullName ?? "—"} />
+              <DetailRow label="Name" value={taxpayer.full_name ?? "—"} />
               {taxpayer.tin && (
                 <>
                   <View style={styles.rowDivider} />
                   <DetailRow label="TIN" value={taxpayer.tin} />
                 </>
               )}
-              {taxpayer.taxpayerCategory && (
+              {taxpayer.taxpayer_category && (
                 <>
                   <View style={styles.rowDivider} />
-                  <DetailRow label="Category" value={taxpayer.taxpayerCategory} />
+                  <DetailRow label="Category" value={taxpayer.taxpayer_category} />
                 </>
               )}
               {taxpayer.region && (
@@ -184,13 +184,13 @@ export default function TaxReturnReviewScreen() {
           <>
             <SectionLabel title="Return Details" />
             <View style={styles.card}>
-              <DetailRow label="Tax Type" value={TAX_TYPE_LABELS[details.taxType] ?? details.taxType} />
+              <DetailRow label="Tax Type" value={TAX_TYPE_LABELS[details.tax_type] ?? details.tax_type} />
               <View style={styles.rowDivider} />
-              <DetailRow label="Tax Year" value={String(details.taxYear)} />
+              <DetailRow label="Tax Year" value={String(details.tax_year)} />
               <View style={styles.rowDivider} />
               <DetailRow
                 label="Period"
-                value={`${fmtShort(details.periodStart)} – ${fmtShort(details.periodEnd)}`}
+                value={`${fmtShort(details.period_start)} – ${fmtShort(details.period_end)}`}
               />
             </View>
           </>
@@ -201,13 +201,13 @@ export default function TaxReturnReviewScreen() {
           <>
             <SectionLabel title="Financials" />
             <View style={styles.card}>
-              <DetailRow label="Gross Income" value={fmt(financials.grossIncome)} />
+              <DetailRow label="Gross Income" value={fmt(financials.gross_income)} />
               <View style={styles.rowDivider} />
-              <DetailRow label="Total Deductions" value={fmt(financials.totalDeductions)} />
+              <DetailRow label="Total Deductions" value={fmt(financials.total_deductions)} />
               <View style={styles.rowDivider} />
-              <DetailRow label="Taxable Income" value={fmt(financials.taxableIncome)} />
+              <DetailRow label="Taxable Income" value={fmt(financials.taxable_income)} />
               <View style={styles.rowDivider} />
-              <DetailRow label="Tax Liability" value={fmt(financials.taxLiability)} highlight />
+              <DetailRow label="Tax Liability" value={fmt(financials.tax_liability)} highlight />
             </View>
           </>
         )}

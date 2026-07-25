@@ -15,15 +15,16 @@ import {
 
 import BottomSheet from "@/components/BottomSheet";
 import { completeOnboarding, getTaxProfile, updateTaxProfile } from "../services/tax-profile.service";
+import { updateMe } from "../services/user.service";
 import { formatCategory, getUserFriendlyError } from "@/utils/error";
 import { useToast } from "@/context/ToastContext";
 
+// Keys MUST match the backend TaxpayerCategory enum (uppercase); /tax-profile GET
+// returns taxpayer_type as the enum name, and /users/me expects the same values.
 const TAXPAYER_TYPES = [
-  { key: "individual",     label: "Individual" },
-  { key: "sole_trader",    label: "Sole Trader" },
-  { key: "small_business", label: "Small Business" },
-  { key: "partnership",    label: "Partnership" },
-  { key: "company",        label: "Company" },
+  { key: "INDIVIDUAL",     label: "Individual" },
+  { key: "SOLE_TRADER",    label: "Sole Trader" },
+  { key: "SMALL_BUSINESS", label: "Small Business" },
 ];
 
 const GHANA_REGIONS = [
@@ -137,7 +138,18 @@ export default function TaxpayerProfileScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateTaxProfile(editData);
+      // TIN, region, and taxpayer category live on the user — /tax-profile ignores them.
+      await updateMe({
+        tin: editData.tin || undefined,
+        region: editData.region || undefined,
+        taxpayer_category: editData.taxpayer_type || undefined,
+      });
+
+      // Tax-year-start lives on the tax profile.
+      if (editData.tax_year_start) {
+        await updateTaxProfile({ tax_year_start: editData.tax_year_start });
+      }
+
       let onboardingComplete = profile?.onboarding_complete ?? false;
       if (!onboardingComplete && editData.tax_year_start) {
         try {

@@ -1,5 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import axios from "axios";
 import * as LocalAuthentication from "expo-local-authentication";
 import React, { useEffect, useRef, useState } from "react";
 import { getUserFriendlyError } from "@/utils/error";
@@ -22,7 +23,7 @@ import { Dropdown } from "react-native-element-dropdown";
 
 import { login, biometricLogin } from "@/services/auth.service";
 import { getMe } from "@/services/user.service";
-import { isBiometricEnabled, getBiometricToken } from "@/utils/storage";
+import { isBiometricEnabled, getBiometricToken, setOnboarded } from "@/utils/storage";
 import { useToast } from "@/context/ToastContext";
 import { useTransactions } from "@/context/TransactionContext";
 import { usePayments } from "@/context/PaymentContext";
@@ -114,6 +115,7 @@ export default function LoginScreen() {
         taxpayer_category: profile.taxpayer_category ?? "",
         active_profile: profile.is_active ?? false,
       });
+      setOnboarded();
       resetPrivacy();
       await Promise.all([refreshTransactions(), refreshPayments(), refreshSubscription()]);
       router.replace("/(tabs)/dashboard");
@@ -170,10 +172,38 @@ export default function LoginScreen() {
         active_profile: profile.is_active ?? false,
       });
 
+      setOnboarded();
       resetPrivacy();
       await Promise.all([refreshTransactions(), refreshPayments(), refreshSubscription()]);
       router.replace("/(tabs)/dashboard");
     } catch (error: any) {
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const raw = (error.response?.data?.message ?? "") as string;
+        const low = raw.toLowerCase();
+
+        // Wrong password: attribute it to the password field, not the phone number.
+        // Show the server's message verbatim so the "You have N attempt(s) left"
+        // countdown reaches the user.
+        if (status === 400 && low.includes("invalid phone number or password")) {
+          setErrors({ password: raw || "Incorrect phone number or password. Please try again." });
+          return;
+        }
+        // No account exists for that number — that's genuinely a phone-field problem.
+        if (status === 404 && low.includes("no account")) {
+          setErrors({ phone: "No account found for this phone number." });
+          return;
+        }
+        // Account-status messages (locked / unverified / deactivated) are account-level,
+        // not field errors — surface the server's own wording as a toast.
+        if (
+          status === 400 &&
+          (low.includes("locked") || low.includes("not verified") || low.includes("deactivated"))
+        ) {
+          showToast(raw, low.includes("not verified") ? "info" : "error");
+          return;
+        }
+      }
       showToast(getUserFriendlyError(error), "error");
     } finally {
       setLoading(false);

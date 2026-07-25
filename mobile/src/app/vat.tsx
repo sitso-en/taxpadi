@@ -57,7 +57,8 @@ export default function VATScreen() {
       setStatus(s);
       if (s?.vat_registered) {
         const recordsRes = await getVatRecords();
-        setRecords(recordsRes.data?.records ?? []);
+        // /history returns the record list directly in `data` (not wrapped in { records })
+        setRecords(recordsRes.data ?? []);
       }
     } catch {
     } finally {
@@ -109,6 +110,8 @@ export default function VATScreen() {
   const current = status?.current_month;
   const outputVat = current?.output_vat ?? 0;
   const inputVat = current?.input_vat ?? 0;
+  const nhil = current?.nhil ?? 0;
+  const getfund = current?.getfund ?? 0;
   const netVat = current?.net_vat_liability ?? 0;
   const thresholdPct = Math.min(threshold?.percentage ?? 0, 100);
 
@@ -208,8 +211,10 @@ export default function VATScreen() {
           </View>
 
           <View style={styles.infoCard}>
-            <Row label="VAT Collected (Output)" value={amountsHidden ? "••••••" : fmt(outputVat)} />
-            <Row label="VAT Paid (Input)" value={amountsHidden ? "••••••" : fmt(inputVat)} />
+            <Row label="VAT Collected (Output, 15%)" value={amountsHidden ? "••••••" : fmt(outputVat)} />
+            <Row label="VAT Paid (Input, 15%)" value={amountsHidden ? "••••••" : fmt(inputVat)} />
+            <Row label="NHIL (2.5%)" value={amountsHidden ? "••••••" : fmt(nhil)} />
+            <Row label="GETFund (2.5%)" value={amountsHidden ? "••••••" : fmt(getfund)} />
             <Row label="Net VAT Payable" value={amountsHidden ? "••••••" : fmt(netVat)} />
           </View>
 

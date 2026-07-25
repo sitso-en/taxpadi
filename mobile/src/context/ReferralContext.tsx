@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import { getReferralOffers } from "@/services/referrals.service";
+import { useSubscription } from "@/context/SubscriptionContext";
 
 type ReferralOfferApiItem = {
   referral_id?: string;
@@ -28,6 +29,7 @@ export function ReferralProvider({
   children: React.ReactNode;
 }) {
   const [availableOffers, setAvailableOffers] = useState(0);
+  const { isPro, loading: subscriptionLoading } = useSubscription();
 
   const load = useCallback(async () => {
     try {
@@ -42,8 +44,10 @@ export function ReferralProvider({
   }, []);
 
   useEffect(() => {
+    // Referral offers are subscription-gated server-side; don't fire the call for free users
+    if (subscriptionLoading || !isPro) return;
     load();
-  }, [load]);
+  }, [load, isPro, subscriptionLoading]);
 
   return (
     <ReferralContext.Provider value={{ availableOffers }}>

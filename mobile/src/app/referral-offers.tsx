@@ -20,6 +20,7 @@ import {
 } from "../services/referrals.service";
 import { useToast } from "@/context/ToastContext";
 import { useNetwork } from "@/context/NetworkContext";
+import { useSubscription } from "@/context/SubscriptionContext";
 
 type Offer = {
   id: string;
@@ -67,6 +68,7 @@ const OFFER_TYPE_ICON: Record<string, any> = {
 export default function ReferralOffersScreen() {
   const { showToast } = useToast();
   const { isOnline } = useNetwork();
+  const { isPro, loading: subscriptionLoading } = useSubscription();
 
   const [offers, setOffers] = useState<Offer[]>([]);
   const [eligibility, setEligibility] = useState<Eligibility | null>(null);
@@ -75,6 +77,12 @@ export default function ReferralOffersScreen() {
   const [actioning, setActioning] = useState<string | null>(null);
 
   const load = useCallback(async () => {
+    // Server gates these endpoints behind a subscription — skip the calls for free users
+    if (!isPro) {
+      setSubscriptionRequired(true);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const [offersRes, eligRes] = await Promise.all([
@@ -101,9 +109,12 @@ export default function ReferralOffersScreen() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isPro]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    if (subscriptionLoading) return;
+    load();
+  }, [load, subscriptionLoading]);
 
   const handleApply = async (offer: Offer) => {
     if (!isOnline) { showToast("You're offline.", "info"); return; }

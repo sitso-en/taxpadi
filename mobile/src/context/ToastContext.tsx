@@ -2,10 +2,12 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useRef,
   useState,
 } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Animated, Easing, Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 type ToastType = "success" | "error" | "info";
@@ -24,7 +26,93 @@ const ToastContext = createContext<ToastContextType>({ showToast: () => {} });
 
 export const useToast = () => useContext(ToastContext);
 
-function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
+const ACCENTS: Record<ToastType, string> = {
+  success: "#2FA968",
+  error: "#E5574A",
+  info: "#6681AD",
+};
+
+const ICONS: Record<ToastType, keyof typeof Ionicons.glyphMap> = {
+  success: "checkmark-circle",
+  error: "alert-circle",
+  info: "information-circle",
+};
+
+const DURATION = 3000;
+
+function ToastRow({
+  toast,
+  onHide,
+}: {
+  toast: ToastItem;
+  onHide: (id: number) => void;
+}) {
+  const translateY = useRef(new Animated.Value(24)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const dismissed = useRef(false);
+
+  const hide = useCallback(() => {
+    if (dismissed.current) return;
+    dismissed.current = true;
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateY, {
+        toValue: 12,
+        duration: 180,
+        easing: Easing.in(Easing.quad),
+        useNativeDriver: true,
+      }),
+    ]).start(() => onHide(toast.id));
+  }, [onHide, opacity, translateY, toast.id]);
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: 1,
+        duration: 220,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateY, {
+        toValue: 0,
+        friction: 9,
+        tension: 80,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    const timer = setTimeout(hide, DURATION);
+    return () => clearTimeout(timer);
+  }, [hide, opacity, translateY]);
+
+  return (
+    <Animated.View
+      style={[styles.toast, { opacity, transform: [{ translateY }] }]}
+    >
+      <Pressable style={styles.toastInner} onPress={hide}>
+        <View style={[styles.iconWrap, { backgroundColor: ACCENTS[toast.type] }]}>
+          <Ionicons name={ICONS[toast.type]} size={16} color="#FFFFFF" />
+        </View>
+        <Text style={styles.text} numberOfLines={3}>
+          {toast.message}
+        </Text>
+      </Pressable>
+    </Animated.View>
+  );
+}
+
+function ToastContainer({
+  toasts,
+  onHide,
+}: {
+  toasts: ToastItem[];
+  onHide: (id: number) => void;
+}) {
   const insets = useSafeAreaInsets();
 
   if (toasts.length === 0) return null;
@@ -32,24 +120,10 @@ function ToastContainer({ toasts }: { toasts: ToastItem[] }) {
   return (
     <View
       style={[styles.container, { bottom: Math.max(insets.bottom, 16) + 16 }]}
-      pointerEvents="none"
+      pointerEvents="box-none"
     >
       {toasts.map((toast) => (
-        <View
-          key={toast.id}
-          style={[
-            styles.toast,
-            toast.type === "success"
-              ? styles.success
-              : toast.type === "info"
-              ? styles.info
-              : styles.error,
-          ]}
-        >
-          <Text style={styles.text} numberOfLines={3}>
-            {toast.message}
-          </Text>
-        </View>
+        <ToastRow key={toast.id} toast={toast} onHide={onHide} />
       ))}
     </View>
   );
@@ -63,18 +137,19 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     (message: string, type: ToastType = "error") => {
       const id = ++nextId.current;
       setToasts((prev) => [...prev, { id, message, type }]);
-      setTimeout(() => {
-        setToasts((prev) => prev.filter((t) => t.id !== id));
-      }, 2500);
     },
     []
   );
+
+  const hideToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
 
   return (
     <ToastContext.Provider value={{ showToast }}>
       <View style={styles.fill}>
         {children}
-        <ToastContainer toasts={toasts} />
+        <ToastContainer toasts={toasts} onHide={hideToast} />
       </View>
     </ToastContext.Provider>
   );
@@ -88,38 +163,37 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    gap: 8,
+    gap: 10,
     zIndex: 9999,
   },
   toast: {
-    borderRadius: 14,
-    paddingVertical: 14,
-    paddingHorizontal: 16,
+    borderRadius: 16,
+    backgroundColor: "#22262B",
     shadowColor: "#000",
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
+    shadowOpacity: 0.22,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
   },
-  success: {
-    backgroundColor: "#676e65",
-    borderLeftWidth: 4,
-    borderLeftColor: "#38b95b",
+  toastInner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    paddingVertical: 13,
+    paddingHorizontal: 14,
   },
-  error: {
-    backgroundColor: "#676e65",
-    borderLeftWidth: 4,
-    borderLeftColor: "#C44736",
-  },
-  info: {
-    backgroundColor: "#676e65",
-    borderLeftWidth: 4,
-    borderLeftColor: "#6681ad",
+  iconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    alignItems: "center",
+    justifyContent: "center",
   },
   text: {
-    color: "#FFFFFF",
+    flex: 1,
+    color: "#F5F5F4",
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
-    lineHeight: 20,
+    fontSize: 13.5,
+    lineHeight: 19,
   },
 });

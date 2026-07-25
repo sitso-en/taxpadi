@@ -31,19 +31,14 @@ import {
   createTransaction,
 } from "@/services/transaction.service";
 import { useTransactions } from "@/context/TransactionContext";
+import {
+  getCategories,
+  whtRateForCategory,
+  formatWhtRate,
+} from "@/data/categories";
 
 const WAVE_BAR_PEAKS = [18, 34, 26, 44, 30, 22, 40];
 const WAVE_BAR_DURATIONS = [380, 340, 490, 310, 440, 370, 410];
-
-const categories = [
-  { label: "Sales", value: "Sales" },
-  { label: "Transport", value: "Transport" },
-  { label: "Utilities", value: "Utilities" },
-  { label: "Food", value: "Food" },
-  { label: "Salary", value: "Salary" },
-  { label: "Rent", value: "Rent" },
-  { label: "Other", value: "Other" },
-];
 
 export default function AddTransactionScreen() {
   const { mode } = useLocalSearchParams<{ mode?: string }>();
@@ -81,6 +76,9 @@ export default function AddTransactionScreen() {
   const player = useAudioPlayer(audioPlaybackUri);
   const playerStatus = useAudioPlayerStatus(player);
 
+  // Prevents useFocusEffect from resetting the form after scan/voice fills it
+  const skipNextReset = useRef(false);
+
   // Waveform bar animations for recording overlay
   const waveBarAnims = useRef(WAVE_BAR_PEAKS.map(() => new Animated.Value(8))).current;
 
@@ -109,17 +107,21 @@ export default function AddTransactionScreen() {
     }
   }, []);
 
-  // Reset deductible/withholding when switching to expense
+  // Reset deductible/withholding and category when type changes
+  // (income and expense have different category lists)
   useEffect(() => {
-    if (type === "expense") {
-      setIsDeductible(false);
-      setWithholdingApplicable(false);
-    }
+    setIsDeductible(false);
+    setWithholdingApplicable(false);
+    setCategory("");
   }, [type]);
 
-  // Reset form every time the screen comes into focus
+  // Reset form every time the screen comes into focus (skip after scan/voice fills fields)
   useFocusEffect(
     useCallback(() => {
+      if (skipNextReset.current) {
+        skipNextReset.current = false;
+        return;
+      }
       setType("income");
       setAmount("");
       setCategory("");
@@ -268,6 +270,7 @@ export default function AddTransactionScreen() {
       setAudioUri(pendingAudioUri);
       setPendingAudioUri(null);
       setAudioPlaybackUri(null);
+      skipNextReset.current = true;
       setShowVoiceReview(false);
       showToast("Fields filled from your recording.", "success");
     } catch (error: any) {
@@ -307,6 +310,7 @@ export default function AddTransactionScreen() {
       setReceiptUri(pendingReceiptUri);
       setPendingReceiptUri(null);
       setPendingReceiptBase64(null);
+      skipNextReset.current = true;
       setShowReceiptPreview(false);
       showToast("Fields filled from receipt.", "success");
     } catch (error: any) {
@@ -388,7 +392,7 @@ export default function AddTransactionScreen() {
         <Text style={styles.label}>CATEGORY</Text>
         <Dropdown
           style={[styles.input, errors.category && styles.inputError, !!errors.category && { marginBottom: 4 }]}
-          data={categories}
+          data={getCategories(type)}
           labelField="label"
           valueField="value"
           placeholder="Select Category"
@@ -440,8 +444,8 @@ export default function AddTransactionScreen() {
           />
         )}
 
-        {/* Tax Deductible — income only */}
-        {type === "income" && (
+        {/* Tax Deductible — expense only */}
+        {type === "expense" && (
           <TouchableOpacity
             style={[styles.checkRow, isDeductible && styles.checkRowActive]}
             onPress={() => setIsDeductible(!isDeductible)}
@@ -449,7 +453,7 @@ export default function AddTransactionScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.switchTitle}>Tax Deductible</Text>
-              <Text style={styles.switchSubtitle}>Reduces your tax liability</Text>
+              <Text style={styles.switchSubtitle}>This expense reduces your taxable income</Text>
             </View>
             <View style={[styles.checkbox, isDeductible && styles.checkboxActive]}>
               {isDeductible && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
@@ -466,7 +470,17 @@ export default function AddTransactionScreen() {
           >
             <View style={{ flex: 1 }}>
               <Text style={styles.switchTitle}>Withholding Tax Applicable</Text>
-              <Text style={styles.switchSubtitle}>Subject to WHT deduction</Text>
+              <Text style={styles.switchSubtitle}>
+                {(() => {
+                  const rate = whtRateForCategory(category);
+                  if (!rate) return "Select an income type above to apply WHT";
+                  const amt = Number(amount);
+                  const label = `${formatWhtRate(rate)} withheld`;
+                  return amt > 0
+                    ? `${label} · GH₵ ${(amt * rate).toFixed(2)}`
+                    : label;
+                })()}
+              </Text>
             </View>
             <View style={[styles.checkbox, withholdingApplicable && styles.checkboxActive]}>
               {withholdingApplicable && <Ionicons name="checkmark" size={14} color="#FFFFFF" />}
