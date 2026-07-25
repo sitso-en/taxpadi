@@ -14,7 +14,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { getAccessToken } from "@/utils/storage";
+import { getAccessToken, setOnboarded } from "@/utils/storage";
 import { AuthArcs } from "@/components/AuthArcs";
 
 const { width: W, height: H } = Dimensions.get("window");
@@ -81,6 +81,13 @@ export default function WelcomeScreen() {
     animatePage(idx);
   };
 
+  // Leaving welcome (skip / sign in / get started) means onboarding is done —
+  // returning logged-out users land on login, never here again.
+  const leaveWelcome = (path: "/login" | "/register") => {
+    setOnboarded();
+    router.push(path);
+  };
+
   const handleTouch = (x: number, y: number) => {
     Animated.spring(grainX, {
       toValue: (x / W - 0.5) * 40,
@@ -116,7 +123,7 @@ export default function WelcomeScreen() {
       {/* Base background */}
       <LinearGradient
         colors={["#F9F3EE", "#F2EDE8", "#EADFD7"]}
-        style={StyleSheet.absoluteFillObject}
+        style={StyleSheet.absoluteFill}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 1 }}
       />
@@ -125,7 +132,7 @@ export default function WelcomeScreen() {
       <Animated.View
         pointerEvents="none"
         style={[
-          StyleSheet.absoluteFillObject,
+          StyleSheet.absoluteFill,
           { transform: [{ translateX: grainX }, { translateY: grainY }] },
         ]}
       >
@@ -153,7 +160,7 @@ export default function WelcomeScreen() {
         {page < 2 && (
           <TouchableOpacity
             style={styles.skipBtn}
-            onPress={() => router.push("/login")}
+            onPress={() => leaveWelcome("/login")}
             activeOpacity={0.7}
           >
             <Text style={styles.skipText}>Skip</Text>
@@ -272,7 +279,7 @@ export default function WelcomeScreen() {
 
               <TouchableOpacity
                 style={styles.primaryButton}
-                onPress={() => router.push("/register")}
+                onPress={() => leaveWelcome("/register")}
                 activeOpacity={0.88}
               >
                 <Text style={styles.primaryButtonText}>Get Started</Text>
@@ -280,7 +287,7 @@ export default function WelcomeScreen() {
 
               <TouchableOpacity
                 style={styles.secondaryButton}
-                onPress={() => router.push("/login")}
+                onPress={() => leaveWelcome("/login")}
                 activeOpacity={0.75}
               >
                 <Text style={styles.secondaryButtonText}>I already have an account</Text>

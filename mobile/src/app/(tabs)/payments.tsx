@@ -22,6 +22,7 @@ import { usePrivacy } from "@/context/PrivacyContext";
 import ErrorState from "@/components/ErrorState";
 import { usePayments } from "../../context/PaymentContext";
 import { getPaymentStatus, confirmPayment } from "@/services/payment.service";
+import { getTaxReturns } from "@/services/taxReturns.service";
 import { useTaxLiability } from "@/context/TaxLiabilityContext";
 import { useSavings } from "@/context/SavingsContext";
 
@@ -56,6 +57,7 @@ export default function PaymentsScreen() {
   const [payAmountText, setPayAmountText] = useState("");
   const [momoNumber, setMomoNumber] = useState("");
   const [momoProvider, setMomoProvider] = useState<"mtn" | "telecel" | "airteltigo">("mtn");
+  const [pendingReturnId, setPendingReturnId] = useState<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -68,6 +70,18 @@ export default function PaymentsScreen() {
       setMomoNumber(user.phoneNumber.replace(/\s/g, ""));
     }
   }, [user?.phoneNumber]);
+
+  // Fetch most recent submitted tax return to link payment to
+  useEffect(() => {
+    getTaxReturns({ status: "submitted", limit: 1 })
+      .then((res) => {
+        const returns = res.data?.returns ?? res.data ?? [];
+        if (returns.length > 0) {
+          setPendingReturnId(returns[0].return_id);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
 
   const netLiability = liability?.net_liability ?? 0;
@@ -147,8 +161,15 @@ export default function PaymentsScreen() {
 
     setPaying(true);
     try {
+      if (!pendingReturnId) {
+        showToast("No submitted tax return found. Please file a return before making a payment.", "error");
+        setPaying(false);
+        return;
+      }
+
       const response = await createPayment({
         amount: payAmount,
+        return_id: pendingReturnId,
         payment_method: paymentMethod === "momo" ? "momo" : paymentMethod === "vault" ? "vault" : "bank_card",
         momo_number: paymentMethod === "momo" ? momoNumber.replace(/\s/g, "") : undefined,
         momo_provider: paymentMethod === "momo" ? momoProvider : undefined,

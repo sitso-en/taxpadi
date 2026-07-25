@@ -20,7 +20,7 @@ export const createInvoice = async (data: {
   client_name: string;
   client_email?: string;
   client_phone?: string;
-  description: string;
+  description?: string;
   subtotal: number;
   due_date?: string;
 }) => {

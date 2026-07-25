@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import BottomSheet from "@/components/BottomSheet";
-import { getPenaltyById, disputePenalty } from "@/services/penalty.service";
+import { getPenaltyById } from "@/services/penalty.service";
 import { getUserFriendlyError } from "@/utils/error";
 import { useToast } from "@/context/ToastContext";
 
@@ -39,9 +39,6 @@ export default function DeadlinesScreen() {
   const [selectedPenalty, setSelectedPenalty] = useState<any>(null);
   const [penaltyDetail, setPenaltyDetail] = useState<any>(null);
   const [detailLoading, setDetailLoading] = useState(false);
-  const [showDispute, setShowDispute] = useState(false);
-  const [disputeReason, setDisputeReason] = useState("");
-  const [disputing, setDisputing] = useState(false);
 
   const openPenaltyDetail = async (penalty: any) => {
     setSelectedPenalty(penalty);
@@ -56,22 +53,6 @@ export default function DeadlinesScreen() {
       // use list data as fallback
     } finally {
       setDetailLoading(false);
-    }
-  };
-
-  const handleDispute = async () => {
-    if (!selectedPenalty?.existing_penalty_id || !disputeReason.trim()) return;
-    setDisputing(true);
-    try {
-      await disputePenalty(selectedPenalty.existing_penalty_id, disputeReason.trim());
-      setShowDispute(false);
-      setSelectedPenalty(null);
-      setDisputeReason("");
-      showToast("Dispute submitted successfully.", "success");
-    } catch (error: any) {
-      showToast(getUserFriendlyError(error), "error");
-    } finally {
-      setDisputing(false);
     }
   };
 
@@ -305,7 +286,7 @@ export default function DeadlinesScreen() {
       </ScrollView>
 
       {/* Penalty detail sheet */}
-      <BottomSheet visible={!!selectedPenalty && !showDispute} onClose={() => setSelectedPenalty(null)}>
+      <BottomSheet visible={!!selectedPenalty} onClose={() => setSelectedPenalty(null)}>
         <View style={styles.sheetContent}>
           <View style={styles.sheetIconRow}>
             <View style={styles.sheetIconBox}>
@@ -358,45 +339,6 @@ export default function DeadlinesScreen() {
             </View>
           )}
 
-          <TouchableOpacity
-            style={styles.disputeBtn}
-            onPress={() => setShowDispute(true)}
-            activeOpacity={0.85}
-          >
-            <Ionicons name="shield-checkmark-outline" size={16} color="#FFFFFF" />
-            <Text style={styles.disputeBtnText}>Dispute This Penalty</Text>
-          </TouchableOpacity>
-        </View>
-      </BottomSheet>
-
-      {/* Dispute sheet */}
-      <BottomSheet visible={showDispute} onClose={() => setShowDispute(false)} avoidKeyboard>
-        <View style={styles.sheetContent}>
-          <Text style={styles.sheetTitle}>Dispute Penalty</Text>
-          <Text style={styles.sheetSub}>
-            Explain why this penalty should be reviewed or waived by the GRA.
-          </Text>
-
-          <Text style={styles.disputeInputLabel}>YOUR REASON</Text>
-          <TextInput
-            style={styles.disputeInput}
-            value={disputeReason}
-            onChangeText={setDisputeReason}
-            placeholder="e.g. Filing was delayed due to system errors on the GRA portal…"
-            placeholderTextColor="#9CA3AF"
-            multiline
-            numberOfLines={4}
-            textAlignVertical="top"
-          />
-
-          <TouchableOpacity
-            style={[styles.disputeBtn, (!disputeReason.trim() || disputing) && { opacity: 0.6 }]}
-            onPress={handleDispute}
-            disabled={!disputeReason.trim() || disputing}
-            activeOpacity={0.85}
-          >
-            <Text style={styles.disputeBtnText}>{disputing ? "Submitting…" : "Submit Dispute"}</Text>
-          </TouchableOpacity>
         </View>
       </BottomSheet>
     </SafeAreaView>

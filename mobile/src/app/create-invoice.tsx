@@ -13,7 +13,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import * as Sharing from "expo-sharing";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
@@ -139,7 +139,7 @@ export default function CreateInvoiceScreen() {
   };
 
   const handleSend = async (channel: "email" | "whatsapp" | "download") => {
-    if (!created?.invoiceId) return;
+    if (!created?.invoiceId || sending) return;
     setSending(true);
     try {
       const res = await send(created.invoiceId, channel);
@@ -222,7 +222,7 @@ export default function CreateInvoiceScreen() {
             )}
           </View>
 
-          <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace("/(tabs)/invoices")} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.doneBtn} onPress={() => router.replace("/invoices")} activeOpacity={0.85}>
             <Text style={styles.doneBtnText}>Done</Text>
           </TouchableOpacity>
         </ScrollView>

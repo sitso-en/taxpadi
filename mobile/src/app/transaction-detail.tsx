@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getTransaction, deleteTransaction } from "@/services/transaction.service";
 import { getUserFriendlyError } from "@/utils/error";
+import { formatCategory } from "@/data/categories";
 import { useToast } from "@/context/ToastContext";
 
 function Row({ label, value }: { label: string; value: string }) {
@@ -127,7 +128,7 @@ export default function TransactionDetailScreen() {
         <View style={styles.card}>
           <Row label="Description" value={transaction.description ?? "—"} />
           <Divider />
-          <Row label="Category" value={transaction.category ?? "—"} />
+          <Row label="Category" value={formatCategory(transaction.category) || "—"} />
           <Divider />
           <Row label="Date" value={date} />
           <Divider />

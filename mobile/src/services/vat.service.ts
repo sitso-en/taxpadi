@@ -17,8 +17,12 @@ export const getVatRecords = async (params?: {
 
 export const registerVat = async (data: {
   vat_registration_no: string;
-  registration_date: string;
+  registration_date?: string;
 }) => {
-  const response = await client.post(ENDPOINTS.VAT.REGISTER, data);
+  // VAT registration lives on the tax profile — providing a registration number
+  // marks the business as VAT-registered and unlocks the VAT section.
+  const response = await client.put(ENDPOINTS.TAX_PROFILE.UPDATE, {
+    vat_registration_no: data.vat_registration_no,
+  });
   return response.data;
 };
