@@ -11,13 +11,16 @@ public class VatRegisterResponse {
     private BigDecimal outputVat;
     private BigDecimal totalPurchases;
     private BigDecimal inputVat;
+    private BigDecimal nhil;
+    private BigDecimal getfund;
     private BigDecimal netVatLiability;
     private String effectiveRate;
     private String returnStatus;
     private LocalDate dueDate;
 
     public VatRegisterResponse(int month, int year, BigDecimal totalSales, BigDecimal outputVat,
-                               BigDecimal totalPurchases, BigDecimal inputVat, BigDecimal netVatLiability,
+                               BigDecimal totalPurchases, BigDecimal inputVat, BigDecimal nhil,
+                               BigDecimal getfund, BigDecimal netVatLiability,
                                String effectiveRate, String returnStatus, LocalDate dueDate) {
         this.month = month;
         this.year = year;
@@ -25,6 +28,8 @@ public class VatRegisterResponse {
         this.outputVat = outputVat;
         this.totalPurchases = totalPurchases;
         this.inputVat = inputVat;
+        this.nhil = nhil;
+        this.getfund = getfund;
         this.netVatLiability = netVatLiability;
         this.effectiveRate = effectiveRate;
         this.returnStatus = returnStatus;
@@ -37,6 +42,8 @@ public class VatRegisterResponse {
     public BigDecimal getOutputVat() { return outputVat; }
     public BigDecimal getTotalPurchases() { return totalPurchases; }
     public BigDecimal getInputVat() { return inputVat; }
+    public BigDecimal getNhil() { return nhil; }
+    public BigDecimal getGetfund() { return getfund; }
     public BigDecimal getNetVatLiability() { return netVatLiability; }
     public String getEffectiveRate() { return effectiveRate; }
     public String getReturnStatus() { return returnStatus; }

@@ -353,13 +353,23 @@ public class AuthService {
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             int attempts = user.getFailedLoginAttempts() + 1;
             user.setFailedLoginAttempts(attempts);
+            auditLogService.log(user, "LOGIN_FAILED", "Invalid password attempt", ipAddress);
+
+            // The attempt that reaches the limit locks the account — say so, rather
+            // than repeating the generic "wrong password" message.
             if (attempts >= MAX_LOGIN_ATTEMPTS) {
                 user.setLockedUntil(LocalDateTime.now().plusMinutes(LOCK_MINUTES));
+                userRepository.save(user);
                 log.warn("Account locked for userId={} after {} failed attempts", user.getUserId(), attempts);
+                throw new IllegalStateException("Account is temporarily locked due to too many failed attempts. Please try again in " + LOCK_MINUTES + " minutes");
             }
+
+            // Earlier failures count down so the lock never feels sudden. Keep the
+            // "Invalid phone number or password" prefix (client maps it to the
+            // password field) and keep the word "locked" out of this message.
             userRepository.save(user);
-            auditLogService.log(user, "LOGIN_FAILED", "Invalid password attempt", ipAddress);
-            throw new IllegalArgumentException("Invalid phone number or password");
+            int remaining = MAX_LOGIN_ATTEMPTS - attempts;
+            throw new IllegalArgumentException("Invalid phone number or password. You have " + remaining + " attempt(s) left.");
         }
 
         // Successful login — clear any lockout state

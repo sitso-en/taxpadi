@@ -68,6 +68,7 @@ public class TransactionService {
     private final CloudinaryService cloudinaryService;
     private final OcrService ocrService;
     private final SpeechService speechService;
+    private final VatService vatService;
 
     public TransactionService(TransactionRepository transactionRepository,
             ImportHistoryRepository importHistoryRepository,
@@ -76,7 +77,8 @@ public class TransactionService {
             AuditLogService auditLogService,
             CloudinaryService cloudinaryService,
             OcrService ocrService,
-            SpeechService speechService) {
+            SpeechService speechService,
+            VatService vatService) {
         this.transactionRepository = transactionRepository;
         this.importHistoryRepository = importHistoryRepository;
         this.taxCalculationRepository = taxCalculationRepository;
@@ -85,6 +87,7 @@ public class TransactionService {
         this.cloudinaryService = cloudinaryService;
         this.ocrService = ocrService;
         this.speechService = speechService;
+        this.vatService = vatService;
     }
 
 
@@ -179,6 +182,7 @@ public class TransactionService {
 
         transactionRepository.save(t);
         updateIncomeTaxCalculationForYear(user, transactionDate.getYear());
+        vatService.recomputeVatForMonth(user, transactionDate.getMonthValue(), transactionDate.getYear());
         auditLogService.log(user, "TRANSACTION_CREATED",
             "Transaction " + t.getTransactionId() + " created. Type: " + type
                 + ", Amount: " + amount + ", Category: " + category, null);
@@ -412,6 +416,7 @@ public class TransactionService {
 
         transactionRepository.save(t);
         updateIncomeTaxCalculationForYear(user, t.getTransactionDate().getYear());
+        vatService.recomputeVatForMonth(user, t.getTransactionDate().getMonthValue(), t.getTransactionDate().getYear());
         auditLogService.log(user, "TRANSACTION_UPDATED",
             "Transaction " + id + " updated. Before: [" + oldValues + "] After: [Amount: "
                 + t.getAmount() + ", Category: " + t.getCategory() + ", Date: " + t.getTransactionDate() + "]", null);
@@ -447,9 +452,11 @@ public class TransactionService {
             null);
 
         int deletedYear = t.getTransactionDate().getYear();
+        int deletedMonth = t.getTransactionDate().getMonthValue();
         t.setIsActive(false);
         transactionRepository.save(t);
         updateIncomeTaxCalculationForYear(user, deletedYear);
+        vatService.recomputeVatForMonth(user, deletedMonth, deletedYear);
     }
 
 

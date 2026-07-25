@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestClient;
 
 import java.time.LocalDateTime;
@@ -125,5 +126,11 @@ public class TaxbotService {
             )).toList();
 
         return new TaxbotHistoryResponse(items, page, limit, convPage.getTotalElements(), convPage.getTotalPages());
+    }
+
+    /** Permanently delete the user's entire TaxBot conversation history. */
+    @Transactional
+    public long clearHistory(User user) {
+        return conversationRepository.deleteByUser(user);
     }
 }

@@ -16,4 +16,6 @@ public interface TaxbotConversationRepository extends JpaRepository<TaxbotConver
 
     int countByUserAndCreatedAtBetween(User user, LocalDateTime from, LocalDateTime to);
 
+    long deleteByUser(User user);
+
 }

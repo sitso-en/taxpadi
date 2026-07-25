@@ -348,8 +348,8 @@ public class TaxReturnService {
     public AmendReturnResponse amend(User user, UUID returnId, AmendReturnRequest request, String ipAddress) {
         TaxReturn r = findForUser(user, returnId);
 
-        if (!"rejected".equals(r.getStatus())) {
-            throw new BadRequestException("Only rejected returns can be amended.");
+        if (!TaxReturnStatus.SUBMITTED.equals(r.getStatus())) {
+            throw new BadRequestException("Only submitted returns can be amended.");
         }
         if (request.getAmendmentReason() == null || request.getAmendmentReason().isBlank()) {
             throw new BadRequestException("Amendment reason is required.");

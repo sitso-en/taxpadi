@@ -42,4 +42,13 @@ public class TaxbotController {
             taxbotService.getHistory(user, page, limit),
             "Conversation history retrieved successfully."));
     }
+
+    @DeleteMapping("/history")
+    public ResponseEntity<ApiResponse<Void>> clearHistory(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails) {
+        User user = userDetails.getUser();
+        taxbotService.clearHistory(user);
+        return ResponseEntity.ok(new ApiResponse<>(true, null,
+            "Conversation history cleared."));
+    }
 }

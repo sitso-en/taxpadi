@@ -20,6 +20,7 @@ import com.taxpadi.api.exception.NotFoundException;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.model.VatRecord;
 import com.taxpadi.api.repository.TransactionRepository;
+import com.taxpadi.api.repository.UserTaxProfileRepository;
 import com.taxpadi.api.repository.VatRecordRepository;
 
 @Service
@@ -33,36 +34,122 @@ public class VatService {
     private final VatRecordRepository vatRecordRepository;
     private final GhanaTaxEngine taxEngine;
     private final TransactionRepository transactionRepository;
+    private final UserTaxProfileRepository profileRepository;
 
     public VatService(VatRecordRepository vatRecordRepository, GhanaTaxEngine taxEngine,
-            TransactionRepository transactionRepository) {
+            TransactionRepository transactionRepository, UserTaxProfileRepository profileRepository) {
         this.vatRecordRepository = vatRecordRepository;
         this.taxEngine = taxEngine;
         this.transactionRepository = transactionRepository;
+        this.profileRepository = profileRepository;
+    }
+
+    private boolean isVatRegistered(User user) {
+        return profileRepository.findByUser(user)
+            .map(p -> Boolean.TRUE.equals(p.getVatRegistered()))
+            .orElse(false);
+    }
+
+    /**
+     * Recompute the VAT record for a month from the user's logged transactions.
+     * Output VAT is derived from income (taxable sales); input VAT from deductible
+     * expenses (VATable purchases). Only runs for VAT-registered users and never
+     * overwrites a return that has already been filed.
+     */
+    @Transactional
+    public void recomputeVatForMonth(User user, int month, int year) {
+        if (!isVatRegistered(user)) return;
+
+        LocalDate start = YearMonth.of(year, month).atDay(1);
+        LocalDate end = YearMonth.of(year, month).atEndOfMonth();
+
+        BigDecimal sales = Optional.ofNullable(
+            transactionRepository.sumAmountByUserAndTypeAndDateRange(user, "income", start, end))
+            .orElse(BigDecimal.ZERO);
+        BigDecimal purchases = Optional.ofNullable(
+            transactionRepository.sumDeductibleExpensesByUserAndDateRange(user, start, end))
+            .orElse(BigDecimal.ZERO);
+
+        Optional<VatRecord> existingOpt = vatRecordRepository.findByUserAndMonthAndYear(user, month, year);
+
+        // No activity and no existing record → nothing to track
+        if (sales.signum() == 0 && purchases.signum() == 0 && existingOpt.isEmpty()) return;
+
+        VatRecord record = existingOpt.orElseGet(() -> {
+            VatRecord r = new VatRecord();
+            r.setUser(user);
+            r.setMonth(month);
+            r.setYear(year);
+            r.setReturnStatus(VatReturnStatus.PENDING);
+            r.setDueDate(YearMonth.of(year, month).atEndOfMonth().plusMonths(1));
+            return r;
+        });
+
+        // Never overwrite a filed return
+        if (VatReturnStatus.FILED.equals(record.getReturnStatus())) return;
+
+        // Only the 15% VAT is recoverable: net VAT = max(output - input, 0).
+        // NHIL and GETFund (2.5% each) are levies on output supplies and are never
+        // offset by input credits, so they are added on top in full.
+        BigDecimal outputVat = taxEngine.calculateVat(sales);
+        BigDecimal inputVat = taxEngine.calculateVat(purchases);
+        BigDecimal levies = taxEngine.calculateNhil(sales).add(taxEngine.calculateGetfund(sales));
+        BigDecimal net = outputVat.subtract(inputVat).max(BigDecimal.ZERO).add(levies);
+
+        record.setTotalSales(sales);
+        record.setOutputVat(outputVat);
+        record.setTotalPurchases(purchases);
+        record.setInputVat(inputVat);
+        record.setNetVatLiability(net);
+
+        vatRecordRepository.save(record);
+    }
+
+    /** Backfill VAT records for every month of a year (used right after a user registers). */
+    @Transactional
+    public void backfillVatForYear(User user, int year) {
+        for (int m = 1; m <= 12; m++) {
+            recomputeVatForMonth(user, m, year);
+        }
     }
 
     public VatStatusResponse getStatus(User user, Integer month, Integer year) {
         int resolvedMonth = month != null ? month : LocalDate.now().getMonthValue();
         int resolvedYear = year != null ? year : LocalDate.now().getYear();
 
-        VatRecord record = vatRecordRepository
-            .findByUserAndMonthAndYear(user, resolvedMonth, resolvedYear)
-            .orElseThrow(() -> new NotFoundException("No VAT record found for this period."));
+        boolean vatRegistered = isVatRegistered(user);
 
         LocalDate yearStart = LocalDate.of(resolvedYear, 1, 1);
         LocalDate yearEnd = LocalDate.of(resolvedYear, 12, 31);
         BigDecimal annualRevenue = Optional.ofNullable(
             transactionRepository.sumAmountByUserAndTypeAndDateRange(user, "income", yearStart, yearEnd))
             .orElse(BigDecimal.ZERO);
-
         String warning = buildThresholdWarning(annualRevenue);
 
+        VatRecord record = vatRecordRepository
+            .findByUserAndMonthAndYear(user, resolvedMonth, resolvedYear)
+            .orElse(null);
+
+        // No record for the period (e.g. registered but no activity yet) → return a
+        // zero-filled status rather than a 404 so the screen still loads.
+        if (record == null) {
+            LocalDate dueDate = YearMonth.of(resolvedYear, resolvedMonth).atEndOfMonth().plusMonths(1);
+            return new VatStatusResponse(
+                resolvedMonth, resolvedYear,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO,
+                VatReturnStatus.PENDING, dueDate, null, warning, vatRegistered
+            );
+        }
+
+        BigDecimal nhil = taxEngine.calculateNhil(record.getTotalSales());
+        BigDecimal getfund = taxEngine.calculateGetfund(record.getTotalSales());
         return new VatStatusResponse(
             record.getMonth(), record.getYear(),
             record.getTotalSales(), record.getOutputVat(),
             record.getTotalPurchases(), record.getInputVat(),
-            record.getNetVatLiability(), record.getReturnStatus(),
-            record.getDueDate(), record.getSubmittedAt(), warning
+            nhil, getfund, record.getNetVatLiability(), record.getReturnStatus(),
+            record.getDueDate(), record.getSubmittedAt(), warning, vatRegistered
         );
     }
 
@@ -78,7 +165,10 @@ public class VatService {
         }
 
         BigDecimal outputVat = taxEngine.calculateVat(request.getTotalSales());
-        BigDecimal netLiability = outputVat.subtract(request.getInputVat()).max(BigDecimal.ZERO);
+        BigDecimal nhil = taxEngine.calculateNhil(request.getTotalSales());
+        BigDecimal getfund = taxEngine.calculateGetfund(request.getTotalSales());
+        BigDecimal netLiability = outputVat.subtract(request.getInputVat()).max(BigDecimal.ZERO)
+            .add(nhil).add(getfund);
 
         LocalDate dueDate = YearMonth.of(year, month).atEndOfMonth().plusMonths(1);
 
@@ -100,7 +190,7 @@ public class VatService {
             month, year,
             record.getTotalSales(), outputVat,
             record.getTotalPurchases(), record.getInputVat(),
-            netLiability, EFFECTIVE_RATE, VatReturnStatus.PENDING, dueDate
+            nhil, getfund, netLiability, EFFECTIVE_RATE, VatReturnStatus.PENDING, dueDate
         );
     }
 
@@ -119,7 +209,10 @@ public class VatService {
         if (request.getInputVat() != null) record.setInputVat(request.getInputVat());
 
         BigDecimal outputVat = taxEngine.calculateVat(record.getTotalSales());
-        BigDecimal netLiability = outputVat.subtract(record.getInputVat()).max(BigDecimal.ZERO);
+        BigDecimal nhil = taxEngine.calculateNhil(record.getTotalSales());
+        BigDecimal getfund = taxEngine.calculateGetfund(record.getTotalSales());
+        BigDecimal netLiability = outputVat.subtract(record.getInputVat()).max(BigDecimal.ZERO)
+            .add(nhil).add(getfund);
         record.setOutputVat(outputVat);
         record.setNetVatLiability(netLiability);
 
@@ -129,7 +222,7 @@ public class VatService {
             record.getMonth(), record.getYear(),
             record.getTotalSales(), outputVat,
             record.getTotalPurchases(), record.getInputVat(),
-            netLiability, EFFECTIVE_RATE, record.getReturnStatus(), record.getDueDate()
+            nhil, getfund, netLiability, EFFECTIVE_RATE, record.getReturnStatus(), record.getDueDate()
         );
     }
 
@@ -143,6 +236,8 @@ public class VatService {
                 r.getVatId(), r.getMonth(), r.getYear(),
                 r.getTotalSales(), r.getOutputVat(),
                 r.getTotalPurchases(), r.getInputVat(),
+                taxEngine.calculateNhil(r.getTotalSales()),
+                taxEngine.calculateGetfund(r.getTotalSales()),
                 r.getNetVatLiability(), r.getReturnStatus(),
                 r.getDueDate(), r.getSubmittedAt()
             )).toList();

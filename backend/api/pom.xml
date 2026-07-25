@@ -10,7 +10,7 @@
 	</parent>
 	<groupId>com.taxpadi</groupId>
 	<artifactId>api</artifactId>
-	<version>0.0.5-SNAPSHOT</version>
+	<version>0.0.8-SNAPSHOT</version>
 	<name>api</name>
 	<description>TaxPadi Backend API - Enterprise tax management system</description>
 	<url>https://github.com/taxpadi/taxpadi</url>

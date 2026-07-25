@@ -17,6 +17,7 @@ import java.io.InputStream;
 import com.itextpdf.layout.properties.HorizontalAlignment;
 import com.itextpdf.layout.properties.TextAlignment;
 import com.itextpdf.layout.properties.UnitValue;
+import com.taxpadi.api.constant.CertificateStatus;
 import com.taxpadi.api.dto.certificate.*;
 import com.taxpadi.api.dto.common.PaginationInfo;
 import com.taxpadi.api.exception.ForbiddenException;
@@ -45,6 +46,24 @@ public class ComplianceCertificateService {
                                         CloudinaryService cloudinaryService) {
         this.repo = repo;
         this.cloudinaryService = cloudinaryService;
+    }
+
+    @Transactional
+    public CertificateDetailDto requestCertificate(User user, RequestCertificateRequest request) {
+        ComplianceCertificate cert = new ComplianceCertificate();
+        cert.setUser(user);
+        cert.setCertificateNumber("TXPD-" + LocalDate.now().getYear() + "-"
+            + UUID.randomUUID().toString().replace("-", "").substring(0, 10).toUpperCase());
+        cert.setCertificateType(request.getTaxType());
+        cert.setStatus(CertificateStatus.ISSUED);
+        cert.setIssueDate(LocalDate.now());
+        cert.setExpiryDate(LocalDate.now().plusYears(1));
+        cert.setIssuedBy("Ghana Revenue Authority");
+        cert.setIssuedAt(LocalDateTime.now());
+        cert.setTinNumber(user.getTin());
+        cert.setBusinessName(user.getFullName());
+        ComplianceCertificate saved = repo.save(cert);
+        return toDetailDto(saved, user);
     }
 
     public CertificateListResponse getCertificates(User user, int page, int limit) {

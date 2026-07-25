@@ -15,6 +15,8 @@ import org.springframework.web.cors.CorsConfigurationSource;
 
 import com.taxpadi.api.security.JwtAuthFilter;
 
+import jakarta.servlet.http.HttpServletResponse;
+
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
@@ -48,6 +50,8 @@ public class SecurityConfig {
             .formLogin(fl -> fl.disable())
             .httpBasic(hb -> hb.disable())
             .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+            .exceptionHandling(eh -> eh.authenticationEntryPoint((request, response, ex) ->
+                response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Unauthorized")))
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/v1/auth/biometric/register").authenticated()
                 .requestMatchers("/api/v1/auth/**").permitAll()

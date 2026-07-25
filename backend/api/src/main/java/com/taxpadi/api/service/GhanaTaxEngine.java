@@ -30,8 +30,16 @@ public class GhanaTaxEngine {
         { null,         bd("0.35")  }
     };
 
-    //VAT effective rate (15% + 2.5% NHIL + 2.5% GETFL)
-    private static final BigDecimal VAT_RATE = bd("0.20");
+    // VAT and health/education levies (Act 1151). Only the 15% VAT is recoverable
+    // as input credit; NHIL (2.5%) and GETFund (2.5%) are levies charged on output
+    // supplies and can NOT be offset by input VAT. Effective rate on output = 20%.
+    private static final BigDecimal VAT_RATE     = bd("0.15");
+    private static final BigDecimal NHIL_RATE    = bd("0.025");
+    private static final BigDecimal GETFUND_RATE = bd("0.025");
+
+    // Employee SSNIT contribution (Tier 1 + Tier 2), deductible from cash
+    // emoluments before PAYE is applied.
+    private static final BigDecimal SSNIT_EMPLOYEE_RATE = bd("0.055");
 
     //Withholding Tax Rates
     public static final BigDecimal WHT_DIVIDENDS         = bd("0.08");
@@ -60,12 +68,26 @@ public class GhanaTaxEngine {
     }
 
     /**
-     * Calculate net VAT liability.
-     * netTaxableSupply = output taxable sales - input VAT credits already applied by transaction engine.
+     * Calculate the 15% VAT on a taxable supply value. This is the only component
+     * that is recoverable as an input credit (output VAT less input VAT).
      */
-    public BigDecimal calculateVat(BigDecimal netTaxableSupply) {
-        if (netTaxableSupply.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
-        return netTaxableSupply.multiply(VAT_RATE).setScale(2, RoundingMode.HALF_UP);
+    public BigDecimal calculateVat(BigDecimal taxableSupply) {
+        return pct(taxableSupply, VAT_RATE);
+    }
+
+    /** Calculate the 2.5% NHIL levy on a taxable supply value (not recoverable). */
+    public BigDecimal calculateNhil(BigDecimal taxableSupply) {
+        return pct(taxableSupply, NHIL_RATE);
+    }
+
+    /** Calculate the 2.5% GETFund levy on a taxable supply value (not recoverable). */
+    public BigDecimal calculateGetfund(BigDecimal taxableSupply) {
+        return pct(taxableSupply, GETFUND_RATE);
+    }
+
+    /** Employee mandatory SSNIT contribution (5.5%), deductible before PAYE. */
+    public BigDecimal calculateEmployeeSsnit(BigDecimal basicSalary) {
+        return pct(basicSalary, SSNIT_EMPLOYEE_RATE);
     }
 
     /**
@@ -89,7 +111,13 @@ public class GhanaTaxEngine {
         return grossAmount.multiply(rate).setScale(2, RoundingMode.HALF_UP);
     }
 
-    //Private helpers 
+    //Private helpers
+
+    /** Apply a flat rate to a base, returning zero for null/non-positive bases. */
+    private BigDecimal pct(BigDecimal base, BigDecimal rate) {
+        if (base == null || base.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;
+        return base.multiply(rate).setScale(2, RoundingMode.HALF_UP);
+    }
 
     private BigDecimal applyBrackets(BigDecimal income, BigDecimal[][] brackets) {
         if (income == null || income.compareTo(BigDecimal.ZERO) <= 0) return BigDecimal.ZERO;

@@ -427,13 +427,19 @@ public class PayeService {
     }
 
 
+    /**
+     * Chargeable (taxable) salary for PAYE = total cash emoluments less the
+     * employee's mandatory 5.5% SSNIT contribution. SSNIT is levied on basic
+     * salary and is deductible before PAYE is applied. All allowances are
+     * treated as taxable cash emoluments.
+     */
     private BigDecimal computeTaxableSalary(Employee emp) {
-        BigDecimal transportExempt = emp.getTransportAllowance().min(new BigDecimal("600"));
+        BigDecimal ssnit = taxEngine.calculateEmployeeSsnit(emp.getGrossSalary());
         return emp.getGrossSalary()
             .add(emp.getTransportAllowance())
             .add(emp.getHousingAllowance())
             .add(emp.getOtherAllowances())
-            .subtract(transportExempt)
+            .subtract(ssnit)
             .max(BigDecimal.ZERO);
     }
 

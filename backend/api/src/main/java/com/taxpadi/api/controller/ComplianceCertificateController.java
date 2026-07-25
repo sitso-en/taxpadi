@@ -4,9 +4,12 @@ import com.taxpadi.api.common.ApiResponse;
 import com.taxpadi.api.dto.certificate.CertificateDetailDto;
 import com.taxpadi.api.dto.certificate.CertificateDownloadDto;
 import com.taxpadi.api.dto.certificate.CertificateListResponse;
+import com.taxpadi.api.dto.certificate.RequestCertificateRequest;
 import com.taxpadi.api.model.User;
 import com.taxpadi.api.security.TaxPadiUserDetails;
 import com.taxpadi.api.service.ComplianceCertificateService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -31,6 +34,15 @@ public class ComplianceCertificateController {
         User user = userDetails.getUser();
         CertificateListResponse data = service.getCertificates(user, page, Math.min(limit, 100));
         return ResponseEntity.ok(new ApiResponse<>(true, data, "Compliance certificates retrieved successfully."));
+    }
+
+    @PostMapping("/request")
+    public ResponseEntity<ApiResponse<CertificateDetailDto>> requestCertificate(
+            @AuthenticationPrincipal TaxPadiUserDetails userDetails,
+            @Valid @RequestBody RequestCertificateRequest request) {
+        CertificateDetailDto data = service.requestCertificate(userDetails.getUser(), request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+            .body(new ApiResponse<>(true, data, "Compliance certificate issued successfully."));
     }
 
     @GetMapping("/{id}")

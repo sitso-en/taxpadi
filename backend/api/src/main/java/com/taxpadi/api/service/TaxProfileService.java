@@ -22,11 +22,14 @@ public class TaxProfileService {
 
     private final UserTaxProfileRepository profileRepository;
     private final UserRepository userRepository;
+    private final VatService vatService;
 
     public TaxProfileService(UserTaxProfileRepository profileRepository,
-                             UserRepository userRepository) {
+                             UserRepository userRepository,
+                             VatService vatService) {
         this.profileRepository = profileRepository;
         this.userRepository = userRepository;
+        this.vatService = vatService;
     }
 
     public TaxProfileDto getProfile(User user) {
@@ -53,8 +56,13 @@ public class TaxProfileService {
         UserTaxProfile profile = profileRepository.findByUser(user)
                 .orElseThrow(() -> new NotFoundException("Tax profile not found for this user"));
 
-        if (request.getVatRegistrationNo() != null)
+        boolean newlyVatRegistered = false;
+        if (request.getVatRegistrationNo() != null && !request.getVatRegistrationNo().isBlank()) {
             profile.setVatRegistrationNo(request.getVatRegistrationNo());
+            // Providing a registration number registers the business for VAT.
+            newlyVatRegistered = !Boolean.TRUE.equals(profile.getVatRegistered());
+            profile.setVatRegistered(true);
+        }
 
         if (request.getNhilRegistered() != null)
             profile.setNhilRegistered(request.getNhilRegistered());
@@ -67,6 +75,11 @@ public class TaxProfileService {
         }
 
         UserTaxProfile saved = profileRepository.save(profile);
+
+        // On first-time VAT registration, backfill this year's VAT records from existing transactions.
+        if (newlyVatRegistered) {
+            vatService.backfillVatForYear(user, LocalDate.now().getYear());
+        }
 
         UpdateTaxProfileResponse response = new UpdateTaxProfileResponse();
         response.setProfileId(saved.getProfileId());
