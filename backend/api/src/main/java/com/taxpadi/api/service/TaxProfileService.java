@@ -68,10 +68,14 @@ public class TaxProfileService {
             profile.setNhilRegistered(request.getNhilRegistered());
 
         if (request.getTaxYearStart() != null) {
-            if (Boolean.TRUE.equals(profile.getOnboardingComplete()))
+            LocalDate requestedStart = LocalDate.parse(request.getTaxYearStart());
+            // Only block an ACTUAL change after onboarding — resending the same
+            // value (e.g. an unchanged field on a profile edit) is a harmless no-op.
+            boolean changing = !requestedStart.equals(profile.getTaxYearStart());
+            if (changing && Boolean.TRUE.equals(profile.getOnboardingComplete()))
                 throw new BadRequestException(
                         "tax_year_start cannot be changed after onboarding is complete");
-            profile.setTaxYearStart(LocalDate.parse(request.getTaxYearStart()));
+            profile.setTaxYearStart(requestedStart);
         }
 
         UserTaxProfile saved = profileRepository.save(profile);
