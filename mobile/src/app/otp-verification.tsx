@@ -21,7 +21,21 @@ import {
   verifyOTP,
   verifyResetOTP,
 } from "@/services/auth.service";
+import { getMe } from "@/services/user.service";
+import { setOnboarded } from "@/utils/storage";
 import { useToast } from "@/context/ToastContext";
+import { useUser } from "@/context/UserContext";
+import { usePrivacy } from "@/context/PrivacyContext";
+import { useTransactions } from "@/context/TransactionContext";
+import { usePayments } from "@/context/PaymentContext";
+import { useSubscription } from "@/context/SubscriptionContext";
+import { useTaxLiability } from "@/context/TaxLiabilityContext";
+import { useDeadlines } from "@/context/DeadlineContext";
+import { useSavings } from "@/context/SavingsContext";
+import { useTaxReturns } from "@/context/TaxReturnsContext";
+import { useInvoices } from "@/context/InvoiceContext";
+import { useCertificates } from "@/context/CertificateContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { getDeviceInfo } from "@/utils/device";
 
 export default function OTPVerificationScreen() {
@@ -33,6 +47,18 @@ export default function OTPVerificationScreen() {
   }>();
 
   const { showToast } = useToast();
+  const { setUser } = useUser();
+  const { resetPrivacy } = usePrivacy();
+  const { refreshTransactions } = useTransactions();
+  const { refreshPayments } = usePayments();
+  const { refresh: refreshSubscription } = useSubscription();
+  const { refreshLiability } = useTaxLiability();
+  const { refreshDeadlines } = useDeadlines();
+  const { refreshVault } = useSavings();
+  const { refreshReturns } = useTaxReturns();
+  const { refreshInvoices } = useInvoices();
+  const { refreshCertificates } = useCertificates();
+  const { refreshUnreadCount } = useNotifications();
   const [otp, setOtp] = useState("");
   const [seconds, setSeconds] = useState(42);
   const [loading, setLoading] = useState(false);
@@ -94,6 +120,40 @@ export default function OTPVerificationScreen() {
       }
 
       if (purpose === "REGISTER") {
+        // Populate the user + app state BEFORE landing on the dashboard, so a fresh
+        // signup shows the same personalised data as a normal login — not the
+        // "Good morning, User" placeholder with an empty profile. Mirrors the
+        // population done in login.tsx handleLogin.
+        const profileRes = await getMe();
+        const profile = profileRes.data ?? profileRes;
+
+        setUser({
+          fullName: profile.full_name ?? response.data?.user?.full_name ?? "",
+          phoneNumber: profile.phone ?? response.data?.user?.phone ?? "",
+          email: profile.email ?? "",
+          tin: profile.tin ?? "",
+          region: profile.region ?? "",
+          category: profile.taxpayer_category ?? "",
+          subscription_tier: profile.subscription_tier ?? response.data?.user?.subscription_tier ?? "FREE",
+          is_active: profile.is_active ?? true,
+          is_verified: profile.is_verified ?? false,
+          label: "",
+          taxpayer_category: profile.taxpayer_category ?? "",
+          active_profile: profile.is_active ?? false,
+        });
+
+        setOnboarded();
+        resetPrivacy();
+        await Promise.all([refreshTransactions(), refreshPayments(), refreshSubscription()]);
+        // Warm the mount-once contexts so nothing shows empty on first landing.
+        refreshLiability(false);
+        refreshDeadlines(false);
+        refreshVault(false);
+        refreshReturns();
+        refreshInvoices(false);
+        refreshCertificates();
+        refreshUnreadCount();
+
         showToast("Welcome to TaxPadi!", "success");
         router.replace("/(tabs)/dashboard");
         return;

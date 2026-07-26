@@ -30,6 +30,13 @@ import { usePayments } from "@/context/PaymentContext";
 import { useUser } from "@/context/UserContext";
 import { usePrivacy } from "@/context/PrivacyContext";
 import { useSubscription } from "@/context/SubscriptionContext";
+import { useTaxLiability } from "@/context/TaxLiabilityContext";
+import { useDeadlines } from "@/context/DeadlineContext";
+import { useSavings } from "@/context/SavingsContext";
+import { useTaxReturns } from "@/context/TaxReturnsContext";
+import { useInvoices } from "@/context/InvoiceContext";
+import { useCertificates } from "@/context/CertificateContext";
+import { useNotifications } from "@/context/NotificationContext";
 import { getDeviceInfo } from "@/utils/device";
 
 const countryCodes = [
@@ -58,6 +65,13 @@ export default function LoginScreen() {
   const { setUser } = useUser();
   const { resetPrivacy } = usePrivacy();
   const { refresh: refreshSubscription } = useSubscription();
+  const { refreshLiability } = useTaxLiability();
+  const { refreshDeadlines } = useDeadlines();
+  const { refreshVault } = useSavings();
+  const { refreshReturns } = useTaxReturns();
+  const { refreshInvoices } = useInvoices();
+  const { refreshCertificates } = useCertificates();
+  const { refreshUnreadCount } = useNotifications();
 
   useEffect(() => {
     LocalAuthentication.hasHardwareAsync().then(async (has) => {
@@ -118,6 +132,16 @@ export default function LoginScreen() {
       setOnboarded();
       resetPrivacy();
       await Promise.all([refreshTransactions(), refreshPayments(), refreshSubscription()]);
+      // These contexts only fetch once on mount, so a logout→login leaves them
+      // stale. Refetch them (in the background, silent) so tax calculations,
+      // deadlines, savings and draft returns are ready without a manual refresh.
+      refreshLiability(false);
+      refreshDeadlines(false);
+      refreshVault(false);
+      refreshReturns();
+      refreshInvoices(false);
+      refreshCertificates();
+      refreshUnreadCount();
       router.replace("/(tabs)/dashboard");
     } catch (error: any) {
       showToast(getUserFriendlyError(error), "error");
@@ -175,6 +199,16 @@ export default function LoginScreen() {
       setOnboarded();
       resetPrivacy();
       await Promise.all([refreshTransactions(), refreshPayments(), refreshSubscription()]);
+      // These contexts only fetch once on mount, so a logout→login leaves them
+      // stale. Refetch them (in the background, silent) so tax calculations,
+      // deadlines, savings and draft returns are ready without a manual refresh.
+      refreshLiability(false);
+      refreshDeadlines(false);
+      refreshVault(false);
+      refreshReturns();
+      refreshInvoices(false);
+      refreshCertificates();
+      refreshUnreadCount();
       router.replace("/(tabs)/dashboard");
     } catch (error: any) {
       if (axios.isAxiosError(error)) {

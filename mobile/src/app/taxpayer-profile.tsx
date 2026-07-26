@@ -145,8 +145,13 @@ export default function TaxpayerProfileScreen() {
         taxpayer_category: editData.taxpayer_type || undefined,
       });
 
-      // Tax-year-start lives on the tax profile.
-      if (editData.tax_year_start) {
+      // Tax-year-start lives on the tax profile. Only send it if it ACTUALLY
+      // changed — it can't be changed after onboarding, and resending the
+      // unchanged value would 400 and silently block the rest of the save.
+      const originalStart = profile?.tax_year_start
+        ? new Date(profile.tax_year_start).toISOString().split("T")[0]
+        : "";
+      if (editData.tax_year_start && editData.tax_year_start !== originalStart) {
         await updateTaxProfile({ tax_year_start: editData.tax_year_start });
       }
 

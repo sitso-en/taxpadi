@@ -2,6 +2,7 @@ import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { useAudioRecorder, useAudioPlayer, useAudioPlayerStatus, AudioModule, RecordingPresets } from "expo-audio";
 import * as ImagePicker from "expo-image-picker";
+import * as FileSystem from "expo-file-system";
 import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dropdown } from "react-native-element-dropdown";
@@ -68,7 +69,6 @@ export default function AddTransactionScreen() {
   const [pendingAudioUri, setPendingAudioUri] = useState<string | null>(null);
   const [showVoiceReview, setShowVoiceReview] = useState(false);
   const [pendingReceiptUri, setPendingReceiptUri] = useState<string | null>(null);
-  const [pendingReceiptBase64, setPendingReceiptBase64] = useState<string | null>(null);
   const [showReceiptPreview, setShowReceiptPreview] = useState(false);
 
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -136,7 +136,6 @@ export default function AddTransactionScreen() {
       setAudioPlaybackUri(null);
       setShowVoiceReview(false);
       setPendingReceiptUri(null);
-      setPendingReceiptBase64(null);
       setShowReceiptPreview(false);
     }, [])
   );
@@ -192,16 +191,19 @@ export default function AddTransactionScreen() {
       const permission = await ImagePicker.requestCameraPermissionsAsync();
       if (!permission.granted) return;
 
+      // Do NOT request base64 here. Encoding the full image to a base64 string at
+      // capture time is a large heap allocation at the exact moment the camera
+      // activity is tearing down and memory is tightest — that spike is what gets
+      // the app OOM-killed by Android on return. Keep only the on-disk (already
+      // compressed) uri, and read base64 lazily at confirm time once memory is free.
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ["images"],
         quality: 0.5,
-        base64: true,
       });
 
-      if (result.canceled || !result.assets[0].base64) return;
+      if (result.canceled || !result.assets[0]?.uri) return;
 
       setPendingReceiptUri(result.assets[0].uri);
-      setPendingReceiptBase64(result.assets[0].base64);
       setShowReceiptPreview(true);
     } catch (error: any) {
       showToast(getUserFriendlyError(error), "error");
@@ -288,10 +290,14 @@ export default function AddTransactionScreen() {
   };
 
   const confirmScan = async () => {
-    if (!pendingReceiptBase64 || scanning) return;
+    if (!pendingReceiptUri || scanning) return;
     setScanning(true);
     try {
-      const response = await scanReceiptTransaction(pendingReceiptBase64, type);
+      // Read base64 from the compressed file now — camera is closed, memory freed.
+      const base64 = await FileSystem.readAsStringAsync(pendingReceiptUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      const response = await scanReceiptTransaction(base64, type);
       const data = response.data;
       setAmount(String(data.amount ?? ""));
       const OCR_CATEGORY_MAP: Record<string, string> = {
@@ -309,7 +315,6 @@ export default function AddTransactionScreen() {
       if (data.transaction_date) setDate(new Date(data.transaction_date));
       setReceiptUri(pendingReceiptUri);
       setPendingReceiptUri(null);
-      setPendingReceiptBase64(null);
       skipNextReset.current = true;
       setShowReceiptPreview(false);
       showToast("Fields filled from receipt.", "success");
@@ -322,7 +327,6 @@ export default function AddTransactionScreen() {
 
   const discardScan = () => {
     setPendingReceiptUri(null);
-    setPendingReceiptBase64(null);
     setShowReceiptPreview(false);
   };
 
