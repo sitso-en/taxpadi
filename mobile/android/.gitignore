@@ -17,3 +17,8 @@ app/src/main/java/inline/
 
 # Bundle artifacts
 *.jsbundle
+
+# Signing keys — never commit a release/upload keystore (debug key is safe to keep)
+*.keystore
+*.jks
+!app/debug.keystore

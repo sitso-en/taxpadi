@@ -4,11 +4,11 @@
     "slug": "taxpadi",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/logoA5.png",
+    "icon": "./assets/images/icon.png",
     "scheme": "taxpadi",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/logoA5.png",
+      "icon": "./assets/images/icon.png",
       "bundleIdentifier": "com.taxpadi.app",
       "googleServicesFile": "./GoogleService-Info.plist",
       "infoPlist": {
@@ -17,9 +17,8 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#F2EDE8",
-        "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundImage": "./assets/images/android-icon-background.png",
+        "backgroundColor": "#211C19",
+        "foregroundImage": "./assets/images/adaptive-foreground.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
@@ -41,10 +40,14 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+          "backgroundColor": "#211C19",
+          "image": "./assets/images/logoA5.png",
+          "imageWidth": 200,
+          "resizeMode": "contain",
+          "dark": {
+            "backgroundColor": "#211C19",
+            "image": "./assets/images/logoA5.png",
+            "imageWidth": 200
           }
         }
       ],

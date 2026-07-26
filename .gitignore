@@ -55,13 +55,7 @@ mobile/*.mobileprovision
 
 # OS files
 .DS_Store
-
-Thumbs.db.claude/
-CLAUDE.md
-.claude/
-
-google-services.json
-
+Thumbs.db
 
 CBG-bank-statement.csv
 TaxPadi API-documentation.html
