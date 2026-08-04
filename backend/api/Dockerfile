@@ -14,4 +14,4 @@ EXPOSE 8080
 # Fit the JVM inside Render's 512MB free tier: cap the heap, use the low-overhead
 # serial GC (G1 reserves a lot of native memory), and stop JIT at C1 to shrink the
 # code cache. Keeps total RSS under 512MB so the login-time request burst doesn't OOM.
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+UseSerialGC", "-XX:+TieredStopAtLevel=1", "-jar", "app.jar"]
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-jar", "app.jar"]

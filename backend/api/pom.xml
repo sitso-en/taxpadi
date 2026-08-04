@@ -160,6 +160,18 @@
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-compiler-plugin</artifactId>
 			</plugin>
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-surefire-plugin</artifactId>
+				<configuration>
+					<!-- Activates src/test/resources/application-test.properties, which
+					     builds a throwaway schema from the entities. Test scope only —
+					     it has no effect on the packaged jar or on deployment. -->
+					<systemPropertyVariables>
+						<spring.profiles.active>test</spring.profiles.active>
+					</systemPropertyVariables>
+				</configuration>
+			</plugin>
 		</plugins>
 	</build>
 
