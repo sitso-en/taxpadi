@@ -62,6 +62,7 @@ jobs:
           SPRING_DATASOURCE_PASSWORD: taxpadi_password
           SPRING_REDIS_HOST: localhost
           SPRING_REDIS_PORT: 6379
+        # Schema creation and test signing keys come from src/test/resources/application.properties.
         run: ./mvnw verify -B
 
       # Keep the reports even when tests fail — that's when they're wanted.
