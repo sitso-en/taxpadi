@@ -38,6 +38,10 @@ import { useCertificates } from "@/context/CertificateContext";
 import { useNotifications } from "@/context/NotificationContext";
 import { getDeviceInfo } from "@/utils/device";
 
+// Must not be shorter than the backend's OTP_RESEND_COOLDOWN_SECONDS
+// (AuthService.java), or the button re-enables early and the resend 429s.
+const RESEND_COOLDOWN_SECONDS = 60;
+
 export default function OTPVerificationScreen() {
   const { logoScale, logoOpacity, items } = useAuthAnimation(3);
 
@@ -60,7 +64,7 @@ export default function OTPVerificationScreen() {
   const { refreshCertificates } = useCertificates();
   const { refreshUnreadCount } = useNotifications();
   const [otp, setOtp] = useState("");
-  const [seconds, setSeconds] = useState(42);
+  const [seconds, setSeconds] = useState(RESEND_COOLDOWN_SECONDS);
   const [loading, setLoading] = useState(false);
   const [otpError, setOtpError] = useState("");
 
@@ -95,6 +99,14 @@ export default function OTPVerificationScreen() {
           phone,
           otp
         );
+
+        if (!response.success || !response.data?.reset_token) {
+          showToast(
+            response.message ?? "Could not verify that code. Please try again.",
+            "error"
+          );
+          return;
+        }
 
         router.replace({
           pathname: "/reset-password",
@@ -181,7 +193,7 @@ export default function OTPVerificationScreen() {
         phone,
         purpose
       );
-      setSeconds(42);
+      setSeconds(RESEND_COOLDOWN_SECONDS);
       showToast("A new verification code has been sent.", "success");
     } catch (error: any) {
       showToast(getUserFriendlyError(error), "error");
@@ -257,7 +269,7 @@ export default function OTPVerificationScreen() {
 
         <Text style={styles.timerText}>
           {seconds > 0
-            ? `Resend code in 0:${seconds
+            ? `Resend code in ${Math.floor(seconds / 60)}:${(seconds % 60)
                 .toString()
                 .padStart(2, "0")}`
             : "You can now resend the code"}
