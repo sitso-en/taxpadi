@@ -24,7 +24,10 @@ export default function ForgotPasswordScreen() {
   const [phoneError, setPhoneError] = useState("");
 
   const handleSendCode = async () => {
-    const cleanedPhone = phone.replace(/\D/g, "");
+    // Accept the number with or without its leading 0 — the placeholder shows
+    // "024 123 4567", so most people type all 10 digits. Mirrors login.tsx.
+    let cleanedPhone = phone.replace(/\D/g, "");
+    if (cleanedPhone.startsWith("0")) cleanedPhone = cleanedPhone.slice(1);
 
     if (!phone.trim()) {
       setPhoneError("Enter your phone number.");
@@ -110,13 +113,21 @@ export default function ForgotPasswordScreen() {
           keyboardType="phone-pad"
           value={phone}
           onChangeText={(text) => {
-            const cleaned = text.replace(/\D/g, "");
+            const hasLeadingZero = text.replace(/\D/g, "").startsWith("0");
+
+            // Group as 024 123 4567 or 24 123 4567 depending on whether the
+            // user typed the leading 0, and cap at a full Ghanaian number.
+            const cleaned = text
+              .replace(/\D/g, "")
+              .slice(0, hasLeadingZero ? 10 : 9);
 
             let formatted = cleaned;
 
-            if (cleaned.length > 2) {
+            if (cleaned.length > (hasLeadingZero ? 3 : 2)) {
               formatted = cleaned.replace(
-                /(\d{2})(\d{0,3})(\d{0,4})/,
+                hasLeadingZero
+                  ? /(\d{3})(\d{0,3})(\d{0,4})/
+                  : /(\d{2})(\d{0,3})(\d{0,4})/,
                 (_, p1, p2, p3) =>
                   [p1, p2, p3].filter(Boolean).join(" ")
               );
