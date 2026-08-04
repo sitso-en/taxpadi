@@ -208,7 +208,9 @@ public class AuthService {
         );
     }
 
-    @Transactional
+    // See verifyResetOtp: the failed-attempt counter is persisted on a path that throws,
+    // so the rollback default has to be waived or the OTP is never burned.
+    @Transactional(noRollbackFor = { IllegalArgumentException.class, IllegalStateException.class })
     public VerifyOtpResponse verifyOtp(VerifyOtpRequest request, String ipAddress) {
         String phone = PhoneUtil.normalize(request.getPhone());
         OtpPurpose purpose = request.getPurpose();
@@ -327,7 +329,11 @@ public class AuthService {
         return new ResendOtpResponse(phone, 10);
     }
 
-    @Transactional
+    // The failed-attempt counter and the lockout are both persisted on paths that then
+    // throw to reject the login. Under the default rollback-on-RuntimeException those
+    // writes were discarded, so failedLoginAttempts never left 0 and the account lock
+    // never engaged. Waive rollback for the two rejection types only.
+    @Transactional(noRollbackFor = { IllegalArgumentException.class, IllegalStateException.class })
     public LoginResponse login(LoginRequest request, String ipAddress) {
         String phone = PhoneUtil.normalize(request.getPhone());
         log.info("Login attempt for phone={}", phone);
@@ -588,27 +594,53 @@ public class AuthService {
         }
     }
 
-    public VerifyResetOtpResponse verifyResetOtp(String phone, String otpCode){
-        phone = PhoneUtil.normalize(phone);
+    // Every failure path below returns this one message, with the same 400 status.
+    // Distinguishing "no such account" from "wrong code" here would undo the
+    // deliberate silence of forgotPassword and let anyone enumerate registered numbers.
+    private static final String RESET_OTP_FAILURE = "Invalid or expired OTP. Please request a new one";
+
+    // noRollbackFor: the attempt counter and the burn below are recorded by throwing.
+    // Under the default rollback-on-RuntimeException they would be discarded and the
+    // lockout would never engage.
+    @Transactional(noRollbackFor = BadRequestException.class)
+    public VerifyResetOtpResponse verifyResetOtp(String rawPhone, String otpCode){
+        // Kept separate rather than reassigning the parameter, so it stays effectively
+        // final and can be referenced from the orElseThrow lambda below.
+        final String phone = PhoneUtil.normalize(rawPhone);
         OtpPurpose purpose = OtpPurpose.PASSWORD_RESET;
 
         log.info("OTP verification attempt for phone={}, purpose={}", phone, purpose);
 
         User user = userRepository.findByPhone(phone)
-                .orElseThrow(() -> new NotFoundException("No account found for this phone number"));
+                .orElseThrow(() -> {
+                    log.warn("Password reset OTP submitted for unknown phone={}", phone);
+                    return new BadRequestException(RESET_OTP_FAILURE);
+                });
 
         OtpVerification otp = otpVerificationRepository
                 .findFirstByPurposeAndUserAndUsedOrderByCreatedAtDesc(purpose, user, false)
-                .orElseThrow(() -> new BadRequestException("No active OTP found. Please request a new one"));
+                .orElseThrow(() -> new BadRequestException(RESET_OTP_FAILURE));
 
         if (otp.getExpiresAt().isBefore(LocalDateTime.now())) {
             log.warn("OTP expired for userId={}", user.getUserId());
-            throw new IllegalStateException("OTP has expired. Please request a new one");
+            throw new BadRequestException(RESET_OTP_FAILURE);
         }
 
         if (!otp.getOtpCode().equals(otpCode)) {
-            log.warn("Invalid OTP code submitted for userId={}", user.getUserId());
-            throw new IllegalArgumentException("Invalid OTP code");
+            // Mirror verifyOtp: burn the code after MAX_OTP_ATTEMPTS so a 6-digit
+            // reset code can't be brute-forced. The remaining count is deliberately
+            // not disclosed here, to keep every failure response identical.
+            int attempts = otp.getAttemptCount() + 1;
+            otp.setAttemptCount(attempts);
+            if (attempts >= MAX_OTP_ATTEMPTS) {
+                otp.setUsed(true);
+                otpVerificationRepository.save(otp);
+                log.warn("Reset OTP burned after {} failed attempts for userId={}", attempts, user.getUserId());
+                throw new BadRequestException(RESET_OTP_FAILURE);
+            }
+            otpVerificationRepository.save(otp);
+            log.warn("Invalid reset OTP submitted for userId={}, attempt {}/{}", user.getUserId(), attempts, MAX_OTP_ATTEMPTS);
+            throw new BadRequestException(RESET_OTP_FAILURE);
         }
 
         otp.setUsed(true);
