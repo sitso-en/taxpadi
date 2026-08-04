@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 import com.google.auth.oauth2.GoogleCredentials;
 import com.google.firebase.FirebaseApp;
@@ -15,6 +16,11 @@ import com.google.firebase.FirebaseOptions;
 import com.google.firebase.messaging.FirebaseMessaging;
 
 @Configuration
+// Push notifications need real Google service-account credentials, which are supplied by
+// FIREBASE_SERVICE_ACCOUNT_JSON in production and by a gitignored file locally — neither
+// exists in CI. Tests substitute a stand-in via TestFirebaseConfig. Inert in production,
+// where the "test" profile is never active.
+@Profile("!test")
 public class FirebaseConfig {
 
     @Value("${FIREBASE_SERVICE_ACCOUNT_JSON:}")
