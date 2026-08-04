@@ -1,0 +1,74 @@
+name: Backend build & test
+
+# Runs on every push and PR that touches the backend. No deploy — this only
+# reports whether the code compiles and the tests pass.
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend.yml'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    # TaxPadiApplicationTests boots the full Spring context, which needs both a
+    # database (Flyway migrations + JPA schema validation) and Redis (OTP resend
+    # cooldowns). Every other setting in application.properties has a default.
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: taxpadi_test
+          POSTGRES_USER: taxpadi_user
+          POSTGRES_PASSWORD: taxpadi_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U taxpadi_user -d taxpadi_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and test
+        working-directory: backend/api
+        env:
+          SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/taxpadi_test
+          SPRING_DATASOURCE_USERNAME: taxpadi_user
+          SPRING_DATASOURCE_PASSWORD: taxpadi_password
+          SPRING_REDIS_HOST: localhost
+          SPRING_REDIS_PORT: 6379
+        run: ./mvnw verify -B
+
+      # Keep the reports even when tests fail — that's when they're wanted.
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: backend/api/target/surefire-reports/
+          if-no-files-found: ignore
